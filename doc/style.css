@@ -1,0 +1,245 @@
+body
+{
+	background-color: #111;
+	color: #FFFFFF;
+}
+
+#projectname
+{
+	color: #2C2C2C;
+	margin-left: 10px;
+	font-family: "Marvel","Corbel";
+}
+
+#projectbrief
+{
+	color: #946823;
+	margin-left: 10px;
+	margin-bottom: 10px;
+}
+
+#projectlogo
+{
+	vertical-align: top;
+}
+
+#titlearea
+{
+	border-bottom: 2px solid #B09737;
+	background-color: #F5D34B;
+}
+
+@media (min-width: 768px)
+{
+	.sm-dox
+	{
+		background-image: none;
+		background-color: #F5D34B;
+	}
+	
+	.sm-dox a
+	{
+		background-image: none;
+	}
+}
+
+.sm-dox
+{
+	background-image: none;
+	background-color: #F5D34B;
+}
+
+.mdescLeft, .mdescRight, .memItemLeft, .memItemRight, .memTemplItemLeft, .memTemplItemRight, .memTemplParams, 
+.memdoc, dl.reflist dd
+{
+	background-color: #333;
+}
+
+.mdescLeft, .mdescRight
+{
+	color: #CCC;
+}
+
+a, a:visited, .contents a:visited
+{
+	color: #FFEDA6;
+}
+
+.sm-dox a
+{
+	color: black;
+	text-shadow: 1px 1px 1px white;
+}
+
+.memTemplParams
+{
+	color: #F5D34B;
+}
+
+h2.groupheader
+{
+	color: #F5D34B;
+	border-bottom: 1px solid gray;
+}
+
+.navpath ul
+{
+	background-image: none;
+	background-color: #F5D34B;
+	border: 2px solid #B09737;
+	border-left: none;
+	border-right: none;
+}
+
+div.headertitle, .memtitle, .memproto, dl.reflist dt
+{
+	background-color: #666;
+}
+
+.memtitle
+{
+	text-shadow: 0px 2px 2px black;
+	background-image: none;
+	padding: 12px;
+}
+
+.memproto, dl.reflist dt
+{
+	text-shadow: 0px 1px 1px black;
+	color: #CCC;
+}
+
+.memtitle, .memproto, dl.reflist dt
+{
+	border: 1px solid #A7A394;
+	border-bottom: none;
+}
+
+.memdoc, dl.reflist dd
+{
+	border: 1px solid #A7A394;
+	border-top: none;
+}
+
+.paramname
+{
+	color: #ADD4FF;
+}
+
+.memtemplate
+{
+	color: #ECD249;
+}
+
+.memSeparator, div.header
+{
+	border-bottom: 1px solid black;
+}
+
+.title
+{
+	text-shadow: 0px 2px 2px black;
+}
+
+span.mlabel
+{
+	border: none;
+	box-shadow: 1px 1px 1px black;
+	background-color: gray;
+}
+
+hr
+{
+	border-top: 1px solid #999;
+}
+
+address
+{
+	color: white;
+}
+
+div.directory
+{
+	border: none;
+}
+
+.directory tr.even
+{
+	background-color: #222;
+}
+
+.directory .levels span
+{
+	color: #F5D34B;
+}
+
+.arrow
+{
+	color: #666;
+}
+
+.icon
+{
+	background-color: gray;
+}
+
+.dyncontent
+{
+	background-color: #DDD;
+	padding: 20px;
+	border-radius: 5px;
+}
+
+div.qindex
+{
+	background-color: #333;
+	box-shadow: 2px 2px 2px black;
+	padding-top: 5px;
+	padding-bottom: 5px;
+	border: none;
+	border-radius: 5px;
+}
+
+div.ah
+{
+	background-image: none;
+	background-color: #333;
+	box-shadow: 2px 2px 2px black;
+}
+
+div.line
+{
+	background-color: #333;
+}
+
+span.preprocessor
+{
+	color: #94A2A9;
+}
+
+span.comment
+{
+	color: #81A059;
+}
+
+a.code
+{
+	color: #FFEDA6;
+}
+
+span.keyword, span.keywordtype, span.keywordflow
+{
+	color: #70A6EA;
+}
+
+span.lineno
+{
+	border-right: 3px solid #ABFFCA;
+	background-color: #333;
+	color: gray;
+}
+
+span.lineno a
+{
+	color: #626177;
+}

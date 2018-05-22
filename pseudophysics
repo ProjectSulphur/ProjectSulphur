@@ -1,0 +1,96 @@
+
+// platform_bullet.h
+#if defined(PS_PHYSX)
+#include "physics/physx/physx_physics.h"
+namespace sulphur
+{
+  namespace physics
+  {
+    using PlatformPhysics = PhysXPhysics;
+    using PhysicsBody = PhysXBody; //!< PhysicsBody implementation to use.
+  }
+}
+#elif defined (PS_BULLET)
+#include "physics/bullet/bullet_physics.h"
+namespace sulphur
+{
+  namespace physics
+  {
+    using PlatformPhysics = BulletPhysics;
+    using PhysicsBody = BulletBody; //!< PhysicsBody implementation to use.
+  }
+}
+#else
+#error "Unimplemented physics SDK"
+#endif
+  
+// bullet_body.h
+namespace sulphur
+{
+  namespace physics
+  {
+    class IPhysicsBody
+    {
+    public:
+      virtual void SetTranslation(const glm::vec3& translation) = 0;
+      virtual glm::vec3 GetTranslation() const = 0;
+    };
+    class BulletBody : IPhysicsBody
+    {
+    public:
+      void SetTranslation(const glm::vec3& translation) override;
+      glm::vec3 GetTranslation() const override;
+    private:
+      btDiscreteDynamicsWorld* dynamics_world_; //!< The world that the body lives in
+      btRigidBody* rigid_body_; //!< The Bullet rigid body
+    };
+  }
+}
+
+// bullet_physics.h
+namespace sulphur
+{
+  namespace physics
+  {
+    class IPhysics
+    {
+    public:
+      virtual bool Initialize() = 0;
+      virtual void Destroy() = 0;
+      virtual PhysicsBody* AddPhysicsBody(
+        const glm::vec3& translation,
+        const glm::quat& rotation,
+        float mass) = 0;
+    };
+
+    class BulletPhysics : public IPhysics
+    {
+    public:
+      bool Initialize() override;
+      void Destroy() override;
+      virtual PhysicsBody* AddPhysicsBody(
+        const glm::vec3& translation,
+        const glm::quat& rotation,
+        float mass) override;
+    };
+  }
+}
+
+// physics_system.h
+namespace sulphur //!< Sulphur namespace
+{
+  namespace engine //!< Engine namespace
+  {
+    // Go read the source if you want to know what this is for, it's on github
+    class PhysicsSystem : public IServiceSystem<PhysicsSystem> 
+    {
+    public:
+      void OnInitialize(Application& app, World& world, foundation::JobGraph&) override;
+      void OnTerminate() override;
+      void OnFixedUpdate() override;
+
+      physics::PhysicsBody* CreatePhysicsBody(Entity& ent);
+      physics::PhysicsBody* GetPhysicsBody(Entity& ent); // Used to forward get and set translation things
+    };
+  }
+}

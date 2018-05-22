@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Settings>
+  <Platform>0</Platform>
+  <User>1</User>
+  <VSVersion>0</VSVersion>
+  <PhysicsVersion>0</PhysicsVersion>
+  <SourcePath>.</SourcePath>
+  <BuildPath>.\build</BuildPath>
+</Settings>

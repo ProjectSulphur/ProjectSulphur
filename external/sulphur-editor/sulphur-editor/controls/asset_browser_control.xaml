@@ -1,0 +1,96 @@
+﻿<UserControl x:Class="sulphur.editor.controls.AssetBrowserControl"
+             Name="asset_manager"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:sulphur.editor"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
+             xmlns:Model="clr-namespace:System.IO;assembly=mscorlib"
+             xmlns:utils="clr-namespace:sulphur.editor.utils"
+             mc:Ignorable="d" 
+             d:DesignHeight="300" d:DesignWidth="300">
+    <UserControl.Resources>
+        <utils:EnumToString x:Key="enum_converter"/>
+
+        <!-- data layout for the tree view-->
+        <HierarchicalDataTemplate x:Key="node_data_layout"  
+                                  DataType="{x:Type local:DirectoryItem}"
+                                      ItemsSource="{Binding items}">
+            <HierarchicalDataTemplate.Resources>
+                <utils:BindingProxy x:Key="proxy" data="{StaticResource workspace}"/> <!--proxy for relaying datacontext-->
+            </HierarchicalDataTemplate.Resources>
+            <TextBlock Text="{Binding Path=name}" ToolTip="{Binding Path=path}">
+          
+                <TextBlock.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="delete folder" Command="{Binding Source={StaticResource proxy}, Path=data.delete_folder_cmd}"
+                                  CommandParameter="{Binding}"></MenuItem>
+                        <MenuItem Header="new folder" Command="{Binding Source={StaticResource proxy}, Path=data.new_folder_cmd}"
+                                  CommandParameter="{Binding}"></MenuItem>
+                    </ContextMenu>
+                </TextBlock.ContextMenu>
+            </TextBlock>
+        </HierarchicalDataTemplate>
+        
+        <!-- the leave node of the tree view-->
+        <DataTemplate x:Key="leaf_data_layout" DataType="{x:Type local:DirectoryItem}">
+            <TextBlock Text="{Binding Path=name}" ToolTip="{Binding Path=path}"/>
+        </DataTemplate>
+
+        
+        <DataTemplate x:Key="asset_browser_layout" DataType="{x:Type local:AssetCacheData}">
+            <DataTemplate.Resources>
+                <utils:BindingProxy x:Key="proxy" data="{StaticResource asset_database}"/>
+            </DataTemplate.Resources>
+            <TextBlock>
+                    <Run Text="{Binding Path=name}"></Run>
+                    <Run Text=" - "></Run>
+                    <Run Text="{Binding Path=type, Converter={StaticResource enum_converter}}"></Run>
+                <TextBlock.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="instantiate" Command="{Binding Source={StaticResource proxy}, Path=data.instantiate_cmd}"
+                                  CommandParameter="{Binding}"></MenuItem>
+                        <MenuItem Header="remove asset" Command="{Binding Source={StaticResource proxy}, Path=data.remove_asset_cmd}"
+                                  CommandParameter="{Binding}"></MenuItem>
+                    </ContextMenu>
+                </TextBlock.ContextMenu>
+            </TextBlock>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"></ColumnDefinition>
+            <ColumnDefinition Width="2"></ColumnDefinition>
+            <ColumnDefinition Width="*"></ColumnDefinition>
+        </Grid.ColumnDefinitions>
+        <TreeView Grid.Column="0" Name="folder_explorer"
+                  ItemsSource="{Binding Path=items}"
+                  DataContext="{StaticResource workspace}"
+                  ItemTemplate="{StaticResource node_data_layout}">
+            <TreeView.ItemContainerStyle>
+                <Style TargetType="{x:Type TreeViewItem}">
+                    <EventSetter Event="TreeViewItem.PreviewMouseRightButtonDown" Handler="TreeViewItem_PreviewMouseRightButtonDown"></EventSetter>
+                </Style>
+            </TreeView.ItemContainerStyle>
+        </TreeView>
+        <GridSplitter Grid.Column="1" Width="2" HorizontalAlignment="Stretch"></GridSplitter>
+        <Grid Grid.Column="2" Name="asset_viewer"  Background="Aqua">
+            <ListBox Name="content"
+                     AllowDrop="True"
+                     Drop="OnContentDrop"
+                     KeyDown="OnContentKeyDown"
+                     MouseDoubleClick="OnMouseDoubleClick"
+                     DataContext="{Binding ElementName=asset_manager, Path=asset_list}"
+                     ItemsSource="{Binding}"
+                     ItemTemplate="{StaticResource asset_browser_layout}">
+                <ListBox.ItemContainerStyle>
+                    <Style>
+                        <EventSetter Event="ListBoxItem.PreviewMouseRightButtonDown" Handler="ListBoxItem_PreviewMouseRightButtonDown"></EventSetter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+            </ListBox>
+        </Grid>
+    </Grid>
+</UserControl>

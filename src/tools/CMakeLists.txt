@@ -1,0 +1,13 @@
+# Add tool projects
+SET (PS_ENABLE_PS4_TOOLS FALSE CACHE BOOL "Should the PlayStation 4 tools be included in the builder?")
+
+IF (PS_ENABLE_PS4_TOOLS)
+	ADD_DEFINITIONS(-DPS_PS4_TOOLS)
+	ADD_SUBDIRECTORY("ps4")
+ENDIF (PS_ENABLE_PS4_TOOLS)
+
+IF (NOT PS_BUILD_ENGINE)
+	ADD_SUBDIRECTORY("networking")
+ENDIF ()
+
+ADD_SUBDIRECTORY("builder")

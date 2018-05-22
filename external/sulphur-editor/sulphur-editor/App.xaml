@@ -1,0 +1,13 @@
+﻿<Application x:Class="sulphur.editor.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:sulphur.editor" 
+             Startup="Application_Startup"
+             Exit ="Application_Exit"
+             ShutdownMode="OnMainWindowClose">
+    <!--StartupUri="MainWindow.xaml">-->
+    <Application.Resources>
+        <local:AssetDatabase x:Key="asset_database"/>
+        <local:Workspace x:Key="workspace"/>
+    </Application.Resources>
+</Application>

@@ -1,0 +1,18 @@
+﻿<Window x:Class="sulphur.editor.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:sulphur.editor"
+        xmlns:controls="clr-namespace:sulphur.editor.controls"
+        mc:Ignorable="d"
+        Title="sulphur-editor" Width="1280" 
+                               Height="720"
+        Icon="./sulphur-generator-icon.ico">
+
+    <DockPanel LastChildFill="True">
+        <controls:AssetBrowserControl x:Name="asset_browser" DockPanel.Dock="Bottom" Height="200"/>
+        <controls:EngineHostControl x:Name="engine" DockPanel.Dock="Top"/>
+    </DockPanel>
+    
+</Window>
