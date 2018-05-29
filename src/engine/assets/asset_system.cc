@@ -1,163 +1,193 @@
 #include "asset_system.h"
 
+#include "engine/application/application.h"
+#include <foundation/io/filesystem.h>
+
 namespace sulphur
 {
   namespace engine
   {
+    AssetSystem* AssetSystem::instance_ = nullptr;
+
     //--------------------------------------------------------------------------------
-    AssetSystem::AssetSystem() : initialized_(false)
-    {}
+    AssetSystem::AssetSystem() :
+      IServiceSystem("AssetSystem"),
+      asset_managers_(static_cast<int>(AssetType::kNumAssetTypes), nullptr)
+    {
+    }
+
+    //--------------------------------------------------------------------------------
+    void AssetSystem::OnInitialize(Application& app, foundation::JobGraph&)
+    {
+      // Add managers to array
+      asset_managers_[static_cast<int>(AssetType::kModel)] = &model_manager_;
+      asset_managers_[static_cast<int>(AssetType::kMesh)] = &mesh_manager_;
+      asset_managers_[static_cast<int>(AssetType::kShader)] = &shader_manager_;
+      asset_managers_[static_cast<int>(AssetType::kComputeShader)] = &compute_shader_manager_;
+      asset_managers_[static_cast<int>(AssetType::kShaderProgram)] = &shader_program_manager_;
+      asset_managers_[static_cast<int>(AssetType::kMaterial)] = &material_manager_;
+      asset_managers_[static_cast<int>(AssetType::kPostProcessMaterial)] = 
+        &post_process_material_manager_;
+      asset_managers_[static_cast<int>(AssetType::kTexture)] = &texture_manager_;
+      asset_managers_[static_cast<int>(AssetType::kSkeleton)] = &skeleton_manager_;
+      asset_managers_[static_cast<int>(AssetType::kAnimation)] = &animation_manager_;
+      asset_managers_[static_cast<int>(AssetType::kScript)] = &script_manager_;
+      asset_managers_[static_cast<int>(AssetType::kAudio)] = &audio_manager_;
+
+      // Initialize subsystems
+      for(size_t i = 0; i < asset_managers_.size(); ++i)
+      {
+        if(asset_managers_[i] != nullptr)
+        {
+          asset_managers_[i]->Initialize(app);
+        }
+      }
+
+      // Save a static instance here to backwards-support the old convention
+      instance_ = this;
+    }
+
+    //--------------------------------------------------------------------------------
+    void AssetSystem::OnTerminate()
+    {
+      ReleaseGPUHandles();
+    }
+
+    //--------------------------------------------------------------------------------
+    void AssetSystem::OnShutdown()
+    {
+      for (size_t i = 0; i < asset_managers_.size(); ++i)
+      {
+        if (asset_managers_[i] != nullptr)
+        {
+          asset_managers_[i]->Shutdown();
+        }
+      }
+    }
 
     //--------------------------------------------------------------------------------
     AssetSystem& AssetSystem::Instance()
     {
-      static AssetSystem instance;
-      if(instance.initialized_ == false)
-      {
-        instance.Initialize();
-      }
-      return instance;
-    }
-
-    //--------------------------------------------------------------------------------
-    void AssetSystem::Shutdown()
-    {
-      AssetSystem& as = AssetSystem::Instance();
-
-      as.model_manager_.Shutdown();
-      as.mesh_manager_.Shutdown();
-      as.shader_manager_.Shutdown();
-      as.shader_program_manager_.Shutdown();
-      as.material_manager_.Shutdown();
-      as.texture_manager_.Shutdown();
-
-      as.initialized_ = false;
+      PS_LOG_IF(instance_ == nullptr, Fatal, "Attempt to access asset system before it was initialized");
+      return *instance_;
     }
 
     //--------------------------------------------------------------------------------
     void AssetSystem::ReleaseGPUHandles()
     {
-      AssetSystem& as = AssetSystem::Instance();
-
-      as.model_manager_.ReleaseGPUHandles();
-      as.mesh_manager_.ReleaseGPUHandles();
-      as.shader_manager_.ReleaseGPUHandles();
-      as.shader_program_manager_.ReleaseGPUHandles();
-      as.material_manager_.ReleaseGPUHandles();
-      as.texture_manager_.ReleaseGPUHandles();
-    }
-
-    //--------------------------------------------------------------------------------
-    void AssetSystem::Release(AssetType type, foundation::AssetID id)
-    {
-      switch (type)
+      for (size_t i = 0; i < asset_managers_.size(); ++i)
       {
-      case AssetType::kModel:
-        model_manager_.Release(id);
-        break;
-      case AssetType::kMesh:
-        mesh_manager_.Release(id);
-        break;
-      case AssetType::kShader:
-        shader_manager_.Release(id);
-        break;
-      case AssetType::kShaderProgram:
-        shader_program_manager_.Release(id);
-        break;
-      case AssetType::kMaterial:
-        material_manager_.Release(id); 
-        break;
-      case AssetType::kTexture:
-        texture_manager_.Release(id); 
-        break;
-      default:
-        break;
+        if (asset_managers_[i] != nullptr)
+        {
+          asset_managers_[i]->ReleaseGPUHandles();
+        }
       }
     }
 
     //--------------------------------------------------------------------------------
-    void AssetSystem::Release(AssetType type, const foundation::AssetName& name)
+    AssetHandle<void> AssetSystem::AddAsset(AssetType asset_type, void* asset,
+      const foundation::AssetName& name)
     {
-      switch (type)
+      switch (asset_type)
       {
       case AssetType::kModel:
-        model_manager_.Release(name);
-        break;
+        return model_manager_.Add(static_cast<Model*>(asset), name);
       case AssetType::kMesh:
-        mesh_manager_.Release(name);
-        break;
+        return mesh_manager_.Add(static_cast<Mesh*>(asset), name);
       case AssetType::kShader:
-        shader_manager_.Release(name);
-        break;
+        return shader_manager_.Add(static_cast<Shader*>(asset), name);
+      case AssetType::kComputeShader:
+        return compute_shader_manager_.Add(static_cast<ComputeShader*>(asset), name);
       case AssetType::kShaderProgram:
-        shader_program_manager_.Release(name);
-        break;
+        return shader_program_manager_.Add(static_cast<ShaderProgram*>(asset), name);
       case AssetType::kMaterial:
-        material_manager_.Release(name);
-        break;
+        return material_manager_.Add(static_cast<Material*>(asset), name);
+      case AssetType::kPostProcessMaterial:
+        return post_process_material_manager_.Add(static_cast<PostProcessMaterial*>(asset),
+          name);
       case AssetType::kTexture:
-        texture_manager_.Release(name);
-        break;
+        return texture_manager_.Add(static_cast<Texture*>(asset), name);
+      case AssetType::kSkeleton:
+        return skeleton_manager_.Add(static_cast<Skeleton*>(asset), name);
+      case AssetType::kAnimation:
+        return animation_manager_.Add(static_cast<Animation*>(asset), name);
+      case AssetType::kScript:
+        return script_manager_.Add(static_cast<Script*>(asset), name);
+      case AssetType::kAudio:
+        return audio_manager_.Add(static_cast<AudioBankData*>(asset), name);
       default:
-        break;
+        return AssetHandle<void>();
       }
     }
 
     //--------------------------------------------------------------------------------
-    int AssetSystem::GetReferenceCount(AssetType type, foundation::AssetID id)
+    AssetHandle<void> AssetSystem::GetHandle(AssetType asset_type, 
+      foundation::AssetID id)
     {
-      switch (type)
-      {
-      case AssetType::kModel:
-        return model_manager_.GetReferenceCount(id);
-      case AssetType::kMesh:
-        return mesh_manager_.GetReferenceCount(id);
-      case AssetType::kShader:
-        return shader_manager_.GetReferenceCount(id);
-      case AssetType::kShaderProgram:
-        return shader_program_manager_.GetReferenceCount(id);
-      case AssetType::kMaterial:
-        return material_manager_.GetReferenceCount(id);
-      case AssetType::kTexture:
-        return texture_manager_.GetReferenceCount(id);
-      default:
-        return 0;
-      }
+      return AssetHandle<void>(asset_managers_[static_cast<int>(asset_type)], 
+        asset_managers_[static_cast<int>(asset_type)]->GetHandle(id));
     }
 
     //--------------------------------------------------------------------------------
-    int AssetSystem::GetReferenceCount(AssetType type,
-                                       const foundation::AssetName& name)
+    AssetHandle<void> AssetSystem::GetHandle(AssetType asset_type,
+      const foundation::AssetName& name)
     {
-      switch (type)
-      {
-      case AssetType::kModel:
-        return model_manager_.GetReferenceCount(name);
-      case AssetType::kMesh:
-        return mesh_manager_.GetReferenceCount(name);
-      case AssetType::kShader:
-        return shader_manager_.GetReferenceCount(name);
-      case AssetType::kShaderProgram:
-        return shader_program_manager_.GetReferenceCount(name);
-      case AssetType::kMaterial:
-        return material_manager_.GetReferenceCount(name);
-      case AssetType::kTexture:
-        return texture_manager_.GetReferenceCount(name);
-      default:
-        return 0;
-      }
+      return AssetHandle<void>(asset_managers_[static_cast<int>(asset_type)],
+        asset_managers_[static_cast<int>(asset_type)]->GetHandle(name));
     }
 
     //--------------------------------------------------------------------------------
-    void AssetSystem::Initialize()
+    AssetHandle<void> AssetSystem::Load(AssetType asset_type, 
+      foundation::AssetID id)
     {
-      model_manager_.Initialize();
-      mesh_manager_.Initialize();
-      shader_manager_.Initialize();
-      shader_program_manager_.Initialize();
-      material_manager_.Initialize();
-      texture_manager_.Initialize();
-      initialized_ = true;
+
+      return AssetHandle<void>(asset_managers_[static_cast<int>(asset_type)],
+        asset_managers_[static_cast<int>(asset_type)]->Load(id));
+    }
+
+    //--------------------------------------------------------------------------------
+    AssetHandle<void> AssetSystem::Load(AssetType asset_type,
+      const foundation::AssetName& name)
+    {
+      return AssetHandle<void>(asset_managers_[static_cast<int>(asset_type)],
+        asset_managers_[static_cast<int>(asset_type)]->Load(name));
+    }
+
+    //--------------------------------------------------------------------------------
+    void AssetSystem::Release(AssetType asset_type, foundation::AssetID id)
+    {
+      asset_managers_[static_cast<int>(asset_type)]->Release(id);
+    }
+
+    //--------------------------------------------------------------------------------
+    void AssetSystem::Release(AssetType asset_type, const foundation::AssetName& name)
+    {
+      asset_managers_[static_cast<int>(asset_type)]->Release(name);
+    }
+
+    //--------------------------------------------------------------------------------
+    int AssetSystem::GetReferenceCount(AssetType asset_type, foundation::AssetID id)
+    {
+      return asset_managers_[static_cast<int>(asset_type)]->GetReferenceCount(id);
+    }
+
+    //--------------------------------------------------------------------------------
+    int AssetSystem::GetReferenceCount(AssetType asset_type,
+      const foundation::AssetName& name)
+    {
+      return asset_managers_[static_cast<int>(asset_type)]->GetReferenceCount(name);
+    }
+
+    //--------------------------------------------------------------------------------
+    void AssetSystem::RefreshCache()
+    {
+      for (size_t i = 0; i < asset_managers_.size(); ++i)
+      {
+        if (asset_managers_[i] != nullptr)
+        {
+          asset_managers_[i]->RefreshCache();
+        }
+      }
     }
   }
 }

@@ -106,6 +106,8 @@ IF (PS_WIN32 AND PS_BUILD_CSHARP)
 	
 	IF (PS_EDITOR)
 		ADD_CSPROJ(sulphur-editor "${PROJECT_SOURCE_DIR}/external/sulphur-editor/sulphur-editor/sulphur-editor.csproj")
+		ADD_DEPENDENCIES(sulphur-editor sulphur-builder-shared)
+		ADD_DEPENDENCIES(sulphur-editor sulphur-networking)
 	ENDIF (PS_EDITOR)
 	
 	SET_SOLUTION_FOLDER_GROUPED("csharp-tools"
@@ -151,6 +153,8 @@ SET_SOLUTION_FOLDER_GROUPED("deps/bullet3" Bullet2FileLoader
 	BulletDynamics BulletInverseDynamics BulletSoftBody
 	LinearMath
 )
+
+SET_SOLUTION_FOLDER(lz4_static "deps/lz4")
 
 IF (PS_BUILD_TOOLS)
 	SET_SOLUTION_FOLDER_GROUPED("deps/assimp"

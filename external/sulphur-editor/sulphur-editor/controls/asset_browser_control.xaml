@@ -8,37 +8,34 @@
              xmlns:sys="clr-namespace:System;assembly=mscorlib"
              xmlns:Model="clr-namespace:System.IO;assembly=mscorlib"
              xmlns:utils="clr-namespace:sulphur.editor.utils"
+             xmlns:controls="clr-namespace:sulphur.editor.controls"
              mc:Ignorable="d" 
              d:DesignHeight="300" d:DesignWidth="300">
     <UserControl.Resources>
         <utils:EnumToString x:Key="enum_converter"/>
-
+        <utils:FolderMappingConverter x:Key="dictionary_converter"/>
         <!-- data layout for the tree view-->
         <HierarchicalDataTemplate x:Key="node_data_layout"  
                                   DataType="{x:Type local:DirectoryItem}"
-                                      ItemsSource="{Binding items}">
+                                  ItemsSource="{Binding items}">
             <HierarchicalDataTemplate.Resources>
-                <utils:BindingProxy x:Key="proxy" data="{StaticResource workspace}"/> <!--proxy for relaying datacontext-->
+                <utils:BindingProxy x:Key="proxy" data="{StaticResource workspace}"/>
+                <!--proxy for relaying datacontext-->
             </HierarchicalDataTemplate.Resources>
-            <TextBlock Text="{Binding Path=name}" ToolTip="{Binding Path=path}">
-          
-                <TextBlock.ContextMenu>
+
+            <controls:EditBox text_="{Binding Path=name}" ToolTip="{Binding Path=path}" allow_edit_="{Binding Path=editable}" 
+                              RenamedCallback="{Binding Path=callback}">
+                <controls:EditBox.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="delete folder" Command="{Binding Source={StaticResource proxy}, Path=data.delete_folder_cmd}"
                                   CommandParameter="{Binding}"></MenuItem>
                         <MenuItem Header="new folder" Command="{Binding Source={StaticResource proxy}, Path=data.new_folder_cmd}"
                                   CommandParameter="{Binding}"></MenuItem>
                     </ContextMenu>
-                </TextBlock.ContextMenu>
-            </TextBlock>
+                </controls:EditBox.ContextMenu>
+            </controls:EditBox>
         </HierarchicalDataTemplate>
-        
-        <!-- the leave node of the tree view-->
-        <DataTemplate x:Key="leaf_data_layout" DataType="{x:Type local:DirectoryItem}">
-            <TextBlock Text="{Binding Path=name}" ToolTip="{Binding Path=path}"/>
-        </DataTemplate>
 
-        
         <DataTemplate x:Key="asset_browser_layout" DataType="{x:Type local:AssetCacheData}">
             <DataTemplate.Resources>
                 <utils:BindingProxy x:Key="proxy" data="{StaticResource asset_database}"/>
@@ -82,9 +79,13 @@
                      Drop="OnContentDrop"
                      KeyDown="OnContentKeyDown"
                      MouseDoubleClick="OnMouseDoubleClick"
-                     DataContext="{Binding ElementName=asset_manager, Path=asset_list}"
-                     ItemsSource="{Binding}"
                      ItemTemplate="{StaticResource asset_browser_layout}">
+                <ListBox.ItemsSource>
+                    <MultiBinding Converter="{StaticResource dictionary_converter}">
+                        <Binding ElementName="folder_explorer" Path="SelectedValue"></Binding>
+                        <Binding Source="{StaticResource asset_database}" Path="data"></Binding>
+                    </MultiBinding>
+                </ListBox.ItemsSource>
                 <ListBox.ItemContainerStyle>
                     <Style>
                         <EventSetter Event="ListBoxItem.PreviewMouseRightButtonDown" Handler="ListBoxItem_PreviewMouseRightButtonDown"></EventSetter>

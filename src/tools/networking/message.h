@@ -55,6 +55,11 @@ namespace sulphur
     */
     struct PacketKey
     {
+      /**
+      * @brief Constructor
+      * @param[in] p (ENetPeer*) The peer
+      * @param[in] r (bool) Reliable or not
+      */
       PacketKey(ENetPeer* p, bool r) : peer(p), reliable(r) {}
       ENetPeer* peer; //!< The peer the packet should be send to
       bool reliable; //!< If this packet should be reliable

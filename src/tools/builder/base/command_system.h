@@ -1,11 +1,22 @@
 #pragma once
 #include "tools/builder/base/commands_base.h"
+#include "tools/builder/pipelines/scene_loader.h"
 #include <foundation/utils/type_definitions.h>
 
 namespace sulphur 
 {
   namespace builder 
   {
+    class ModelPipeline;
+    class MaterialPipeline;
+    class MeshPipeline;
+    class ShaderPipeline;
+    class TexturePipeline;
+    class SkeletonPipeline;
+    class AnimationPipeline;
+    class ScriptPipeline;
+    class AudioPipeline;
+
     /**
     * @brief error return codes for command system
     */
@@ -32,10 +43,26 @@ namespace sulphur
        */
       using ErrorHandler = void(*)(const CommandErr& message);
 
+
       /**
-      * @brief constructor
+      *@brief constructor
+      *@param[in] model_pipeline (sulphur::builder::ModelPipeline*) a model pipeline
+      *@param[in] mesh_pipeline (sulphur::builder::MeshPipeline*) a mesh pipeline
+      *@param[in] material_pipeline (sulphur::builder::MaterialPipeline*) a material pipeline
+      *@param[in] texture_pipeline (sulphur::builder::TexturePipeline*) a texture pipeline
+      *@param[in] shader_pipeline (sulphur::builder::ShaderPipeline*) a shader pipeline
+      *@param[in] skeleton_pipeline (sulphur::builder::SkeletonPipeline*) a skeleton pipeline
+      *@param[in] animation_pipeline (sulphur::builder::AnimationPipeline*) an animation pipeline
+      *@param[in] script_pipeline (sulphur::builder::ScriptPipeline*) a script pipeline
+      *@param[in] audio_pipeline (sulphur::builder::AudioPipeline*) an audio pipeline
+      *@param[in] scene_loader (sulphur::builder::SceneLoader*) a scene loader
       */
-      CommandSystem();
+      CommandSystem(ModelPipeline* model_pipeline,
+        MeshPipeline* mesh_pipeline, MaterialPipeline* material_pipeline,
+        TexturePipeline* texture_pipeline, ShaderPipeline* shader_pipeline,
+        SkeletonPipeline* skeleton_pipeline, AnimationPipeline* animation_pipeline,
+        ScriptPipeline* script_pipeline, AudioPipeline* audio_pipeline, 
+        SceneLoader* scene_loader);
 
       /**
       * @brief destructor
@@ -59,7 +86,7 @@ namespace sulphur
 
       /**
       *@brief unregister a command from the command list.
-      *@param[in] command_id (unsigned int) command to unregister. value is the id returned when this command was registered.
+      *@param[in] command_id (unsigned int) command to unregister. value is the id returned when this command was registered  with sulphur::builder::CommandSystem::RegisterCommand.
       *@return (bool) true if removed false if command does not exist.
       *@see sulphur::builder::CommandSystem::RegisterCommand
       */
@@ -80,6 +107,16 @@ namespace sulphur
       */
       void PrintDescriptions() const;
     private:
+      ModelPipeline* model_pipeline_;         //!< a model pipeline passed by the constructor
+      MeshPipeline* mesh_pipeline_;           //!< a mesh pipeline passed by the constructor
+      MaterialPipeline* material_pipeline_;   //!< a material pipeline passed by the constructor
+      TexturePipeline* texture_pipeline_;     //!< a texture pipeline passed by the constructor
+      ShaderPipeline* shader_pipeline_;       //!< a shader pipeline passed by the constructor
+      SkeletonPipeline* skeleton_pipeline_;   //!< a skeleton pipeline passed by the constructor
+      AnimationPipeline* animation_pipeline_; //!< an animation pipeline passed by the constructor
+      ScriptPipeline* script_pipeline_;       //!< a script pipeline passed by the constructor
+      AudioPipeline* audio_pipeline_;         //!< an audio pipeline passed by the constructor
+      SceneLoader* scene_loader_;             //!< a scene loader passed by the constructor
 
       ErrorHandler error_handler_;
       foundation::Vector<ICommand*> registered_commands_;
@@ -119,6 +156,17 @@ namespace sulphur
                     "command is not derived from Command class");
 
       registered_commands_.push_back(new T(key, args...));
+      registered_commands_.back()->SetPipelines(model_pipeline_,
+        mesh_pipeline_,
+        material_pipeline_,
+        texture_pipeline_,
+        shader_pipeline_,
+        skeleton_pipeline_,
+        animation_pipeline_,
+        script_pipeline_,
+        audio_pipeline_,
+        scene_loader_);
+
       command_ids_.push_back(num_commands_);
       ++num_commands_;
       return command_ids_.back();

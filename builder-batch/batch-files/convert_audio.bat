@@ -1,0 +1,1 @@
+sulphur-builder.exe --convert_audio -dir %INPUTFOLDER%unprocessed/ -r -output %INPUTFOLDER%processed/

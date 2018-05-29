@@ -2,6 +2,7 @@
 #include "tools/builder/pipelines/pipeline_base.h"
 #include <foundation/utils/template_util.h>
 #include <foundation/pipeline-assets/shader.h>
+#include <foundation/io/filesystem.h>
 
 namespace glslang
 {
@@ -37,23 +38,23 @@ namespace sulphur
       
       /**
        * @brief Loads, compiles and reflects on a shader loaded from disk and returns it as an asset.
-       * @param[in] shader_file (const sulphur::foundation::String&) File containing the shader source.
+       * @param[in] shader_file (const sulphur::foundation::Path&) File containing the shader source.
        * @param[in] options (const sulphur::builder::ShaderPipelineOptions&) Options for shader compilation.
        * @param[out] shader (sulphur::foundation::ShaderAsset&) Shader asset created from shader file.
        * @return (bool) False when there was an error that couldn't be recovered from. 
        * @remark If the function returned false, the shader should be discarded.
        */
-      bool Create(const foundation::String& shader_file, const ShaderPipelineOptions& options, 
+      bool Create(const foundation::Path& shader_file, const ShaderPipelineOptions& options, 
         foundation::ShaderAsset& shader);
 
       /**
-      * @brief Adds a texture to the package.
-      * @param[in] asset_origin (const sulphur::foundation::String&) The file the asset was
+      * @brief Adds a shader to the package.
+      * @param[in] asset_origin (const sulphur::foundation::Path&) The file the asset was
       * created from. Should be ASSET_ORIGIN_USER when the asset is created by the user.
       * @param[in] shader (sulphur::foundation::ShaderAsset&) The shader to add to the package.
       * @return (bool) True if the shader was added to the package succesfully.
       */
-      bool PackageShader(const foundation::String& asset_origin, foundation::ShaderAsset& shader);
+      bool PackageShader(const foundation::Path& asset_origin, foundation::ShaderAsset& shader);
 
       /**
       * @see sulphur::builder::PipelineBase
@@ -64,6 +65,11 @@ namespace sulphur
       * @see sulphur::builder::PipelineBase
       */
       foundation::String GetPackageExtension() const override;
+
+      /*
+      * @see sulphur::builder::PipelineBase::PackageDefaultAssets
+      */
+      bool PackageDefaultAssets() override;
     private:
       /**
       *@brief construct the platform specific shader compilers
@@ -86,30 +92,30 @@ namespace sulphur
 
       /**
       *@brief find the shader name and store it in the shader struct
-      *@param[in] path (const sulphur::builder::String&) path to the shader on disk
+      *@param[in] path (const sulphur::foundation::Path&) path to the shader on disk
       *@param[out] shader (sulphur::foundation::ShaderAsset&) shader struct to fill in
       */
-      bool GetShaderName(const foundation::String& path, foundation::ShaderAsset& shader);
+      bool GetShaderName(const foundation::Path& path, foundation::ShaderAsset& shader);
 
       /**
       *@brief find the shader stage and store it in the shader struct
-      *@param[in] path (const sulphur::builder::String&) path to the shader on disk
+      *@param[in] path (const sulphur::foundation::Path&) path to the shader on disk
       *@param[out] shader (sulphur::foundation::ShaderData&) shader struct to fill in
       */
-      bool GetShaderStage(const foundation::String& path, foundation::ShaderData& shader);
+      bool GetShaderStage(const foundation::Path& path, foundation::ShaderData& shader);
 
       /**
       *@brief use sulphur::builder::SpvShaderCompiler to get spirv compiled output 
       *@param[in] shader_source (sulphur::foundation::String& shader_source) source data to validate and compile
       *@param[in|out] shader (sulphur::foundation::ShaderAsset&) shader struct for reflection data
-      *@param[in] path (const sulphur::foundation::String&) path to the source file
+      *@param[in] path (const sulphur::foundation::Path&) path to the source file
       *@param[in] options (const sulphur::builder::ShaderPipelineOptions&) options to process the shader with
       *@param[out] out_compiled (sulphur::foundation::Vector<unsigned int>&) compiled data in spirv format ready for reflection
       *@return (bool) boolean indicating whether the passed source data is valid hlsl
       */
       bool ValidateSource(const foundation::String& shader_source,
                           foundation::ShaderAsset& shader,
-                          const foundation::String& path,
+                          const foundation::Path& path,
                           const ShaderPipelineOptions& options,
                           foundation::Vector<uint8_t>& out_compiled);
 
@@ -124,16 +130,9 @@ namespace sulphur
                                  const spirv_cross::SPIRType& spv_type,
                                  const spirv_cross::Compiler& compiler);
 
-
-    protected:
-      /*
-       * @see sulphur::builder::PipelineBase::PackageDefaultAssets
-       */
-      bool PackageDefaultAssets() override;
-
     private:
       bool CreateFromSource(const foundation::String& source,
-        const foundation::String& shader_file,
+        const foundation::Path& shader_file,
         const foundation::String& name,
         foundation::ShaderData::ShaderStage shader_stage,
         const ShaderPipelineOptions& options,

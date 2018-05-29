@@ -19,10 +19,12 @@
 #define PS_NETWORKING_C_API extern "C" __declspec(dllimport)
 #endif  
 #include "tools/networking/connection_state.h"
-#include "tools/networking/networking_system.h"
 #include "tools/networking/network_player.h"
 #include "tools/networking/network_value.h"
+#include "tools/networking/network_value_owner.h"
 #include "tools/networking/disconnection_info.h"
+#include "tools/networking/rpc_data.h"
+#include "tools/networking/syncable_network_value.h"
 #include <foundation/containers/vector.h>
 
 #ifdef __cplusplus
@@ -35,7 +37,7 @@ namespace sulphur
 {
   namespace networking
   {
-    static NetworkingSystem* network_manager_ = nullptr; //!< Network system, for internal use only
+    static class NetworkingSystem* network_manager_ = nullptr; //!< Network system, for internal use only
     /**
     * @brief constructs the engine networking system
     * @remarks This functions needs to be called to construct a network instance, 
@@ -60,7 +62,7 @@ namespace sulphur
     /**
     * @brief Create a host version for your networking setup
     * @param[in] port (unsigned int) The port opened by the host
-    * @param[in] max_client (unsigned int) Maximum amount of clients the hsot allows
+    * @param[in] max_client (unsigned int) Maximum amount of clients the host allows
     * @param[in] player_name (const sulphur::foundation::String&) The name of the host, 
     used in the playerlist
     * @return (bool) Whether the initialising has succeeded
@@ -143,7 +145,7 @@ namespace sulphur
     no matter if you are a host or a client
     * @return (unsigned int) amount of players
     */
-    PS_NETWORKING_API unsigned int SNetGetNumPlayers();
+    PS_NETWORKING_API unsigned int SNetGetNumClients();
     /**
     * @brief Recieve a networkplayer list
     * @remark Type is NetworkPlayerData as the main struct should not be exposed
@@ -211,7 +213,7 @@ namespace sulphur
     * @return (uint16_t) The id of the value
     */
     PS_NETWORKING_API uint16_t SNetCreateSyncValue(const NetworkValueType type,
-      void* location, NetworkValueOwner owner = NetworkValueOwner::kHost);
+      NetworkValueOwner owner = NetworkValueOwner::kHost);
     /**
     * @brief Remove a sync value
     * @param[in] id (uint16_t) The id of the value
@@ -239,34 +241,93 @@ namespace sulphur
     */
     PS_NETWORKING_API void SNetValidateAllValues();
     /**
-    * @brief Set the OnConnectedToServer callback. This function is called when this client is connected to a host
-    * @param[in] function (std::function<void()>) The function
+    * @brief Set the OnConnectedToServer callback. This function is called when a client is connected to a host
+    * @param[in] function (eastl::function<void()>) The function
     */
     PS_NETWORKING_API void SNetSetOnConnectedToServerCallback(
-      std::function<void()> function);
+      eastl::function<void()> function);
     /**
-    * @brief Set the OnDisconnectedFromServer callback. This function is called when this client is disconnected from a host
-    * @param[in] function (std::function<void()>) The function
+    * @brief Set the OnDisconnectedFromServer callback. This function is called when a client is disconnected from a host
+    * @param[in] function (eastl::function<void()>) The function
     */
     PS_NETWORKING_API void SNetSetOnDisconnectedFromServerCallback(
-      std::function<void(DisconnectionInfo)> function);
+      eastl::function<void(DisconnectionInfo)> function);
     /**
-    * @brief Set the OnPlayerConnected callback. This function is called when any player is connected. This excludes yourself. This includes the host
-    * @param[in] function (std::function<void(NetworkPlayerData)>) The function
+    * @brief Set the OnPlayerConnected callback. This function is called when any player is connected.
+    * @param[in] function (eastl::function<void(NetworkPlayerData)>) The function
     */
     PS_NETWORKING_API void SNetSetOnPlayerConnected(
-      std::function<void(NetworkPlayerData)> function);
+      eastl::function<void(NetworkPlayerData)> function);
     /**
-    * @brief Set the OnPlayerDisconnected callback. This function is called when any player is disconnected. This excludes yourself. This includes the host
-    * @param[in] function (std::function<void(NetworkPlayerData)>) The function
+    * @brief Set the OnPlayerDisconnected callback. This function is called when any player is disconnected.
+    * @param[in] function (eastl::function<void(NetworkPlayerData)>) The function
     */
     PS_NETWORKING_API void SNetSetOnPlayerDisconnected(
-      std::function<void(NetworkPlayerData)> function);
+      eastl::function<void(NetworkPlayerData)> function);
     /**
     * @brief Set the OnFailedToConnect callback. This function is called when a connection could not be established.
-    * @param[in] function (std::function<void()>) The function
+    * @param[in] function (eastl::function<void()>) The function
     */
-    PS_NETWORKING_API void SNetSetOnFailedToConnect(std::function<void()> function);
+    PS_NETWORKING_API void SNetSetOnFailedToConnect(eastl::function<void()> function);
+    /**
+    * @brief Retrieve the ping of the host of an user, clients can only lookup the host
+    * @param[in] id (uint8_t) The id of the client we want to lookup. Optional for clients
+    */
+    PS_NETWORKING_API unsigned int SNetGetPing(uint8_t id = 0);
+    /**
+    * @brief Registers an rpc in the system
+    * @param[in] function (eastl::function<void(sulphur::networking::RPCHandle, sulphur::networking::NetworkPlayerData, sulphur::foundation::Vector<sulphur::networking::NetworkValue>)>) The function pointer
+    * @param[in] arguments (const sulphur::foundation::Vector<NetworkValueType>&) The arguments
+    * @return (sulphur::networking::RPCHandle) The handle associated with the handle
+    */
+    PS_NETWORKING_API RPCHandle SNetRegisterRPC(eastl::function<void(RPCHandle, NetworkPlayerData,
+      const foundation::Vector<NetworkValue>&)> function, 
+      const foundation::Vector<NetworkValueType>& arguments);
+    /**
+    * @brief Removes an rpc from the system
+    * @param[in] handle (const sulphur::foundation::RPCHandle) The handle
+    */
+    PS_NETWORKING_API void SNetUnregisterRPC(const RPCHandle handle);
+    /**
+    * @brief Invokes an RPC on another machine(s)
+    * @param[in] handle (const sulphur::foundation::RPCHandle) The handle
+    * @param[in] mode (const sulphur::foundation::RPCMode) The mode
+    * @param[in] arguments (const sulphur::foundation::Vector<sulphur::networking::NetworkValue>&) The arguments
+    */
+    PS_NETWORKING_API void SNetInvokeRPC(const RPCHandle handle, const RPCMode mode, 
+      const foundation::Vector<NetworkValue>& arguments);
+    /**
+    * @brief Validates an RPC on other clients
+    * @param[in] id (uint8_t) The id we want to validate
+    * @remarks This function should be used occasionally, as it might eat up your bandwith however for debugging this can be nice
+    * @remarks Only the host is able to use this call,
+    this is because the host should have the correct version of the game, anyone else is wrong.
+    */
+    PS_NETWORKING_API void SNetValidateRPC(uint16_t id);
+    /**
+    * @brief Validates all RPCs on other clients. Just as ValidateRPC does
+    * @remarks This function should be used occasionally, as it might eat up your bandwith however for debugging this can be nice
+    * @remarks Only the host is able to use this call,
+    this is because the host should have the correct version of the game, anyone else is wrong.
+    */
+    PS_NETWORKING_API void SNetValidateAllRPCs();
+    /**
+    * @brief Set the value of a syncable value
+    * @param[in] id (sulphur::networking::SyncValueID) The id of the syncvalue we want to set the value
+    * @param[in] value (const NetworkValue&) The value
+    */
+    PS_NETWORKING_API void SNetSetSyncValue(SyncValueID id, const NetworkValue& value);
+    /**
+    * @brief Get the value of a syncable value
+    * @param[in] id (sulphur::networking::SyncValueID) The id of the syncvalue we want to get the value
+    * @param[out] value (NetworkValue*) A pointer to a networkvalue
+    * @return (bool) If getting the value succeeded
+    */
+    PS_NETWORKING_API bool SNetGetSyncValue(SyncValueID id, NetworkValue* value);
+    /**
+    * @brief Clears the RPC buffer, usefull to call after a point where everybody is equal again (example: back to the lobby)
+    */
+    PS_NETWORKING_API void SNetClearRPCBuffer();
     namespace editor
     {
       /**

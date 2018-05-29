@@ -8,6 +8,7 @@ namespace sulphur
   namespace physics
   {
     class PhysicsShape;
+    class PhysicsCollider;
 
     /**
     * @brief Indicates the type of physics body, which in turn influences its behaviour in the simulation.
@@ -247,16 +248,24 @@ namespace sulphur
       */
       virtual PhysicsBodyType GetPhysicsBodyType() const = 0;
 
-      protected:
-        friend class PhysicsShape; //!< Declared friend class for attaching shapes to the body.
+      /**
+      * @brief Adds a physics shape to the body.
+      * @param[in] shape (sulphur::physics::PhysicsShape*) The shape to add to the body.
+      * @return (sulphur::physics:PhysicsCollider*) The constructed collider linked to this body.
+      */
+      virtual PhysicsCollider* AddShape(PhysicsShape* shape) = 0;
 
       /**
-      * @brief Sets the physicsshape of the body.
-      * @note This function is for internal use by sulphur::physics::PhysicsShape only.
-      * @param[in] shape (sulphur::physics::PhysicsShape*) the set of the body
+      * @brief Removes a collider from the body and destroys the collider instance.
+      * @param[in] collider (sulphur::physics::PhysicsCollider*) The collider to remove from the body.
       */
-      virtual void SetShape(PhysicsShape* shape) = 0;
+      virtual void RemoveShape(PhysicsCollider* collider) = 0;
 
+      /**
+      * @brief Called when the collider may need to be updated PhysicsBody-side.
+      * @param[in] collider (sulphur::physics::PhysicsCollider*) The collider to update.
+      */
+      virtual void UpdateCollider(PhysicsCollider* collider) = 0;
     };
   }
 }

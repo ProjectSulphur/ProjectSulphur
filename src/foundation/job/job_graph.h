@@ -82,6 +82,8 @@ namespace sulphur
       * @brief Submit a specific job and all its children to the job pool
       * @param[in] job_name (const sulphur::foundation::String&) 
       *            The starting job to submit
+      * @param[in] root (const sulphur::foundation::String&)
+      *            The root of the subtree in which the job needs to be
       * @param[in] pool (sulphur::foundation::ThreadPool&) 
       *            The thread pool to submit the jobs to
       * @param[in] task_map (sulphur::foundation::Map<sulphur::foundation::String, 
@@ -92,6 +94,7 @@ namespace sulphur
       *         Handle for the task created on the job pool
       */
       TaskHandle SubmitJobToPool(const String& job_name,
+                                 const String& root,
                                   ThreadPool& pool, 
                                   Map<String, TaskHandle>& task_map) const;
 
@@ -107,7 +110,7 @@ namespace sulphur
        * @brief Find all dependencies (blockers and parents) of the given job 
        *        and add the specified flag to its entry in the dependency buffer.
        *        Now entries will be created as required.
-       * @param[in] job (const sulphur::foundation::Job& job) 
+       * @param[in] job (const sulphur::foundation::Job&) 
        *            The job to find the dependencies for
        * @param[in] dependency_buffer 
        *            (sulphur::foundation::Map<sulphur::foundation::String, uint8_t>)
@@ -118,6 +121,16 @@ namespace sulphur
         const Job& job, 
         Map<String, uint8_t>& dependency_buffer,
         uint8_t mask) const;
+
+      /**
+       * @brief Check if the given job is in the subtree defined by the root
+       * @param[in] job (const sulphur::foundation::Job&)
+       *            The job for which to check if it is in the subtree
+       * @param[in] root (const sulphur::foundation::String&)
+       *            The name of the subtree root job
+       * @return (bool) True if the job has the root as one of its parents
+       */
+      bool IsJobInSubTree(const Job& job, const String& root) const;
     };
   }
 }

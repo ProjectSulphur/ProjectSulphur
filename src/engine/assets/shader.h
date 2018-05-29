@@ -39,12 +39,12 @@ namespace sulphur
         ShaderProgramHandle geometry_shader,
         ShaderProgramHandle pixel_shader);
 
-      const ShaderProgramHandle GetShaderByType(ShaderType type) const;
-      const ShaderProgramHandle vertex_shader() const { return vertex_shader_; };
-      const ShaderProgramHandle hull_shader() const { return hull_shader_; };
-      const ShaderProgramHandle domain_shader() const { return domain_shader_; };
-      const ShaderProgramHandle geometry_shader() const { return geometry_shader_; };
-      const ShaderProgramHandle pixel_shader() const { return pixel_shader_; };
+      const ShaderProgramHandle& GetShaderByType(ShaderType type) const;
+      const ShaderProgramHandle& vertex_shader() const { return vertex_shader_; }
+      const ShaderProgramHandle& hull_shader() const { return hull_shader_; }
+      const ShaderProgramHandle& domain_shader() const { return domain_shader_; }
+      const ShaderProgramHandle& geometry_shader() const { return geometry_shader_; }
+      const ShaderProgramHandle& pixel_shader() const { return pixel_shader_; }
       
       /**
       * @brief Returns a reference to the uniform buffer attached to the shader of this type
@@ -59,6 +59,14 @@ namespace sulphur
       * @return (const foundation::Vector <TextureInfo>&) The list of texture types
       */
       const foundation::Vector<TextureInfo>& GetTextureInfo(ShaderType shader_type = ShaderType::kPixel) const;
+
+      /**
+      * @brief Returns a list of all uav texture info used by the shader program
+      * @param[in] shader_type (ShaderType) The shader to get the texture info from
+      * @return (const foundation::Vector <TextureInfo>&) The list of texture types
+      */
+      const foundation::Vector<TextureInfo>& GetUAVInfo(ShaderType shader_type = ShaderType::kPixel) const;
+
 
       graphics::PipelineState pipeline_state;
 

@@ -22,6 +22,26 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------
+    IAllocator& IAllocator::operator=(IAllocator&& other)
+    {
+      open_allocations_ = other.open_allocations_;
+      allocated_ = other.allocated_;
+      max_allocated_ = other.max_allocated_;
+      alive_ = other.alive_;
+
+#ifdef PS_MEMORY_DEBUG
+      debug_allocation_data_ = eastl::move(other.debug_allocation_data_);
+#endif
+
+      other.open_allocations_ = 0;
+      other.allocated_ = 0;
+      other.max_allocated_ = 0;
+      other.alive_ = false;
+
+      return *this;
+    }
+
+    //--------------------------------------------------------------------------
     void* IAllocator::Allocate(size_t size, size_t alignment)
     {
       bool initialized = Memory::IsInitialized();
@@ -43,6 +63,8 @@ namespace sulphur
           allocated_,
           size,
           max_allocated_);
+
+        assert(false);
 
         return nullptr;
       }
@@ -126,6 +148,7 @@ namespace sulphur
       assert(allocated_ == 0);
 
       printf("[Allocator] No memory leaks detected\n");
+
       alive_ = false;
     }
 

@@ -1,21 +1,35 @@
 #include "world.h"
 
 #include "engine/core/entity_system.h"
+#include "engine/graphics/debug_render_system.h"
 
+#include "engine/systems/components/mesh_render_system.h"
+#include "engine/systems/components/skinned_mesh_render_system.h"
 #include "engine/systems/components/transform_system.h"
 #include "engine/systems/components/light_system.h"
-#include "engine/systems/components/debug_render_system.h"
-#include "engine/systems/components/mesh_render_system.h"
 #include "engine/systems/components/camera_system.h"
 #include "engine/systems/components/rigid_body_system.h"
 #include "engine/systems/components/collider_system.h"
 #include "engine/systems/components/canvas_system.h"
-#include "engine/networking/messaging_system.h"
+#include "engine/systems/components/network_component_system.h"
+#include "engine/systems/components/constraint_system.h"
+#include "engine/systems/components/audio_listener_system.h"
+#include "engine/systems/components/audio_event_system.h"
+#include "engine/assets/asset_system.h"
+
+#include <lua-classes/world.lua.cc>
+
 
 namespace sulphur
 {
   namespace engine
   {
+    //--------------------------------------------------------------------------
+    ScriptableWorld::ScriptableWorld()
+    {
+
+    }
+
     //--------------------------------------------------------------------------
     WorldProviderSystem::WorldProviderSystem() :
       IServiceSystem("WorldProviderSystem"),
@@ -52,7 +66,7 @@ namespace sulphur
       //                 If anyone decides to change that they should manually create a new world
       CreateEmptyWorld(app, job_graph);
     }
-    
+
     //--------------------------------------------------------------------------
     void WorldProviderSystem::OnTerminate()
     {
@@ -64,55 +78,27 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------
-    void WorldProviderSystem::OnFixedUpdate()
-    {
-      GetWorld().FixedUpdate();
-    }
-
-    //--------------------------------------------------------------------------
-    void WorldProviderSystem::OnUpdate(float delta_time)
-    {
-      GetWorld().Update(delta_time);
-    }
-
-    //--------------------------------------------------------------------------
-    void WorldProviderSystem::OnPreRender()
-    {
-      GetWorld().PreRender();
-    }
-
-    //--------------------------------------------------------------------------
-    void WorldProviderSystem::OnRender()
-    {
-      GetWorld().Render();
-    }
-
-    //--------------------------------------------------------------------------
-    void WorldProviderSystem::OnPostRender()
-    {
-      GetWorld().PostRender();
-    }
-
-    //--------------------------------------------------------------------------
     World::World() :
       BaseResource("World")
     {
       DebugRenderSystem::SetupDebugAssets();
 
-      // Entity-system
-      systems_.Create<EntitySystem>();
-
       // Components
-      systems_.Create<TransformSystem>();
-      systems_.Create<CameraSystem>();
-      systems_.Create<LightSystem>();
-      systems_.Create<DebugRenderSystem>();
-      systems_.Create<MeshRenderSystem>();
-      systems_.Create<RigidBodySystem>();
-      systems_.Create<BoxColliderSystem>();
-      systems_.Create<SphereColliderSystem>();
-      systems_.Create<CapsuleColliderSystem>();
-      systems_.Create<CanvasSystem>();
+      components_.Create<TransformSystem>();
+      components_.Create<CameraSystem>();
+      components_.Create<LightSystem>();
+      components_.Create<MeshRenderSystem>();
+      components_.Create<SkinnedMeshRenderSystem>();
+      components_.Create<RigidBodySystem>();
+      components_.Create<ColliderSystem>();
+      components_.Create<CanvasSystem>();
+      components_.Create<NetworkComponentSystem>();
+      components_.Create<ConstraintSystem>();
+      components_.Create<AudioEventSystem>();
+      components_.Create<AudioListenerSystem>();
+      // Self-owned systems
+      owners_.Create<EntitySystem>();
+      owners_.Create<DebugRenderSystem>();
     }
 
     //--------------------------------------------------------------------------
@@ -124,43 +110,89 @@ namespace sulphur
     //--------------------------------------------------------------------------
     void World::Initialize(Application& app, foundation::JobGraph& job_graph)
     {
-      systems_.Execute(&ISystemBase::OnInitialize, app, job_graph);
+      components_.Execute(&IComponentSystem::OnInitialize, app, job_graph);
+      owners_.Execute(&IOwnerSystemBase::OnInitialize, app, job_graph);
     }
 
     //--------------------------------------------------------------------------
     void World::Terminate()
     {
-      systems_.Execute(&ISystemBase::OnTerminate);
+      components_.Execute(&IComponentSystem::OnTerminate);
+      owners_.Execute(&IOwnerSystemBase::OnTerminate);
     }
 
     //--------------------------------------------------------------------------
-    void World::FixedUpdate()
+    WorldProviderSystem* ScriptableWorld::system_ = nullptr;
+    Application* ScriptableWorld::app_ = nullptr;
+
+    //--------------------------------------------------------------------------
+    ScriptableWorld::ScriptableWorld(World* world) :
+      world_(world)
     {
-      systems_.Execute(&ISystemBase::OnFixedUpdate);
     }
 
     //--------------------------------------------------------------------------
-    void World::Update(float delta_time)
+    void ScriptableWorld::Initialize(
+      WorldProviderSystem* system, 
+      Application* app)
     {
-      systems_.Execute(&ISystemBase::OnUpdate, delta_time);
+      system_ = system;
+      app_ = app;
     }
 
     //--------------------------------------------------------------------------
-    void World::PreRender()
+    bool ScriptableWorld::IsValid()
     {
-      systems_.Execute(&ISystemBase::OnPreRender);
+      bool check = (system_ != nullptr && app_ != nullptr);
+
+      if (check == false)
+      {
+        PS_LOG(Error, "ScriptableWorld is not initialized for use!");
+      }
+
+      return check;
     }
 
     //--------------------------------------------------------------------------
-    void World::Render()
+    ScriptableWorld ScriptableWorld::Create()
     {
-      systems_.Execute(&ISystemBase::OnRender);
+      if (IsValid() == false)
+      {
+        return nullptr;
+      }
+
+      World& created = system_->GetWorld();
+
+      return ScriptableWorld(&created);
     }
 
     //--------------------------------------------------------------------------
-    void World::PostRender()
+    Entity ScriptableWorld::CreateEntity() const
     {
-      systems_.Execute(&ISystemBase::OnPostRender);
+      if (world_ == nullptr)
+      {
+        PS_LOG(Error, 
+          "Could not create an entity in a ScriptableWorld, because it is not intialized yet");
+
+        return Entity();
+      }
+
+      Entity handle = world_->GetOwner<EntitySystem>().Create();
+      return handle;
+    }
+
+    //--------------------------------------------------------------------------
+    void ScriptableWorld::DestroyEntity(ScriptHandle entity) const
+    {
+      if (world_ == nullptr)
+      {
+        PS_LOG(Error,
+          "Could not destroy an entity in a ScriptableWorld, because it is not intialized yet");
+      }
+
+      Entity* ent = reinterpret_cast<Entity*>(ScriptUtils::As<void*>(entity));
+
+      world_->GetOwner<EntitySystem>().Destroy(*ent);
     }
   }
 }

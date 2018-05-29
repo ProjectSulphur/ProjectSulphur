@@ -1,13 +1,20 @@
 #include "mesh_render_system.h"
 
-#include "engine/assets/asset_system.h"
-#include "engine/application/application.h"
-
 #include "engine/systems/components/transform_system.h"
 #include "engine/systems/components/camera_system.h"
-#include "engine/systems/components/debug_render_system.h"
 
+#include "engine/application/application.h"
+#include "engine/assets/asset_system.h"
+#include "engine/graphics/debug_render_system.h"
+#include "engine/scripting/script_utils.h"
+#include "engine/assets/scriptable_asset_system.h"
+
+#include <foundation/job/data_policy.h>
+#include <foundation/job/job.h>
+#include <foundation/job/job_graph.h>
 #include <graphics/platform/pipeline_state.h>
+
+#include <lua-classes/mesh_render_system.lua.cc>
 
 namespace sulphur
 {
@@ -15,18 +22,52 @@ namespace sulphur
   {
     //------------------------------------------------------------------------------------------------------
     MeshRenderSystem::MeshRenderSystem() :
-      IComponentSystem<MeshRenderComponent, MeshRenderSystemData>("MeshRenderSystem")
+      IComponentSystem("MeshRenderSystem")
     {
     }
     
     //------------------------------------------------------------------------------------------------------
-    void MeshRenderSystem::OnInitialize(Application& app, foundation::JobGraph&)
+    void MeshRenderSystem::OnInitialize(Application& app, foundation::JobGraph& job_graph)
     {
       World& world = app.GetService<WorldProviderSystem>().GetWorld();
 
-      camera_system_ = &world.GetSystem<CameraSystem>();
-      tranform_system_ = &world.GetSystem<TransformSystem>();
+      camera_system_ = &world.GetComponent<CameraSystem>();
+      tranform_system_ = &world.GetComponent<TransformSystem>();
       renderer_ = &app.platform_renderer();
+
+      { // MeshRenderSystem Render Meshes Job, starts after DebugRenderSystem Render Job
+        const auto function = [](MeshRenderSystem& system)
+        {
+          system.RenderMeshes();
+        };
+
+        foundation::Job job = foundation::make_job(
+          "meshrendersystem_render",
+          "render",
+          function,
+          bind_write(*this)
+        );
+
+        job.set_blocker("debugrendersystem_render");
+        job_graph.Add(std::move(job));
+      } 
+      
+      { // MeshRenderSystem Apply Post Processing Job, starts after SkinnedMeshRenderSystem Render Job
+        const auto function = [](MeshRenderSystem& system)
+        {
+          system.ApplyPostProcessing();
+        };
+
+        foundation::Job job = foundation::make_job(
+          "meshrendersystem_apply_post_processing",
+          "render",
+          function,
+          bind_write(*this)
+        );
+
+        job.set_blocker("skinnedmeshrendersystem_render_meshes");
+        job_graph.Add(std::move(job));
+      }
     }
 
     //------------------------------------------------------------------------------------------------------
@@ -37,7 +78,7 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    MeshRenderComponent MeshRenderSystem::Create(Entity entity)
+    MeshRenderComponent MeshRenderSystem::Create(Entity& entity)
     {
       if (!entity.Has<TransformComponent>())
       {
@@ -54,10 +95,8 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    void MeshRenderSystem::Destroy(MeshRenderComponent handle)
+    void MeshRenderSystem::Destroy(ComponentHandleBase handle)
     {
-      //TODO: Validate handle
-      // Like this?
       if (component_data_.data.IsValid(handle))
       {
         component_data_.data.Remove(handle);
@@ -65,57 +104,7 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    void MeshRenderSystem::OnPreRender()
-    {
-      // First iteration: Naive approach
-      /*const foundation::Vector<CameraComponent>& cameras = camera_system_->GetCameras();
-
-      for (const auto& component : component_data_.data)
-      {
-        TransformComponent transform = component.entity.Get<TransformComponent>();
-
-        if (!transform.HasChanged())
-        {
-          continue;
-        }
-
-        for (const CameraComponent& camera : cameras)
-        {
-          camera_entity_map_.emplace(eastl::make_pair(camera.GetIndex(), foundation::Vector<Entity>()));
-
-        }
-      }*/
-
-      //List<Camera, List<Entity>>
-
-      // if(camera's layer mask does not contain the layer the component is on, cull it)
-
-
-      // Option 1:
-      // Create cached a list of object
-
-      // Option 2:
-      // Do it on the fly
-      // slow
-
-
-      // TODO: Cull Objects
-      // TODO: Sort Objects
-      // TODO: Batch Objects
-
-      //SortingLayerEntityMap layer_to_entity = tranform_system_->layer_to_entity_map();
-
-      // compile a list of entities 
-
-
-
-
-      //for each camera
-      // Add all entities in a layer, no duplicates
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    void MeshRenderSystem::OnRender()
+    void MeshRenderSystem::RenderMeshes()
     {
       if (!camera_system_->main_camera().IsValid())
       {
@@ -127,7 +116,6 @@ namespace sulphur
       foundation::Vector<CameraComponent> cameras = camera_system_->GetCameras();
 
       // IF I CAN FIGURE OUT WHAT MESHES RENDER ON THE SAME CAMERA, I CAN MODIFY THE MVP AND USE THE SAME STATE
-
       for (CameraComponent& camera : cameras)
       {
         camera_system_->set_current_camera(camera);
@@ -140,69 +128,106 @@ namespace sulphur
         // TODO: Render batches for this camera
         // -> Use Material passes
 
-        // FIXME: For now just do for every component
         for (size_t i = 0; i < component_data_.data.size(); ++i)
         {
-          MaterialHandle material;
-          if (component_data_.materials->empty() || DebugRenderSystem::force_default_material)
+          TransformComponent transform =
+            component_data_.entity[i].Get<TransformComponent>();
+
+          // Layer culling
+          if (camera.GetLayerMask().ContainsLayer(transform.GetSortingLayer()) == false)
           {
-            material = AssetSystem::Instance().GetHandle<Material>("Default_Material");
-          }
-          else
-          {
-            material = component_data_.materials[i][0];
+            continue;
           }
 
-          if (!material) // If this material is invalid, show the error material
+          // Frustum culling
+          const foundation::Sphere bounding_sphere = component_data_.mesh[i]->bounding_sphere().
+            Transform(transform.GetWorldPosition(), transform.GetWorldScale());
+          if(camera.GetFrustum().Intersects(bounding_sphere) == false)
           {
-            material = AssetSystem::Instance().GetHandle<Material>("Error_Material");
+            continue;
           }
+
+          renderer_->SetModelMatrix(transform.GetLocalToWorld());
+
+          renderer_->SetMesh(component_data_.mesh[i]);
+
+          foundation::Vector<MaterialHandle>& materials = component_data_.materials[i];
+          size_t submesh_count = component_data_.mesh[i]->GetSubmeshCount();
           
+          // Make sure we render with a material
+          UpdateMaterials(materials, submesh_count);
 
-          for (size_t j = 0; j < material->NumMaterialPasses(); ++j)
+          for (size_t j = 0; j < materials.size(); ++j)
           {
-            const MaterialPass& pass = material->GetMaterialPass(j);
+            MaterialHandle material = materials[j];
 
-            renderer_->SetMaterial(pass);
-            // TODO: Set scissor rect ( probably part of set pipeline state, but whatever)
-
-            if (DebugRenderSystem::HasOverrides())
+            if (DebugRenderSystem::force_default_material)
             {
-              graphics::PipelineState ps = pass.shader()->pipeline_state; // Copy pipeline state
-
-              if (DebugRenderSystem::force_wireframe)
-                ps.rasterizer_state.fill_mode = graphics::FillMode::kWireFrame;
-
-              renderer_->SetPipelineState(ps);
+              material = AssetSystem::Instance().GetHandle<Material>("Default_Material");
             }
+          
+            for (size_t k = 0; k < material->NumMaterialPasses(); ++k)
+            {
+              // Set the material
+              const MaterialPass& pass = material->GetMaterialPass(k);
+              renderer_->SetMaterial(pass);
 
-            TransformComponent transform = 
-              component_data_.entity[i].Get<TransformComponent>();
-            renderer_->SetModelMatrix(transform.GetLocalToWorld());
+              // Override pipeline state
+              if (DebugRenderSystem::HasOverrides())
+              {
+                graphics::PipelineState ps = pass.shader()->pipeline_state; // Copy pipeline state
 
-            renderer_->SetMesh(component_data_.mesh[i]);
-            renderer_->Draw();
+                if (DebugRenderSystem::force_wireframe)
+                  ps.rasterizer_state.fill_mode = graphics::FillMode::kWireFrame;
+
+                renderer_->SetPipelineState(ps);
+              }
+
+              // Render the mesh
+              const SubMeshOffset offset = component_data_.mesh[i]->GetSubmesh(static_cast<uint>(j));
+
+              renderer_->Draw(offset.size, offset.offset);
+            }
           }
-
         }
-        // END FIXME
       }
+    }
 
-      // TODO: Prepare post processing data
+    //------------------------------------------------------------------------------------------------------
+    void MeshRenderSystem::ApplyPostProcessing()
+    {
+      foundation::Vector<CameraComponent> cameras = camera_system_->GetCameras();
 
-      /*for (CameraHandle camera : cameras) {
-        camera_system_.SetCurrentCamera(camera);
-        renderer_->SetCamera(camera);
+      for (CameraComponent& camera : cameras)
+      {
+        camera_system_->set_current_camera(camera);
 
-        // For each post process material {
-        // For each material pass {
-        // TODO: Upload GPU data (textures etc. by calling renderer->SetTexture(), SetX(), ...)
-        // TODO: Set pipeline state
-        // TODO: Set scissor rect ( probably part of set pipeline state, but whatever)
-        // TODO: Draw call
-        // }
-        // }
-      }*/
+        PostProcessMaterialHandle material = camera.GetPostProcessMaterial();
+
+        if (!material)
+        {
+          continue;
+        }
+
+        for (size_t j = 0; j < material->NumComputePasses(); ++j)
+        {
+          const ComputePass& pass = material->GetComputePass(j);
+          const TextureHandle& tex = material->GetUAV(0);
+          uint width = tex->width();
+          uint height = tex->height();
+
+          renderer_->SetComputePass(pass);
+          const glm::vec3 group_size = pass.GetWorkGroupSize();
+          uint groups_x = static_cast<uint>(ceil(width / group_size.x));
+          uint groups_y = static_cast<uint>(ceil(height / group_size.y));
+          renderer_->Dispatch(
+            graphics::ComputeQueueType::kPostProcessing,
+            groups_x,
+            groups_y,
+            1u
+          );
+        }
+      }
 
       // Reset current camera to main
       camera_system_->set_current_camera(camera_system_->main_camera());
@@ -227,6 +252,38 @@ namespace sulphur
       system_->SetMesh(*this, mesh);
       return *this;
     }
+
+    //------------------------------------------------------------------------------------------------------
+    MeshRenderComponent MeshRenderComponent::SetMesh(ScriptableAsset* mesh)
+    {
+      if (mesh->type() != ScriptableAsset::AssetTypes::kMesh)
+      {
+        return *this;
+      }
+
+      BaseAssetHandle* h = mesh->GetHandle();
+      MeshHandle* m = static_cast<MeshHandle*>(h);
+      system_->SetMesh(*this, *m);
+      system_->SetMaterial(*this, AssetSystem::Instance().GetHandle<Material>("Default_Material"));
+      return *this;
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    MeshRenderComponent MeshRenderComponent::SetModel(ScriptableAsset* model)
+    {
+      if (model->type() != ScriptableAsset::AssetTypes::kModel)
+      {
+        return *this;
+      }
+
+      BaseAssetHandle* h = model->GetHandle();
+      ModelHandle m = *static_cast<ModelHandle*>(h);
+      system_->SetMesh(*this, m->mesh_handle());
+      system_->SetMaterials(*this, m->material_handles());
+      return *this;
+    }
+
+    //------------------------------------------------------------------------------------------------------
     void MeshRenderSystem::SetMesh(MeshRenderComponent handle, const MeshHandle& mesh)
     {
       component_data_.data.
@@ -234,10 +291,12 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    MeshHandle MeshRenderComponent::GetMesh() const
+    MeshHandle MeshRenderComponent::GetMesh(MeshHandle*) const
     {
       return system_->GetMesh(*this);
     }
+
+    //------------------------------------------------------------------------------------------------------
     MeshHandle MeshRenderSystem::GetMesh(MeshRenderComponent handle) const
     {
       return component_data_.data.
@@ -356,6 +415,19 @@ namespace sulphur
     {
       return component_data_.data.Get<static_cast<size_t>
         (MeshRenderComponentElements::kCastShadows)>(handle);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void MeshRenderSystem::UpdateMaterials(foundation::Vector<MaterialHandle>& materials, size_t expected_count)
+    {
+      if (materials.size() != expected_count) // If no material was set, apply the default one
+        materials.resize(expected_count, AssetSystem::Instance().GetHandle<Material>("Default_Material"));
+
+      for (MaterialHandle& material : materials)
+      {
+        if (!material) // If this material is invalid, show the error material
+          material = AssetSystem::Instance().GetHandle<Material>("Error_Material");
+      }
     }
   }
 }

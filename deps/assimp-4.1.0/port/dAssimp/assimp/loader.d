@@ -1,4 +1,4 @@
-﻿/*
+/*
 ---------------------------------------------------------------------------
 Open Asset Import Library (ASSIMP)
 ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ const uint ASSIMP_BINDINGS_MINOR = 0;
 /**
  * Loader class for dynamically loading the Assimp library.
  *
- * The library is Â»reference-countedÂ«, meaning that the library is not
+ * The library is »reference-counted«, meaning that the library is not
  * unloaded on a call to <code>unload()</code> if there are still other
  * references to it.
  */

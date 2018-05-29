@@ -5,8 +5,10 @@
 #include "tools/networking/message.h"
 #include "tools/networking/network_player.h"
 #include "tools/networking/network_value.h"
-#include "tools/networking/value_owner.h"
+#include "tools/networking/network_value_owner.h"
 #include "tools/networking/disconnection_info.h"
+#include "tools/networking/rpc_data.h"
+#include "tools/networking/syncable_network_value.h"
 #include <foundation/containers/list.h>
 #include <foundation/containers/vector.h>
 #include <foundation/containers/deque.h>
@@ -18,6 +20,7 @@ namespace sulphur
   {
     class PacketHandler;
     class ValueSyncer;
+    class RPCSystem;
     /**
     * @class sulphur::networking::NetworkingSystem
     * @brief Main networking class
@@ -29,6 +32,7 @@ namespace sulphur
     class NetworkingSystem
     {
       friend PacketHandler;
+      friend RPCSystem;
     public:
       /**
       * @brief Constructor
@@ -197,15 +201,15 @@ namespace sulphur
       * @param[in] owner (sulphur::networking::NetworkValueOwner) The owner of the value
       * @return (uint16_t) The id of the value
       */
-      uint16_t CreateSyncValue(const NetworkValueType type, void* location, NetworkValueOwner owner);
+      SyncValueID CreateSyncValue(const NetworkValueType type, NetworkValueOwner owner);
       /**
       * @brief Remove a sync value
       * @param[in] id (uint16_t) The id of the value
       */
-      void RemoveSyncValue(uint16_t id);
+      void RemoveSyncValue(SyncValueID id);
       /**
       * @brief Validates a value on other clients
-      * @param[in] id (uint8_t) The id we want to validate
+      * @param[in] id (uint16_t) The id we want to validate
       * @remarks This function should be used occasionally, 
       as it might eat up your bandwith however for debugging this can be nice
       * @remarks Only the host is able to use this call,
@@ -213,7 +217,7 @@ namespace sulphur
       @remarks If something is invalid, it wont report back to the host,
       the client should decide if something is really wrong and should be disconnected.
       */
-      void ValidateValue(uint16_t id);
+      void ValidateValue(SyncValueID id);
       /**
       * @brief Validates all values on other clients. Just as ValidateValue does
       * @remarks This function should be used occasionally, 
@@ -226,32 +230,98 @@ namespace sulphur
       void ValidateAllValues();
       /**
       * @brief Set the OnConnectedToServer callback
-      * @param[in] function (std::function<void()>) The function
+      * @param[in] function (eastl::function<void()>) The function
       */
-      void SetOnConnectedToServerCallback(std::function<void()> function);
+      void SetOnConnectedToServerCallback(eastl::function<void()> function);
       /**
       * @brief Set the OnDisconnectedFromServer callback
-      * @param[in] function (std::function<void()>) The function
+      * @param[in] function (eastl::function<void()>) The function
       */
-      void SetOnDisconnectedFromServerCallback(std::function<void(DisconnectionInfo)> function);
+      void SetOnDisconnectedFromServerCallback(eastl::function<void(DisconnectionInfo)> function);
       /**
       * @brief Set the OnPlayerConnected callback
-      * @param[in] function (std::function<void(NetworkPlayerData)>) The function
+      * @param[in] function (eastl::function<void(NetworkPlayerData)>) The function
       */
-      void SetOnPlayerConnected(std::function<void(NetworkPlayerData)> function);
+      void SetOnPlayerConnected(eastl::function<void(NetworkPlayerData)> function);
       /**
       * @brief Set the OnPlayerDisconnected callback
-      * @param[in] function (std::function<void(NetworkPlayerData)>) The function
+      * @param[in] function (eastl::function<void(NetworkPlayerData)>) The function
       */
-      void SetOnPlayerDisconnected(std::function<void(NetworkPlayerData)> function);
+      void SetOnPlayerDisconnected(eastl::function<void(NetworkPlayerData)> function);
       /**
       * @brief Set the OnFailedToConnect callback
-      * @param[in] function (std::function<void()>) The function
+      * @param[in] function (eastl::function<void()>) The function
       */
-      void SetOnFailedToConnect(std::function<void()> function);
+      void SetOnFailedToConnect(eastl::function<void()> function);
+      /**
+      * @brief Retrieve the ping of the host of an user, clients can only lookup the host
+      * @param[in] id (uint8_t) The id of the client we want to lookup. Optional for clients
+      */
+      unsigned int GetPing(uint8_t id);
+      /**
+      * @brief Registers an rpc in the system
+      * @param[in] function (eastl::function<void(sulphur::networking::RPCHandle, sulphur::networking::NetworkPlayerData
+      sulphur::foundation::Vector<sulphur::networking::NetworkValue>)>) The function pointer
+      * @param[in] arguments (sulphur::foundation::Vector<NetworkValueType>) The arguments
+      * @return (sulphur::networking::RPCHandle) The handle associated with the handle
+      */
+      RPCHandle RegisterRPC(eastl::function<void(RPCHandle, NetworkPlayerData,
+        const foundation::Vector<NetworkValue>&)> function, 
+        const foundation::Vector<NetworkValueType>& arguments);
+      /**
+      * @brief Removes an rpc from the system
+      * @param[in] handle (const sulphur::foundation::RPCHandle) The handle
+      */
+      void UnregisterRPC(const RPCHandle handle);
+      /**
+      * @brief Invokes an RPC on another machine(s)
+      * @param[in] handle (const sulphur::foundation::RPCHandle) The handle
+      * @param[in] mode (const sulphur::foundation::RPCMode) The mode
+      * @param[in] arguments (sulphur::foundation::Vector<sulphur::networking::NetworkValue>) The arguments
+      */
+      void InvokeRPC(const RPCHandle handle, const RPCMode mode, 
+        const foundation::Vector<NetworkValue>& arguments);
+      /**
+      * @brief Validates an RPC on other clients
+      * @param[in] id (uint16_t) The id we want to validate
+      * @remarks This function should be used occasionally, as it might eat up your bandwith however for debugging this can be nice
+      * @remarks Only the host is able to use this call,
+      this is because the host should have the correct version of the game, anyone else is wrong.
+      */
+      void ValidateRPC(uint16_t id);
+      /**
+      * @brief Validates all RPCs on other clients. Just as ValidateRPC does
+      * @remarks This function should be used occasionally, as it might eat up your bandwith however for debugging this can be nice
+      * @remarks Only the host is able to use this call,
+      this is because the host should have the correct version of the game, anyone else is wrong.
+      */
+      void ValidateAllRPCs();
+      /**
+      * @brief Return the networkplayer
+      * @return (NetworkPlayer*) return the player
+      */
+      NetworkPlayer* network_player();
+      /**
+      * @brief Set the value of a syncable value
+      * @param[in] id (SyncValueID) The id of the syncvalue we want to set the value
+      * @param[in] value (const NetworkValue&) The value
+      */
+      void SetSyncValue(SyncValueID id, const NetworkValue& value);
+      /**
+      * @brief Get the value of a syncable value
+      * @param[in] id (SyncValueID) The id of the syncvalue we want to get the value
+      * @param[out] value (NetworkValue*) A pointer to a networkvalue
+      * @return (bool) If getting the value succeeded
+      */
+      bool GetSyncValue(SyncValueID id, NetworkValue* value);
+      /**
+      * @brief Clears the RPC buffer, usefull to call after a point where everybody is equal again (example: back to the lobby)
+      */
+      void ClearRPCBuffer();
     private:
       PacketHandler* packet_handler_; //!<The packet handler
       ValueSyncer* value_syncer_; //!<The value syncer
+      RPCSystem* rpc_system_; //!<The RPC system
       ConnectionSetup connection_setup_; //!<The current connection setup
       ConnectionStatus connection_status_; //!<The current connection status
       ENetHost* host_; //!< The ENet host
@@ -265,11 +335,11 @@ namespace sulphur
       NetworkPlayer* network_player_; //!<Our Networkplayer in the networkplayer list
       foundation::List<NetworkPlayer> network_player_list_; //!<The list with all the networkplayers
       foundation::Deque<uint8_t> available_ids_; //!<The available IDs that can be used
-      std::function<void()> on_connected_to_server_; //!<The OnConnectedToServer callback
-      std::function<void(DisconnectionInfo)> on_disconnected_from_server_; //!<The OnDisconnectedFromServer callback
-      std::function<void(NetworkPlayerData)> on_player_connected_; //!<The OnPlayerConnected callback
-      std::function<void(NetworkPlayerData)> on_player_disconnected_; //!<The OnPlayerDisconnected callback
-      std::function<void()> on_failed_to_connect_; //!<The OnFailedToConnect callback
+      eastl::function<void()> on_connected_to_server_; //!<The OnConnectedToServer callback
+      eastl::function<void(DisconnectionInfo)> on_disconnected_from_server_; //!<The OnDisconnectedFromServer callback
+      eastl::function<void(NetworkPlayerData)> on_player_connected_; //!<The OnPlayerConnected callback
+      eastl::function<void(NetworkPlayerData)> on_player_disconnected_; //!<The OnPlayerDisconnected callback
+      eastl::function<void()> on_failed_to_connect_; //!<The OnFailedToConnect callback
       /**
       * @brief handle a connect event
       * @remarks Internal use only
@@ -354,6 +424,11 @@ namespace sulphur
       * @param[in] id (uint8_t) The if we want to free
       */
       void FreeID(uint8_t id);
+      /**
+      * @brief Update all ping fields
+      * @remarks Internal use only
+      */
+      void UpdatePing();
       /**
       * @brief Find a networkplayer by peer
       * @remarks Internal use only

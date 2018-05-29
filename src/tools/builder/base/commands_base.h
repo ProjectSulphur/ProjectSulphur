@@ -7,6 +7,17 @@ namespace sulphur
 {
   namespace builder 
   {
+    class ModelPipeline;
+    class MaterialPipeline;
+    class MeshPipeline;
+    class ShaderPipeline;
+    class TexturePipeline;
+    class SkeletonPipeline;
+    class AnimationPipeline;
+    class ScriptPipeline;
+    class AudioPipeline;
+    class SceneLoader;
+
     /**
     *@struct sulphur::builder::Syntax
     *@brief structure describing the syntax of a command
@@ -37,7 +48,8 @@ namespace sulphur
       /**
       *@brief construct input class with flags and arguments
       *@param[in] flags (sulphur::builder::CommandInput::Flags) flags parsed from a command line
-      *@param[in] flag_args (sulphur::builder::CommandInput::FlagArgs) arguments belonging to the flag. if no argument is found the entry will be empty
+      *@param[in] flag_args (sulphur::builder::CommandInput::FlagArgs) arguments belonging to the flag. 
+      *@remark if no argument is found the entry will be empty
       */
       CommandInput(Flags flags, FlagArgs flag_args);
 
@@ -132,6 +144,26 @@ namespace sulphur
       */
       virtual const char* GetDescription() const;
 
+      /**
+      *@brief sets the pipelines this convert command has to use.
+      *@param[in] model_pipeline (sulphur::builder::ModelPipeline*) a model pipeline
+      *@param[in] mesh_pipeline (sulphur::builder::MeshPipeline*) a mesh pipeline
+      *@param[in] material_pipeline (sulphur::builder::MaterialPipeline*) a material pipeline
+      *@param[in] texture_pipeline (sulphur::builder::TexturePipeline*) a texture pipeline
+      *@param[in] shader_pipeline (sulphur::builder::ShaderPipeline*) a shader pipeline
+      *@param[in] skeleton_pipeline (sulphur::builder::SkeletonPipeline*) a skeleton pipeline
+      *@param[in] animation_pipeline (sulphur::builder::AnimationPipeline*) an animation pipeline
+      *@param[in] script_pipeline (sulphur::builder::ScriptPipeline*) a script pipeline
+      *@param[in] audio_pipeline (sulphur::builder::AudioPipeline*) an audio pipeline
+      *@param[in] scene_loader (sulphur::builder::SceneLoader*) a scene loader
+      */
+      void SetPipelines(ModelPipeline* model_pipeline,
+        MeshPipeline* mesh_pipeline, MaterialPipeline* material_pipeline,
+        TexturePipeline* texture_pipeline, ShaderPipeline* shader_pipeline,
+        SkeletonPipeline* skeleton_pipeline, AnimationPipeline* animation_pipeline,
+        ScriptPipeline* script_pipeline, AudioPipeline* audio_pipeline, 
+        SceneLoader* scene_loader);
+
     protected:
       /**
       *@brief specify what flags are valid for use with this command. each type in Args... will be valid.
@@ -160,6 +192,17 @@ namespace sulphur
        */
       template<typename T>
       void IsOptional(bool value);
+    protected:
+      ModelPipeline* model_pipeline_;         //!< a model pipeline passed by the constructor
+      MeshPipeline* mesh_pipeline_;           //!< a mesh pipeline passed by the constructor
+      MaterialPipeline* material_pipeline_;   //!< a material pipeline passed by the constructor
+      TexturePipeline* texture_pipeline_;     //!< a texture pipeline passed by the constructor
+      ShaderPipeline* shader_pipeline_;       //!< a shader pipeline passed by the constructor
+      SkeletonPipeline* skeleton_pipeline_;   //!< a skeleton pipeline passed by the constructor
+      AnimationPipeline* animation_pipeline_; //!< an animation pipeline passed by the constructor
+      ScriptPipeline* script_pipeline_;       //!< a script pipeline passed by the constructor
+      AudioPipeline* audio_pipeline_;         //!< an audio pipeline passed by the constructor
+      SceneLoader* scene_loader_;             //!< a scene loader passed by the constructor
 
     private:
       template<typename... Args>

@@ -2,6 +2,7 @@
 #include "tools/networking/networking_logger.h"
 #include "tools/networking/networking_system.h"
 #include "tools/networking/packet_handler.h"
+#include <eastl/sort.h>
 
 namespace sulphur
 {
@@ -23,96 +24,84 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    uint16_t ValueSyncer::CreateValue(NetworkValueType type, void* location,
+    SyncValueID ValueSyncer::CreateValue(NetworkValueType type,
       NetworkValueOwner owner)
     {
-      uint16_t id = RequestID();
+      SyncValueID id = RequestID();
       SyncableNetworkValue nv;
-      nv.location = location;
-      nv.value = NetworkValueFromLocation(location, type);
+      nv.updated = false;
+      nv.value = DefaultNetworkValue(type);
       value_stack_[id] = nv;
-      if ((owner == NetworkValueOwner::kHost && networking_system_->is_host())
-        || (owner == NetworkValueOwner::kMe))
-      {
-        our_values_.push_back(id);
-      }
+      all_values_.push_back({ id, owner });
+
       return id;
     }
 
     //-------------------------------------------------------------------------
-    void ValueSyncer::RemoveValue(uint16_t id)
+    void ValueSyncer::RemoveValue(SyncValueID id)
     {
-      id_stack_.push_back(id);
-
-      foundation::Vector<uint16_t>::iterator iter_ = 
-        eastl::find(our_values_.begin(), our_values_.end(), id);
-      if (iter_ == our_values_.end())
+      foundation::Vector<SyncValueIDWithOwner>::iterator iter_ =
+        eastl::find(all_values_.begin(), all_values_.end(), id);
+      if (iter_ == all_values_.end())
       {
-        PS_LOG_WITH(NetworkLogger, Warning, 
+        PS_LOG_WITH(NetworkLogger, Warning,
           "Tried removing invalid value: %u", static_cast<unsigned int>(id));
         return;
       }
-      if (iter_ != our_values_.end() - 1)
+      if (iter_ != all_values_.end() - 1)
       {
-        eastl::iter_swap(iter_, our_values_.end() - 1);
+        eastl::iter_swap(iter_, all_values_.end() - 1);
       }
-      our_values_.pop_back();
+      id_stack_.push_back(id);
+      all_values_.pop_back();
     }
 
     //-------------------------------------------------------------------------
     void ValueSyncer::Sync()
     {
-      foundation::Vector<uint16_t>::iterator iter_;
-      for (iter_ = our_values_.begin(); iter_ != our_values_.end(); ++iter_)
+      if (networking_system_->connection_setup() == ConnectionSetup::kNone)
       {
-        const uint16_t& id = *iter_;
-        if (NeedsUpdate(value_stack_[id]))
+        return;
+      }
+
+      foundation::Vector<SyncValueIDWithOwner>::iterator iter_;
+      for (iter_ = all_values_.begin(); iter_ != all_values_.end(); ++iter_)
+      {
+        const SyncValueID& id = iter_->id;
+        if (value_stack_[id].updated == true)
         {
-          value_stack_[id].value = NetworkValueFromLocation(
-            value_stack_[id].location, value_stack_[id].value.type);
-          packet_handler_->HostClientSyncValue(id, value_stack_[id].value);
+          if ((iter_->owner == NetworkValueOwner::kHost && networking_system_->is_host())
+            || (iter_->owner == NetworkValueOwner::kMe))
+          {
+            value_stack_[id].updated = false;
+            packet_handler_->HostClientSyncValue(id, value_stack_[id].value);
+          }
         }
       }
     }
 
     //-------------------------------------------------------------------------
-    size_t ValueSyncer::ClientHostProcessValueSync(uint8_t* data, 
+    size_t ValueSyncer::ClientHostProcessValueSync(uint8_t* data,
       ENetPeer* from)
     {
-      uint16_t id;
-      memcpy(&id, data, 2);
+      SyncValueID id;
+      memcpy(&id, data, sizeof(SyncValueID));
 
       NetworkValueType type = value_stack_[id].value.type;
-      size_t size = 0;
-
-      switch (type)
+      NetworkValue temp_value = { };
+      temp_value.type = type;
+      size_t size = temp_value.GetSize();
+      size_t size_string = 0;
+      if (type == NetworkValueType::kString)
       {
-      case NetworkValueType::kFloat:
-        size = sizeof(float);
-        break;
-      case NetworkValueType::kDouble:
-        size = sizeof(double);
-        break;
-      case NetworkValueType::kInt:
-        size = sizeof(int);
-        break;
-      case NetworkValueType::kUnsignedInt:
-        size = sizeof(unsigned int);
-        break;
-      case NetworkValueType::kBool:
-        size = sizeof(bool);
-        break;
-      case NetworkValueType::kVec2:
-        size = sizeof(glm::vec2);
-        break;
-      case NetworkValueType::kVec3:
-        size = sizeof(glm::vec3);
-        break;
-      case NetworkValueType::kVec4:
-        size = sizeof(glm::vec4);
-        break;
-      default:
-        break;
+        size_string = static_cast<size_t>(data[2]);
+        size = size_string;
+        size++;
+      }
+
+      if (networking_system_->connection_setup() == ConnectionSetup::kNone)
+      {
+        return 2 + size;
       }
 
       if (ValidateID(id) == false)
@@ -122,14 +111,20 @@ namespace sulphur
         return 2 + size;
       }
 
-      memcpy(value_stack_[id].location, &data[2], size);
+      if (type == NetworkValueType::kString)
+      {
+        memset(value_stack_[id].value.str, '\0', kStringLength);
+        memcpy(value_stack_[id].value.str, &data[3], size_string);
+      }
+      else
+      {
+        memcpy(static_cast<void*>(&value_stack_[id].value.f), &data[2], size);
+      }
 
       if (networking_system_->is_host())
       {
         //if we recieve a message as a host, it means that we need to send it to the other clients
-        packet_handler_->HostClientSyncValue(id, 
-          NetworkValueFromLocation(value_stack_[id].location, 
-            value_stack_[id].value.type), from);
+        packet_handler_->HostClientSyncValue(id, value_stack_[id].value, from);
       }
       return 2 + size;
     }
@@ -137,27 +132,32 @@ namespace sulphur
     //-------------------------------------------------------------------------
     void ValueSyncer::ClientProcessValueValidation(uint8_t* data)
     {
-      uint16_t id = 0;
+      SyncValueID id = 0;
       memcpy(&id, &data[0], 2);
       uint8_t type = 0;
       memcpy(&type, &data[2], 1);
 
+      if (networking_system_->connection_setup() == ConnectionSetup::kNone)
+      {
+        return;
+      }
+
       if (ValidateID(id) == false)
       {
-        PS_LOG_WITH(NetworkLogger, Error, 
+        PS_LOG_WITH(NetworkLogger, Error,
           "Value with id: %u is invalid!", static_cast<unsigned int>(id));
         return;
       }
 
       if (value_stack_[id].value.type != static_cast<NetworkValueType>(type))
       {
-        PS_LOG_WITH(NetworkLogger, Error, 
+        PS_LOG_WITH(NetworkLogger, Error,
           "Value with id: %u is invalid!", static_cast<unsigned int>(id));
       }
     }
 
     //-------------------------------------------------------------------------
-    void ValueSyncer::ValidateValue(uint16_t id)
+    void ValueSyncer::ValidateValue(SyncValueID id)
     {
       if (networking_system_->is_host() == false)
       {
@@ -182,8 +182,48 @@ namespace sulphur
 
       for (unsigned int i = 0; i < value_stack_.size(); ++i)
       {
-        ValidateValue(static_cast<uint16_t>(i));
+        ValidateValue(static_cast<SyncValueID>(i));
       }
+    }
+
+    //-------------------------------------------------------------------------
+    void ValueSyncer::CleanUp()
+    {
+      id_stack_.clear();
+      for (unsigned int i = 0; i < value_stack_.size(); ++i)
+      {
+        id_stack_.push_back(static_cast<SyncValueID>(i));
+      }
+    }
+
+    //-------------------------------------------------------------------------
+    void ValueSyncer::SortIDs()
+    {
+      eastl::sort(id_stack_.begin(), id_stack_.end());
+    }
+
+    //-------------------------------------------------------------------------
+    void ValueSyncer::SetValue(SyncValueID id, const NetworkValue& value)
+    {
+      if (ValidateID(id) == true)
+      {
+        if (value_stack_[id].value != value)
+        {
+          value_stack_[id].updated = true;
+          value_stack_[id].value = value;
+        }
+      }
+    }
+
+    //-------------------------------------------------------------------------
+    bool ValueSyncer::GetValue(SyncValueID id, NetworkValue* value)
+    {
+      bool result = ValidateID(id);
+      if (result == true)
+      {
+        *value = value_stack_[id].value;
+      }
+      return result;
     }
 
     //-------------------------------------------------------------------------
@@ -204,74 +244,80 @@ namespace sulphur
 
       for (unsigned int i = current_size; i < new_size; ++i)
       {
-        id_stack_.push_back(static_cast<uint16_t>(i));
+        id_stack_.push_back(static_cast<SyncValueID>(i));
       }
     }
 
     //-------------------------------------------------------------------------
-    uint16_t ValueSyncer::RequestID()
+    SyncValueID ValueSyncer::RequestID()
     {
       if (id_stack_.size() == 0)
       {
         GrowStack();
       }
 
-      uint16_t id = id_stack_.front();
+      SyncValueID id = id_stack_.front();
       id_stack_.pop_front();
       return id;
     }
 
     //-------------------------------------------------------------------------
-    bool ValueSyncer::ValidateID(uint16_t id)
+    bool ValueSyncer::ValidateID(SyncValueID id)
     {
       if (id >= value_stack_.size())
       {
         return false;
       }
-      
+
       return eastl::find(id_stack_.begin(), id_stack_.end(), id)
         == id_stack_.end();
     }
 
     //-------------------------------------------------------------------------
-    bool ValueSyncer::NeedsUpdate(const SyncableNetworkValue& nv)
+    NetworkValue ValueSyncer::DefaultNetworkValue(const NetworkValueType type)
     {
-      NetworkValue other =
-        NetworkValueFromLocation(nv.location, nv.value.type);
-      return other != nv.value;
-    }
-
-    //-------------------------------------------------------------------------
-    NetworkValue ValueSyncer::NetworkValueFromLocation(void* location,
-      const NetworkValueType type)
-    {
-      NetworkValue nv;
+      NetworkValue nv = { };
       nv.type = type;
       switch (type)
       {
       case NetworkValueType::kFloat:
-        nv.f = *static_cast<float*>(location);
+        nv.f = 0.0f;
         break;
       case NetworkValueType::kDouble:
-        nv.d = *static_cast<double*>(location);
+        nv.d = 0.0;
         break;
       case NetworkValueType::kInt:
-        nv.i = *static_cast<int*>(location);
+        nv.i = 0;
         break;
       case NetworkValueType::kUnsignedInt:
-        nv.ui = *static_cast<unsigned int*>(location);
+        nv.ui = 0u;
         break;
       case NetworkValueType::kBool:
-        nv.b = *static_cast<bool*>(location);
+        nv.b = false;
         break;
       case NetworkValueType::kVec2:
-        nv.v2 = *static_cast<glm::vec2*>(location);
+        nv.v2 = glm::vec2(0.0f);
         break;
       case NetworkValueType::kVec3:
-        nv.v3 = *static_cast<glm::vec3*>(location);
+        nv.v3 = glm::vec3(0.0f);
         break;
       case NetworkValueType::kVec4:
-        nv.v4 = *static_cast<glm::vec4*>(location);
+        nv.v4 = glm::vec4(0.0f);
+        break;
+      case NetworkValueType::kInt8:
+        nv.i8 = 0;
+        break;
+      case NetworkValueType::kInt16:
+        nv.i16 = 0;
+        break;
+      case NetworkValueType::kUnsignedInt8:
+        nv.ui8 = 0u;
+        break;
+      case NetworkValueType::kUnsignedInt16:
+        nv.ui16 = 0u;
+        break;
+      case NetworkValueType::kString:
+        memset(nv.str, '\0', kStringLength);
         break;
       }
       return nv;

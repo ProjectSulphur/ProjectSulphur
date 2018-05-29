@@ -1,6 +1,6 @@
 #pragma once
-#include "tools/networking/network_value.h"
-#include "tools/networking/value_owner.h"
+#include "tools/networking/syncable_network_value.h"
+#include "tools/networking/network_value_owner.h"
 #include "tools/networking/enet_fwd.h"
 #include <foundation/containers/vector.h>
 #include <foundation/containers/deque.h>
@@ -10,7 +10,7 @@ namespace sulphur
 {
   namespace networking
   {
-    const unsigned int kValueStackSize = 32;//!<The size of a value stack, used to increase the pool
+    const unsigned int kValueStackSize = 32; //!<The size of a value stack, used to increase the pool
 
     class PacketHandler;
     class NetworkingSystem;
@@ -24,6 +24,8 @@ namespace sulphur
     public:
       /**
       * @brief Constructor
+      * @param[in] networking_system (sulphur::networking::NetworkingSystem) The system
+      * @param[in] packet_handler (sulphur::networking::PacketHandler) The packet handler
       */
       ValueSyncer(NetworkingSystem* networking_system, PacketHandler* packet_handler);
       /**
@@ -33,16 +35,15 @@ namespace sulphur
       /**
       * @brief Create a syncable value
       * @param[in] type (sulphur::networking::NetworkValueType) The type of the value
-      * @param[in] location (void*) The location of the value in the engine
       * @param[in] owner (sulphur::networking::NetworkValueOwner) The owner of the value
-      * @return (uint16_t) The id associated with the value
+      * @return (sulphur::networking::SyncValueID) The id associated with the value
       */
-      uint16_t CreateValue(NetworkValueType type, void* location, NetworkValueOwner owner);
+      SyncValueID CreateValue(NetworkValueType type, NetworkValueOwner owner);
       /**
       * @brief Remove a value from the synclist
-      * @param[in] id (uint16_t) The id of the value
+      * @param[in] id (sulphur::networking::SyncValueID) The id of the value
       */
-      void RemoveValue(uint16_t id);
+      void RemoveValue(SyncValueID id);
       /**
       * @brief Sync the proper values
       */
@@ -60,7 +61,7 @@ namespace sulphur
       void ClientProcessValueValidation(uint8_t* data);
       /**
       * @brief Validates a value on other clients
-      * @param[in] id (uint8_t) The id we want to validate
+      * @param[in] id (sulphur::networking::SyncValueID) The id we want to validate
       * @remarks This function should be used occasionally
       * @remarks Only the host is able to use this call,
       this is because the host should have the correct version of the game, anyone else is wrong.
@@ -68,7 +69,7 @@ namespace sulphur
       sometimes in 1 frame, a value could possibly not be create yet.
       However if it keeps occuring something is wrong.
       */
-      void ValidateValue(uint16_t id);
+      void ValidateValue(SyncValueID id);
       /**
       * @brief Validates all values on other clients. Just as ValidateValue does
       * @remarks This function should be used occasionally
@@ -79,12 +80,34 @@ namespace sulphur
       However if it keeps occuring something is wrong.
       */
       void ValidateAllValues();
+      /**
+      * @brief CleanUp the leftover calls and reset the id stack
+      */
+      void CleanUp();
+      /**
+      * @brief The ids that are not in use need to be sorted. This is mostly for the client after exiting a game,
+      then connecting to a new one. The lifetime rpcs still exist, but the gameplay rpcs are gone, resulting in a weird id stack
+      */
+      void SortIDs();
+      /**
+      * @brief Set the value of a syncable value
+      * @param[in] id (sulphur::networking::SyncValueID) The id of the syncvalue we want to set the value
+      * @param[in] value (const NetworkValue&) The value
+      */
+      void SetValue(SyncValueID id, const NetworkValue& value);
+      /**
+      * @brief Get the value of a syncable value
+      * @param[in] id (sulphur::networking::SyncValueID) The id of the syncvalue we want to get the value
+      * @param[out] value (NetworkValue*) A pointer to a networkvalue
+      * @return (bool) If getting the value succeeded
+      */
+      bool GetValue(SyncValueID id, NetworkValue* value);
     private:
-      NetworkingSystem * networking_system_;//!<The networking system
+      NetworkingSystem* networking_system_;//!<The networking system
       PacketHandler* packet_handler_;//!<The packet handler
       foundation::Vector<SyncableNetworkValue> value_stack_; //!<The values we need to sync
-      foundation::Deque<uint16_t> id_stack_;//!<The list of available ids
-      foundation::Vector<uint16_t> our_values_;//!<The list with ids that we need to sync
+      foundation::Deque<SyncValueID> id_stack_;//!<The list of available ids
+      foundation::Vector<SyncValueIDWithOwner> all_values_;//!<The list with ids that we need to sync
       /**
       * @brief Grow the stack of values and ids safely
       * @remarks Internal use only
@@ -93,32 +116,23 @@ namespace sulphur
       /**
       * @brief Request and unique ID, will grow the pool if needed
       * @remarks Internal use only
-      * @return (uint16_t) The id
+      * @return (sulphur::networking::SyncValueID) The id
       */
-      uint16_t RequestID();
+      SyncValueID RequestID();
       /**
       * @brief A check if the value is in use by the system, should prevent crashes on invalidations
-      * @param[in] id (uint16_t id) The id
+      * @param[in] id (sulphur::networking::SyncValueID) The id
       * @remarks Internal use only
-      * @return (bool) If the value is in use by the system
+      * @return (sulphur::networking::SyncValueID) If the value is in use by the system
       */
-      bool ValidateID(uint16_t id);
+      bool ValidateID(SyncValueID id);
       /**
-      * @brief Check if the value needs syncing
-      * @param[in] nv (const sulphur::networking::SyncableNetworkValue&) The value
-      * @remarks Internal use only
-      * @return (bool) If we need to sync this value
-      */
-      bool NeedsUpdate(const SyncableNetworkValue& nv);
-      /**
-      * @brief Create a NetworkValue from location and type
-      * @param[in] location (void*) The location
+      * @brief Create a default NetworkValue
       * @param[in] type (const sulphur::networking::NetworkValueType) The type
       * @remarks Internal use only
       * @return (const sulphur::networking::NetworkValue) the NetworkValue
       */
-      NetworkValue NetworkValueFromLocation(void* location,
-        const NetworkValueType type);
+      NetworkValue DefaultNetworkValue(const NetworkValueType type);
     };
   }
 }

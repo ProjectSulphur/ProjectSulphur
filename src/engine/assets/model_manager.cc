@@ -6,15 +6,17 @@
 #include <foundation/memory/memory.h>
 
 #include <foundation/pipeline-assets/model.h>
+#include <foundation/io/filesystem.h>
 
 namespace sulphur
 {
   namespace engine
   {
     //--------------------------------------------------------------------------------
-    Model* ModelManager::ImportAsset(const foundation::String& asset_file)
+    Model* ModelManager::ImportAsset(const foundation::Path& asset_file)
     {
-      foundation::BinaryReader reader(asset_file);
+      foundation::BinaryReader reader(
+        foundation::Path(application_->project_directory()) + asset_file);
       if (reader.is_ok())
       {
         AssetSystem& asset_system = AssetSystem::Instance();

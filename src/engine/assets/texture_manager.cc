@@ -9,9 +9,10 @@ namespace sulphur
   namespace engine
   {
     //--------------------------------------------------------------------------------
-    Texture* TextureManager::ImportAsset(const foundation::String& asset_file)
+    Texture* TextureManager::ImportAsset(const foundation::Path& asset_file)
     {
-      foundation::BinaryReader reader(asset_file);
+      foundation::BinaryReader reader(
+        foundation::Path(application_->project_directory()) + asset_file);
       if (reader.is_ok() == true)
       {
         foundation::TextureData texture_data = reader.Read<foundation::TextureData>();

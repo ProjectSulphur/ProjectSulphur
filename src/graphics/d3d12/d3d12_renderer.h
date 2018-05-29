@@ -10,6 +10,7 @@
 #include "graphics/d3d12/assets/d3d12_material_manager.h"
 
 #include <engine/assets/material.h>
+#include <engine/assets/post_process_material.h>
 #include <engine/assets/mesh.h>
 
 #include <foundation/utils/color.h>
@@ -54,7 +55,7 @@ namespace sulphur
       * @see sulphur::engine::IRenderer::OnInitialize
       */
       void OnInitialize(
-        foundation::NativeWindowHandle hWnd,
+        void* window_handle,
         const glm::ivec2& screen_size = glm::ivec2(1280, 720),
         bool vsync = false) override;
 
@@ -72,7 +73,7 @@ namespace sulphur
       * @see sulphur::engine::IRenderer::OnResizeWindow
       */
       void OnResizeWindow(uint width, uint height) override;
-
+      
       /**
       * @see sulphur::engine::IRenderer::StartFrame
       */
@@ -90,6 +91,11 @@ namespace sulphur
       void SetMesh(const engine::MeshHandle& mesh) override;
 
       /**
+      * @see sulphur::engine::IRenderer::SetBoneMatrices
+      */
+      void SetBoneMatrices(const foundation::Vector<glm::mat4>& bone_matrices) override;
+
+      /**
       * @see sulphur::engine::IRenderer::SetPipelineState
       */
       void SetPipelineState(const PipelineState& pipeline_state) override;
@@ -98,6 +104,11 @@ namespace sulphur
       * @see sulphur::engine::IRenderer::SetMaterial
       */
       void SetMaterial(const engine::MaterialPass& material) override;
+
+      /**
+      * @see sulphur::engine::IRenderer::SetComputePass
+      */
+      void SetComputePass(const engine::ComputePass& pass) override;
 
       /**
       * @see sulphur::engine::IRenderer::SetCamera
@@ -139,7 +150,13 @@ namespace sulphur
       /**
       * @see sulphur::engine::IRenderer::Draw
       */
-      void Draw() override;
+      void Draw(uint index_count = 0, uint index_offset = 0) override;
+
+      /**
+      * @brief Copies the render target contents onto the back buffer, overwriting it
+      * @see sulphur::engine::IRenderer::CopyToScreen
+      */
+      void CopyToScreen(const engine::RenderTarget& render_target) override;
 
       /**
       * @see sulphur::engine::IRenderer::Dispatch
@@ -152,14 +169,36 @@ namespace sulphur
       */
       void SetVsync(bool value) override;
 
+      /**
+      * @see sulphur::engine::IRenderer::SetStencilRef
+      */
+      void SetStencilRef(uint value) override;
+
     protected:
       // Setting GPU resources
       /**
       * @brief Sets the currently used texture at the specified register id.
       * @param[in] register_id (int) The register id to bind the texture to.
       * @param[in] texture (const sulphur::engine::TextureHandle&) A handle to the texture to set.
+      * @param[in] is_compute_resource (bool) Is this texture being bound as a resource to a compute shader?
+      * @param[in] use_ping_pong (bool) Is the current pass using this texture as a ping-pong buffer?
       */
-      void SetTexture(int register_id, const engine::TextureHandle& texture);
+      void SetTexture(
+        int register_id,
+        const engine::TextureHandle& texture,
+        bool is_compute_resource = false,
+        bool use_ping_pong = false);
+
+      /**
+      * @brief Sets the currently used Read/Write texture at the specified register id.
+      * @param[in] register_id (int) The register id to bind the texture to.
+      * @param[in] uav_texture (const sulphur::engine::TextureHandle&) A handle to the texture to set.
+      * @param[in] use_ping_pong (bool) Is the current pass using this texture as a ping-pong buffer?
+      */
+      void SetUAV(
+        int register_id,
+        const engine::TextureHandle& uav_texture,
+        bool use_ping_pong = false);
 
       /**
       * @brief Sets the currently used render target at the specified register id with an optimized clear value.
@@ -187,7 +226,6 @@ namespace sulphur
       */
       void LoadTexture(
         const engine::TextureHandle& texture,
-        const D3D12TextureType type,
         foundation::Color clear_color = foundation::Color::kBlackTransparent);
 
       /**
@@ -248,11 +286,10 @@ namespace sulphur
       IDXGISwapChain3* swap_chain_; //!< The DirectX swap chain object.
 
       // TODO: Replace with proper resource wrappers?
-      ID3D12Resource* OM_render_targets_[BACK_BUFFER_COUNT]; //!< DirectX 12 resources for the back buffers
-      uint32_t persistent_render_target_handles_[BACK_BUFFER_COUNT]; //!< Handles to the back buffer descriptors in the persistent descriptor heap.
+      D3D12Texture2D* OM_render_targets_[BACK_BUFFER_COUNT]; //!< DirectX 12 resources for the back buffers
       ID3D12Resource* depth_buffer_[BACK_BUFFER_COUNT]; //!< DirectX 12 resource for the main depth buffers.
       uint32_t persistent_depth_buffer_handles_[BACK_BUFFER_COUNT]; //!< Handles to the main depth buffer descriptors in the persistent descriptor heap.
-
+      
       // TODO: Temporary root signature
       ID3D12RootSignature* root_signature_; //!< The default root signature.
 

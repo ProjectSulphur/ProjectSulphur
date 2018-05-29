@@ -1,10 +1,16 @@
 #pragma once
 #include "physics/iphysics_body.h"
+#include "physics/physics_collider.h"
+
+#include <foundation/containers/vector.h>
 
 class btCollisionShape;
 struct btDefaultMotionState;
 class btRigidBody;
 class btDiscreteDynamicsWorld;
+class btCompoundShape;
+class btManifoldPoint;
+struct btCollisionObjectWrapper;
 
 namespace sulphur
 {
@@ -176,8 +182,6 @@ namespace sulphur
       */
       glm::bvec3 GetRotationLock() const override;
 
-      
-
       /**
       * @see sulphur::physics::IPhysicsBody::SetPhysicsBodyType
       */
@@ -187,17 +191,111 @@ namespace sulphur
       */
       PhysicsBodyType GetPhysicsBodyType() const override;
 
-    protected:
-      friend class PhysicsShape; //!< Declared friend class for attaching shapes to the body.
       /**
-      * @see sulphur::physics::IPhysicsBody::SetShape
+      * @see sulphur::physics::IPhysicsBody::AddShape
+      * @remarks Modifying the body's shape will recalculate the inertia tensor automatically.
       */
-      void SetShape(PhysicsShape* shape) override;
+      PhysicsCollider* AddShape(PhysicsShape* shape) override;
+
+      /**
+      * @see sulphur::physics::IPhysicsBody::RemoveShape
+      * @remarks Modifying the body's shape will recalculate the inertia tensor automatically.
+      */
+      void RemoveShape(PhysicsCollider* collider) override;
+
+      /**
+      * @brief Updates the collider BulletBody-side.
+      * @param[in] collider (sulphur::physics::PhysicsCollider*) The collider to update.
+      * @remarks Modifying the body's shape will recalculate the inertia tensor automatically.
+      */
+      void UpdateCollider(PhysicsCollider* collider) override;
+
+      /**
+      * @brief Set the friction combine mode.
+      * @param[in] mode (sulphur::physics::PhysicsCollider::MaterialCombineMode) The combine mode to set it to.
+      * @internal
+      */
+      void set_friction_combine_mode(PhysicsCollider::MaterialCombineMode mode);
+
+      /**
+      * @brief Returns the friction combine mode.
+      * @return (sulphur::physics::PhysicsCollider::MaterialCombineMode) The combine mode currently in use.
+      * @internal
+      */
+      PhysicsCollider::MaterialCombineMode friction_combine_mode() const;
+
+      /**
+      * @brief Set the restitution combine mode.
+      * @param[in] mode (sulphur::physics::PhysicsCollider::MaterialCombineMode) The combine mode to set it to.
+      * @internal
+      */
+      void set_restitution_combine_mode(PhysicsCollider::MaterialCombineMode mode);
+
+      /**
+      * @brief Returns the restitution combine mode.
+      * @return (sulphur::physics::PhysicsCollider::MaterialCombineMode) The combine mode currently in use.
+      * @internal
+      */
+      PhysicsCollider::MaterialCombineMode restitution_combine_mode() const;
+
+      /**
+      * @brief Set the static friction coefficient.
+      * @param[in] friction (float) The static friction coefficient to use.
+      * @internal
+      */
+      void set_static_friction(float friction);
+
+      /**
+      * @brief Returns the static friction coefficient.
+      * @return (float) The static friction coefficient currently in use.
+      * @internal
+      */
+      float static_friction() const;
+
+      /**
+      * @brief Returns the Bullet rigid body.
+      * @returns (btRigidBody*) The Bullet rigid body.
+      * @internal
+      */
+      btRigidBody* rigid_body() const;
 
     private:
+
+      /**
+      * @brief Returns the index of the given collider on this body.
+      * @param[in] collider (sulphur::physics::PhysicsCollider*) The collider on this body.
+      * @return (int) The index of the collider. Returns -1 if the collider is not attached.
+      * @internal
+      */
+      int GetColliderIndex(PhysicsCollider* collider) const;
+
       btDiscreteDynamicsWorld* dynamics_world_; //!< The world that the body lives in
       btDefaultMotionState* motion_state_; //!< The default motion state
       btRigidBody* rigid_body_; //!< The Bullet rigid body
+
+      btCompoundShape* shape_; //!< The shape container, can manage multiple shapes.
+      foundation::Vector<PhysicsCollider*> colliders_; //!< List of colliders currently attached to this body.
+
+      // Because Bullet handles materials per body, additional material data and functions will be handled by this class as well.
+
+      /**
+      * @brief Custom material callback. Function signature is defined by Bullet. Internal use only.
+      * @param[in] contact_point (btManifoldPoint&) The contact point.
+      * @param[in] col_obj0_wrap (btCollisionObjectWrapper*) Collision object wrapper.
+      * @param[in] part_id0 (int) Collision data.
+      * @param[in] index0 (int) Collision data.
+      * @param[in] col_obj1_wrap (btCollisionObjectWrapper*) Collision object wrapper.
+      * @param[in] part_id1 (int) Collision data.
+      * @param[in] index1 (int) Collision data.
+      * @returns (bool) Unused return value.
+      */
+      static bool CustomMaterialCallback(btManifoldPoint& contact_point,
+        const btCollisionObjectWrapper* col_obj0_wrap, int part_id0, int index0,
+        const btCollisionObjectWrapper* col_obj1_wrap, int part_id1, int index1);
+
+      PhysicsCollider::MaterialCombineMode friction_combine_mode_; //!< Combine mode used for calculating friction.
+      PhysicsCollider::MaterialCombineMode restitution_combine_mode_; //!< Combine mode used for calculating restitution.
+      float static_friction_; //!< Static friction coefficient, which doesn't exist in Bullet.
     };
   }
 }

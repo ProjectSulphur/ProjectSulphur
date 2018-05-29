@@ -3,10 +3,6 @@
 
 #include <foundation/pipeline-assets/shader.h>
 
-#if defined(PS_PS4)
-#include <graphics/gnm/ps4_default_shaders.h>
-#endif
-
 namespace sulphur
 {
   namespace engine
@@ -30,7 +26,26 @@ namespace sulphur
       geometry_shader_(geometry_shader),
       pixel_shader_(pixel_shader)
     {
-
+      if (vertex_shader_)
+      {
+        assert(vertex_shader_->IsValid() && vertex_shader_->type() == ShaderType::kVertex);
+      }
+      if (hull_shader_)
+      {
+        assert(hull_shader_->IsValid() && hull_shader_->type() == ShaderType::kHull);
+      }
+      if (domain_shader_)
+      {
+        assert(domain_shader_->IsValid() && domain_shader_->type() == ShaderType::kDomain);
+      }
+      if (geometry_shader_)
+      {
+        assert(geometry_shader_->IsValid() && geometry_shader_->type() == ShaderType::kGeometry);
+      }
+      if (pixel_shader_)
+      {
+        assert(pixel_shader_->IsValid() && pixel_shader_->type() == ShaderType::kPixel);
+      }
     }
 
     //--------------------------------------------------------------------------------
@@ -44,7 +59,7 @@ namespace sulphur
         return hull_shader_->uniform_buffer();
       case ShaderType::kDomain:
         return domain_shader_->uniform_buffer();
-      case ShaderType::kGemometry:
+      case ShaderType::kGeometry:
         return geometry_shader_->uniform_buffer();
       case ShaderType::kPixel:
       default:
@@ -53,7 +68,7 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------------
-    const ShaderProgramHandle Shader::GetShaderByType(ShaderType type) const
+    const ShaderProgramHandle& Shader::GetShaderByType(ShaderType type) const
     {
       switch (type)
       {
@@ -63,7 +78,7 @@ namespace sulphur
         return hull_shader_;
       case ShaderType::kDomain:
         return domain_shader_;
-      case ShaderType::kGemometry:
+      case ShaderType::kGeometry:
         return geometry_shader_;
       case ShaderType::kPixel:
       default:
@@ -82,11 +97,30 @@ namespace sulphur
         return hull_shader_->GetTextureInfo();
       case ShaderType::kDomain:
         return domain_shader_->GetTextureInfo();
-      case ShaderType::kGemometry:
+      case ShaderType::kGeometry:
         return geometry_shader_->GetTextureInfo();
       case ShaderType::kPixel:
       default:
         return pixel_shader_->GetTextureInfo();
+      }
+    }
+
+    //--------------------------------------------------------------------------------
+    const foundation::Vector<TextureInfo>& Shader::GetUAVInfo(ShaderType type) const
+    {
+      switch (type)
+      {
+      case ShaderType::kVertex:
+        return vertex_shader_->GetUAVInfo();
+      case ShaderType::kHull:
+        return hull_shader_->GetUAVInfo();
+      case ShaderType::kDomain:
+        return domain_shader_->GetUAVInfo();
+      case ShaderType::kGeometry:
+        return geometry_shader_->GetUAVInfo();
+      case ShaderType::kPixel:
+      default:
+        return pixel_shader_->GetUAVInfo();
       }
     }
 
@@ -100,24 +134,11 @@ namespace sulphur
       if (!init_)
       {
         init_ = true;
-
-#ifdef PS_WIN32
-#include <graphics/d3d12/d3d12_default_vertex.h>
-        const byte* p = default_vs;
-        size_t len = sizeof(default_vs);
-#elif defined(PS_PS4)
-        const byte* p = default_vertex_shader;
-        size_t len = sizeof(default_vertex_shader);
-#endif
-        vertex_shader_ = as.AddAsset<ShaderProgram>(
-          foundation::Memory::Construct<ShaderProgram>(),
-          "__default_vertex_shader");
-
-        vertex_shader_->shader_byte_code_.assign(p, p + len);
+        vertex_shader_ = as.Load<ShaderProgram>("ps_default_vertex_shader");
       }
       else
       {
-        vertex_shader_ = as.GetHandle<ShaderProgram>("__default_vertex_shader");
+        vertex_shader_ = as.GetHandle<ShaderProgram>("ps_default_vertex_shader");
       }
     }
 
@@ -131,25 +152,11 @@ namespace sulphur
       if (!init_)
       {
         init_ = true;
-
-#ifdef PS_WIN32
-#include <graphics/d3d12/d3d12_default_pixel.h>
-        const byte* p = default_ps;
-        size_t len = sizeof(default_ps);
-#elif defined(PS_PS4)
-        const byte* p = default_pixel_shader;
-        size_t len = sizeof(default_pixel_shader);
-#endif
-        pixel_shader_ = as.AddAsset<ShaderProgram>(
-          foundation::Memory::Construct<ShaderProgram>(),
-          "__default_pixel_shader");
-        
-        pixel_shader_->textures_.resize(1);
-        pixel_shader_->shader_byte_code_.assign(p, p + len);
+        pixel_shader_ = as.Load<ShaderProgram>("ps_default_pixel_shader");
       }
       else
       {
-        pixel_shader_ = as.GetHandle<ShaderProgram>("__default_pixel_shader");
+        pixel_shader_ = as.GetHandle<ShaderProgram>("ps_default_pixel_shader");
       }
     }
   }

@@ -16,7 +16,8 @@ namespace sulphur
     {
       static int idx = 0;
 
-      Texture* texture_01 = foundation::Memory::Construct<Texture>(width, height, format);
+      Texture* texture_01 = foundation::Memory::Construct<Texture>(width, height, format,
+        TextureCreateFlags::kAllowDepthStencil);
 
       buffer_ = AssetSystem::Instance().AddAsset(
         texture_01,

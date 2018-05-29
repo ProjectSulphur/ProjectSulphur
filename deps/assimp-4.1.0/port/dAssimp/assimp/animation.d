@@ -1,4 +1,4 @@
-﻿/*
+/*
 ---------------------------------------------------------------------------
 Open Asset Import Library (ASSIMP)
 ---------------------------------------------------------------------------
@@ -120,8 +120,8 @@ extern ( C ) {
     * matrix at a specific time. This means all keys are absolute and not
     * relative to the bone default pose.
     *
-    * The order in which the transformations are applied is â€“
-    * as usual â€“ scaling, rotation, translation.
+    * The order in which the transformations are applied is –
+    * as usual – scaling, rotation, translation.
     *
     * Note: All keys are returned in their correct, chronological order.
     *    Duplicate keys don't pass the validation step. Most likely there will

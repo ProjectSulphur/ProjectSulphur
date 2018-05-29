@@ -4,7 +4,7 @@ using System.Windows.Controls;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Windows.Input;
-using System.Windows.Media;
+using System.Windows.Documents;
 
 namespace sulphur
 {
@@ -12,39 +12,40 @@ namespace sulphur
   {
     namespace controls
     {
-      public partial class AssetBrowserControl : UserControl, ISubscribeable, INotifyPropertyChanged
+      /**
+       *@class sulphur.editor.controls.AssetBrowserControl : UserControl, sulphur.editor.ISubscribeable, INotifyPropertyChanged 
+       *@brief the asset browser xaml code behind for handling control events and response to notifications 
+       *@author Stan Pepels
+       */
+      public partial class AssetBrowserControl : UserControl, ISubscribeable
       {
-        /*public members*/
-        public List<AssetCacheData> asset_list
+        /**
+         * @brief Notifications ids for messages send to other systems.
+         */
+        public enum Notifications
         {
-          get
-          {
-            return asset_list_value;
-          }
-          set
-          {
-            if (value != asset_list_value)
-            {
-              asset_list_value = value;
-              NotifyPropertyChanged();
-            }
-          }
+          kFileDrop, //!< Indicates that a file has been dropped on this control.
+          kAssetRemoved, //!< Indicated that an has been removed.
+          kAssetInstantiated //!< Indicates that an object has been instatiated using a certain asset.
         }
-        public event PropertyChangedEventHandler PropertyChanged;
 
+        /**
+         *@brief constructor 
+         */
         public AssetBrowserControl()
         {
           InitializeComponent();
-          folder_explorer.SelectedItemChanged += FolderExplorerSelectionChanged;
-          database = Application.Current.Resources["asset_database"] as AssetDatabase;
         }
 
         #region ISubscribable
+        /**
+          *@brief get the subscritions to systems we want recieve notifications from
+          *@return (sulphur.editor.Subscription[]) arrray of subscriptions to systems  
+          *@remark this system is subscribed to the asset database
+          */
         public Subscription[] GetSubscriptions()
         {
-          Subscription[] subscritions = new Subscription[1];
-          subscritions[0] = new Subscription(ID.type_id<AssetDatabase>.value(), OnNotification);
-          return subscritions;
+          return null;
         }
 
         event OnNotification ISubscribeable.notify_event
@@ -57,47 +58,25 @@ namespace sulphur
           {
             notify_subscribers_ -= value;
           }
-        }
+        }//<! event fired for notifying subscribed system that something important happend
         #endregion
 
-        /*private members*/   
+        /**
+         *@brief actual event handler used to fire the notification event from the sulphur.editor.ISubscribeable interface
+         */
         private event OnNotification notify_subscribers_;
-        private DirectoryItem curr_directory;
-        private List<AssetCacheData> asset_list_value;
-        private AssetDatabase database { get; set; }
 
-        private void NotifyPropertyChanged(string propertyName = "")
-        {
-          PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        private void FolderExplorerSelectionChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
-        {
-          curr_directory = e.NewValue as DirectoryItem;
-          if (curr_directory != null)
-          {
-            asset_list = database.GetAssetsInFolder(curr_directory.path);
-          }
-          else
-          {
-            asset_list = null;
-          }
-        }
-
-        private void OnNotification(object sender, NotificationEventArgs e)
-        {
-          if (e.type_id == ID.type_id<AssetDatabase>.value())
-          {
-            if (curr_directory != null)
-            {
-              asset_list = database.GetAssetsInFolder(curr_directory.path);
-            }
-          }
-        }
-
+        /**
+         *@brief handle the OnContentDrop event 
+         *@param[in] sender (object) the original sender of the event
+         *@param[in] e (DragEventArgs) event arguments passed when the event was fired
+         *@remark Sends an FileDrop notification for each file in the drop operation.
+         *@see Notifications 
+         */
         private void OnContentDrop(object sender, DragEventArgs e)
         {
-          if (e.Data.GetDataPresent(DataFormats.FileDrop) && curr_directory != null)
+          DirectoryItem directory = folder_explorer.SelectedItem as DirectoryItem;
+          if (e.Data.GetDataPresent(DataFormats.FileDrop) && directory != null)
           {
             string[] file_names = (string[])e.Data.GetData(DataFormats.FileDrop);
             if ((e.Effects & DragDropEffects.Copy) != 0)
@@ -105,40 +84,69 @@ namespace sulphur
               foreach (string file in file_names)
               {
                 string name = file.Substring(file.LastIndexOf("\\"));
-                File.Copy(file, curr_directory.path + name, true);
-                database.Import(curr_directory.path + name);
+                App.Current.MainWindow.Focus();
+
+                File.Copy(file, directory.path + name, true);
+                NotificationEventArgs args = new NotificationEventArgs(directory.path + name, (int)Notifications.kFileDrop, id<AssetBrowserControl>.type_id_);
+                notify_subscribers_?.Invoke(this,args);
               }
             }
           }
         }
 
+
+        /**
+         *@brief handle the OnMouseDoubleClick event 
+         *@param[in] sender (object) the original sender of the event
+         *@param[in] e (MouseButtonEventArgs) event arguments passed when the event was fired
+         *@remark Sends an Asset instantiated notification 
+         *@see Notifications
+         */
         private void OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-          database.instantiate_cmd.Execute(content.SelectedItem);
+          NotificationEventArgs args = new NotificationEventArgs(content.SelectedItem, (int)Notifications.kAssetInstantiated, id<AssetBrowserControl>.type_id_);
+          notify_subscribers_?.Invoke(this, args);
         }
 
+        /**
+        *@brief handle the OnContentKeyDown event 
+        *@param[in] sender (object) the original sender of the event
+        *@param[in] e (KeyEventArgs) event arguments passed when the event was fired
+        *@remark Sends an Asset removed notification
+        *@see Notifications 
+        */
         private void OnContentKeyDown(object sender, KeyEventArgs e)
         {
           switch (e.Key)
           {
             case Key.Delete:
-              AssetCacheData selected = (AssetCacheData)content.SelectedItem;
-              database.DeleteAsset(selected);
+              NotificationEventArgs args = new NotificationEventArgs(content.SelectedItem, (int)Notifications.kAssetRemoved, id<AssetBrowserControl>.type_id_);
+              notify_subscribers_?.Invoke(this, args);
               break;
           }
         }
 
+        /**
+        *@brief handle the PreviewRightMouseButtonDown event on the treeview (folder tree)
+        *@param[in] sender (object) the original sender of the event
+        *@param[in] e (MouseEventArgs) event arguments passed when the event was fired
+        */
         private void TreeViewItem_PreviewMouseRightButtonDown(object sender, MouseEventArgs e)
         {
-          TreeViewItem treeViewItem = GetTreeviewItem(e.OriginalSource as DependencyObject); // find the first treeviewItem
+          TreeViewItem item = Utils.GetTreeViewItemInParents(e.OriginalSource as DependencyObject);
 
-          if (treeViewItem != null)
+          if (item != null)
           {
-            treeViewItem.Focus();
+            item.Focus();
             e.Handled = true;
           }
         }
 
+        /**
+        *@brief handle the PreviewMouseRightButtonDown event on the Listbox (asset list)
+        *@param[in] sender (object) the original sender of the event
+        *@param[in] e (MouseEventArgs) event arguments passed when the event was fired
+        */
         private void ListBoxItem_PreviewMouseRightButtonDown(object sender, RoutedEventArgs e)
         {
           ListBoxItem ListBoxItem = sender as ListBoxItem; // find the first treeviewItem
@@ -148,15 +156,6 @@ namespace sulphur
             ListBoxItem.IsSelected = true;
             e.Handled = true;
           }
-        }
-
-        private TreeViewItem GetTreeviewItem(DependencyObject source)
-        {
-          while (source != null && !(source is TreeViewItem))
-          {
-            source = VisualTreeHelper.GetParent(source);
-          }
-          return source as TreeViewItem;
         }
       }
     }

@@ -17,6 +17,7 @@ namespace sulphur
         PhysicsShape::kDefaultExtents);
       shape_ = foundation::Memory::Construct<btBoxShape>(
         BulletConversions::ToBt(default_extents));
+      shape_->setUserPointer(this);
     }
 
     //-------------------------------------------------------------------------
@@ -31,6 +32,7 @@ namespace sulphur
     {
       reinterpret_cast<btBoxShape*>(shape_)->setImplicitShapeDimensions(
         BulletConversions::ToBt(extents));
+      UpdateColliders();
     }
 
     //-------------------------------------------------------------------------

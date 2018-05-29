@@ -1,53 +1,30 @@
 #pragma once
-#define GLM_ENABLE_EXPERIMENTAL
 
-#include <glm/glm.hpp>
-#include <foundation/containers/vector.h>
-#include <foundation/utils/asset_definitions.h>
+#include "foundation/containers/vector.h"
+#include "foundation/utils/asset_definitions.h"
+#include "foundation/utils/shapes.h"
 
 namespace sulphur 
 {
-	namespace foundation 
-	{
-	  /**
-	   * @struct sulphur::foundation::BoundingSphere
-		 * @brief Bounding sphere.
-		 * @author Timo van Hees
-		 */
-		struct BoundingSphere
-		{
-			glm::vec3 center; //!< The center of the bounding sphere.
-			float radius;     //!< The radius of the bounding sphere.
-		};
-
+  namespace foundation 
+  {
     /**
-    * @struct sulphur::foundation::BoundingBox
-    * @brief Bounding box.
-		* @author Timo van Hees
-    */
-		struct BoundingBox
-		{
-			glm::vec3 min;  //!< The front lower left corner of the bounding box.
-			glm::vec3 max;  //!< The back upper right corner of the bounding box.
-		};
-
-	  /**
-		 * @brief Enum with the possible primitive types of a vertex buffer.
-		 */
-		enum struct PrimitiveType : uint8_t
-		{
-			kNone,  //!< Invalid primitve type.
-			kPoint,         
-			kLine,          
-			kTriangle,      
+     * @brief Enum with the possible primitive types of a vertex buffer.
+     */
+    enum struct PrimitiveType : uint8_t
+    {
+      kNone,  //!< Invalid primitve type.
+      kPoint,         
+      kLine,          
+      kTriangle,      
       kLineStrip,     
       kTriangleStrip  
-		};
+    };
 
     /**
     * @struct sulphur::foundation::VertexBones
     * @brief Bone data for a single vertex.
-		* @author Timo van Hees
+    * @author Timo van Hees
     */
     struct VertexBones
     {
@@ -58,7 +35,7 @@ namespace sulphur
     /**
     * @struct sulphur::foundation::VertexTextured
     * @brief Texture data for a single vertex.
-		* @author Timo van Hees
+    * @author Timo van Hees
     */
     struct VertexTextured
     {
@@ -69,7 +46,7 @@ namespace sulphur
     /**
     * @struct sulphur::foundation::VertexColor
     * @brief Color data for a single vertex.
-		* @author Timo van Hees
+    * @author Timo van Hees
     */
     struct VertexColor
     {
@@ -79,7 +56,7 @@ namespace sulphur
     /**
     * @struct sulphur::foundation::VertexBase
     * @brief Base data for a single vertex.
-		* @author Timo van Hees
+    * @author Timo van Hees
     */
     struct VertexBase
     {
@@ -106,12 +83,12 @@ namespace sulphur
       kAll = 0xFF //!< Base vertex data with color, texture and bone data.
     };
 
-	  /**
-	   * @brief Or assignement operator for sulphur::foundation::VertexConfig.
-	   * @param[in|out] c1 (sulphur::foundation::VertexConfig&) Left operand.
-	   * @param[in] c2 (sulphur::foundation::VertexConfig&) Right operand.
-	   */
-	  inline void operator|=(VertexConfig& c1, const VertexConfig& c2)
+    /**
+     * @brief Or assignement operator for sulphur::foundation::VertexConfig.
+     * @param[in|out] c1 (sulphur::foundation::VertexConfig&) Left operand.
+     * @param[in] c2 (sulphur::foundation::VertexConfig&) Right operand.
+     */
+    inline void operator|=(VertexConfig& c1, const VertexConfig& c2)
     {
       c1 = VertexConfig(int(c1) | int(c2));
     }
@@ -119,35 +96,36 @@ namespace sulphur
     /**
     * @class sulphur::foundation::SubMesh : sulphur::foundation::IBinarySerializable
     * @brief Sub-mesh of a mesh. Contains the vertex data.
-		* @author Timo van Hees
+    * @author Timo van Hees
     */
-		class SubMesh : public IBinarySerializable
-		{
-		public:
+    class SubMesh : public IBinarySerializable
+    {
+    public:
       /*
       * @see sulphur::foundation::IBinarySerializable::Write
       */
-		  void Write(BinaryWriter& binary_writer) const override;
+      void Write(BinaryWriter& binary_writer) const override;
       /*
       * @see sulphur::foundation::IBinarySerializable::Read
       */
-		  void Read(BinaryReader& binary_reader) override;
+      void Read(BinaryReader& binary_reader) override;
 
-		  VertexConfig vertex_config;                           //!< The vertex data configuration.
-			Vector<VertexBase> vertices_base;         //!< The base vertex data.
+      VertexConfig vertex_config;               //!< The vertex data configuration.
+      Vector<VertexBase> vertices_base;         //!< The base vertex data.
       Vector<VertexColor> vertices_color;       //!< The color vertex data.
       Vector<VertexTextured> vertices_textured; //!< The texture vertex data.
       Vector<VertexBones> vertices_bones;       //!< The bone vertex data.
-			Vector<uint32_t> indices;                 //!< The index data.
-			PrimitiveType primitve_type;                          //!< The primitive type stored in the vertex data.
-			BoundingBox bounding_box;                             //!< The bounding box of the sub-mesh.
-			BoundingSphere bounding_sphere;                       //!< The bounding sphere of the sub-mesh.
-		};
+      Vector<uint32_t> indices;                 //!< The index data.
+      PrimitiveType primitive_type;             //!< The primitive type stored in the vertex data.
+      AABB bounding_box;                        //!< The bounding box of the sub-mesh.
+      Sphere bounding_sphere;                   //!< The bounding sphere of the sub-mesh.
+      glm::mat4 root_transform;                 //!< The offset matrix of the sub-mesh from the root.
+    };
 
     /**
     * @class sulphur::foundation::MeshData : sulphur::foundation::IBinarySerializable
     * @brief Mesh data to store in the package.
-		* @author Timo van Hees
+    * @author Timo van Hees
     */
     class MeshData : public IBinarySerializable
     {
@@ -161,19 +139,21 @@ namespace sulphur
       */
       void Read(BinaryReader& binary_reader) override;
 
-      Vector<SubMesh> sub_meshes; //!< List of sub-meshes.    
+      Vector<SubMesh> sub_meshes; //!< List of sub-meshes.   
+      AABB bounding_box; //!< The bounding box of the mesh.
+      Sphere bounding_sphere; //!< The bounding sphere of the mesh.
     };
 
     /**
     * @struct sulphur::foundation::MeshAsset
     * @brief Mesh loaded from a file.
-		* @author Timo van Hees
+    * @author Timo van Hees
     */
-		struct MeshAsset
-		{
-		  AssetName name; //!< The name of the mesh.
+    struct MeshAsset
+    {
+      AssetName name; //!< The name of the mesh.
       AssetID id;     //!< The ID of the mesh.
       MeshData data;              //!< The mesh data of the mesh.
-		};
-	}
+    };
+  }
 }

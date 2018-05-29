@@ -5,6 +5,7 @@
 #include <engine/assets/mesh.h>
 #include <engine/assets/texture.h>
 #include <engine/assets/shader.h>
+#include <engine/assets/compute_shader.h>
 
 #include <foundation/utils/color.h>
 #include <foundation/containers/vector.h>
@@ -91,12 +92,10 @@ namespace sulphur
       /**
       * @brief Creates GPU resources for a texture.
       * @param[in] texture (const sulphur::engine::TextureHandle&) A handle to the texture to create resources for.
-      * @param[in] type (const sulphur::graphics::D3D12TextureType) The type of the texture to create resources for.
       * @param[in] clear_color (sulphur::foundation::Color) 
       */
       void Create(
         const engine::TextureHandle& texture,
-        const D3D12TextureType type,
         const foundation::Color clear_color = foundation::Color::kBlackTransparent
       );
 
@@ -146,6 +145,12 @@ namespace sulphur
       * @param[in] shader (const sulphur::engine::ShaderHandle&) A handle to the shader to create resources for.
       */
       void Create(const engine::ShaderHandle& shader);
+
+      /**
+      * @brief Creates GPU resources for a given compute shader.
+      * @param[in] compute_shader (const sulphur::engine::ComputeShaderHandle&) A handle to the shader to create resources for.
+      */
+      void Create(const engine::ComputeShaderHandle& compute_shader);
 
       /**
       * @see sulphur::engine::IGPUAssetManager::Release

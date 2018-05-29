@@ -502,63 +502,6 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    /**
-    * @brief Input hack for imgui. Can replace the current WndProc function. 
-    * @param[in] hWnd (void*) A window handle.
-    * @param[in] message (UINT) The message to handle.
-    * @param[in] wParam (WPARAM) Additional message information. Depends on the message.
-    * @param[in] lParam (LPARAM) Additional message information. Depends on the message.
-    * @return (LRESULT) A result value.
-    */
-    IMGUI_API LRESULT 
-      ImGui_Impl_WndProcHandler(void* hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-    {
-      ImGuiIO& io = ImGui::GetIO();
-      switch (message)
-      {
-      case WM_LBUTTONDOWN:
-        io.MouseDown[0] = true;
-        return true;
-      case WM_LBUTTONUP:
-        io.MouseDown[0] = false;
-        return true;
-      case WM_RBUTTONDOWN:
-        io.MouseDown[1] = true;
-        return true;
-      case WM_RBUTTONUP:
-        io.MouseDown[1] = false;
-        return true;
-      case WM_MBUTTONDOWN:
-        io.MouseDown[2] = true;
-        return true;
-      case WM_MBUTTONUP:
-        io.MouseDown[2] = false;
-        return true;
-      case WM_MOUSEWHEEL:
-        io.MouseWheel += GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? +1.0f : -1.0f;
-        return true;
-      case WM_MOUSEMOVE:
-        io.MousePos.x = (signed short)(lParam);
-        io.MousePos.y = (signed short)(lParam >> 16);
-        return true;
-      case WM_KEYDOWN:
-        if (wParam < 256)
-          io.KeysDown[wParam] = 1;
-        return true;
-      case WM_KEYUP:
-        if (wParam < 256)
-          io.KeysDown[wParam] = 0;
-        return true;
-      case WM_CHAR:
-        // You can also use ToAscii()+GetKeyboardState() to retrieve characters.
-        if (wParam > 0 && wParam < 0x10000)
-          io.AddInputCharacter((unsigned short)wParam);
-        return true;
-      }
-      return DefWindowProc((HWND)hWnd, message, wParam, lParam);
-    }
-
-    //------------------------------------------------------------------------------------------------------
     bool ImGui_Impl_CreateFontsTexture()
     {
       // Create fonts texture and SRV descriptor for it
@@ -582,7 +525,9 @@ namespace sulphur
       desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
       desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-      g_font_texture = foundation::Memory::Construct<D3D12Texture2D>();
+      g_font_texture = foundation::Memory::Construct<D3D12Texture2D>(
+        foundation::Memory::Construct<D3D12Resource>()
+        );
 
       if (g_device->CreateTexture2D(
         pixels,
@@ -590,7 +535,8 @@ namespace sulphur
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
         nullptr,
         1,
-        g_font_texture) == false)
+        g_font_texture,
+        nullptr) == false)
       {
         PS_LOG(Error, "Failed to create fonts texture.\n");
         return false;
@@ -600,7 +546,7 @@ namespace sulphur
 
       D3D12_CPU_DESCRIPTOR_HANDLE src_cpu_handle;
       g_device->persistent_descriptor_heap().GetCPUHandleForSRVDescriptor(
-        g_font_texture->srv_persistent_index_,
+        g_font_texture->srv_persistent_index(),
         src_cpu_handle
       );
 

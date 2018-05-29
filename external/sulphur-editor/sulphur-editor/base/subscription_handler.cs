@@ -4,13 +4,24 @@ namespace sulphur
 {
   namespace editor
   {
+    /**
+     *@class sulphur.editor.SubscriptionHandler 
+     *@brief this class handles the application subscriptions. every class implmenting the sulphur.editor.ISubscribable 
+     * interface must be registered with this class in order to link up the events and delegates properly. 
+     *@author Stan Pepels 
+     */
     class SubscriptionHandler
     {
+      /**
+       *@brief register a class of type T with this system
+       *@param[in] obj (T) refrence object to register
+       *@remark the object must implement the sulphur.editor.ISubscribable else a compile error is thrown  
+       */
       public static void Register<T>(T obj) where T : class, ISubscribeable
       {
         ISubscribeable subscribable = obj;
         Subscription[] subs = subscribable.GetSubscriptions();
-        SubscriberID id = new SubscriberID(ID.type_id<T>.value());
+        SubscriberID id = new SubscriberID(id<T>.type_id_);
         if(systems_by_type_.ContainsKey(id) == false)
         {
           systems_by_type_.Add(id, new List<ISubscribeable>());
@@ -20,15 +31,21 @@ namespace sulphur
 
         if (subs != null)
         {
-          ProcessSubscriptions(subs, ref subscribable);
+          ProcessSubscriptions(subs);
         }
-        SubscribeTo(id, ref subscribable);
+        SubscribeTo(ref obj);
       }
 
+      /**
+      *@brief unregister a class of type T with this system
+      *@param[in] obj (T) refrence object to unregister
+      *@remark the object must implement the sulphur.editor.ISubscribable else a compile error is thrown
+      *@remark in order for e registered object to become eledagble for garbage collection it must be unregistered from this system   
+      */
       public static void Unregister<T>(T obj) where T : class, ISubscribeable
       {
         Subscription[] subs = obj.GetSubscriptions();
-        SubscriberID id = new SubscriberID(ID.type_id<T>.value());
+        SubscriberID id = new SubscriberID(id<T>.type_id_);
         systems_by_type_[id].Remove(obj);
 
         foreach(Subscription sub in subs)
@@ -70,7 +87,11 @@ namespace sulphur
         }
       }
 
-      private static void ProcessSubscriptions(Subscription[] subs, ref ISubscribeable obj)
+      /**
+       *@brief process the subscription retrieved by calling sulphur.editor.ISubscribable.GetSubscriptions function and link up the call-backs with allready registered systems 
+       *@param[in] subs (sulphur.editor.Subscription[]) subscriptions to be linked up 
+       */
+      private static void ProcessSubscriptions(Subscription[] subs)
       {
         for (int i = 0; i < subs.Length; ++i)
         {
@@ -87,22 +108,26 @@ namespace sulphur
         }
       }
 
-      private static void SubscribeTo(SubscriberID id, ref ISubscribeable obj)
+      /**
+       *@brief check all previously registered systems if they are subscribed to an object and if so link up the events and callbacks.
+       *@param[in] obj (T) object to subscribe all previously registered objects to.
+       */
+      private static void SubscribeTo<T>(ref T obj) where T : class, ISubscribeable
       {
         Dictionary<SubscriberID, List<ISubscribeable>>.Enumerator it = systems_by_type_.GetEnumerator();
-       while(it.MoveNext() == true)
+        while (it.MoveNext() == true)
         {
           Subscription[] subs = it.Current.Value[0].GetSubscriptions();
-          if(subs == null)
+          if (subs == null)
           {
             continue;
           }
 
-          bool is_subscribed_to_obj = false; 
+          bool is_subscribed_to_obj = false;
           uint index = 0;
           foreach (Subscription sub in subs)
           {
-            if (sub.target_id.type_id == id.type_id)
+            if (sub.target_id.type_id == id<T>.type_id_)
             {
               is_subscribed_to_obj = true;
               break;
@@ -120,7 +145,8 @@ namespace sulphur
         }
       }
 
-      private static Dictionary<SubscriberID, List<ISubscribeable>> systems_by_type_ = new Dictionary<SubscriberID, List<ISubscribeable>>(new SubscriberIDComparer());
+      private static Dictionary<SubscriberID, List<ISubscribeable>> systems_by_type_ = 
+        new Dictionary<SubscriberID, List<ISubscribeable>>(new SubscriberIDComparer()); //<! dictionary of registered systems sorted by there type_id
     }
   }
 }

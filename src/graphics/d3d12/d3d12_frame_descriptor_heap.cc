@@ -50,13 +50,11 @@ namespace sulphur
     //------------------------------------------------------------------------------------------------------
     void D3D12FrameDescriptorHeap::Initialize(
       uint32_t frame_buffer_count,
-      size_t srv_heap_size,
-      size_t uav_heap_size,
+      size_t srv_uav_heap_size,
       size_t rtv_heap_size,
       size_t dsv_heap_size)
     {
-      srv_heap_size_ = srv_heap_size;
-      uav_heap_size_ = uav_heap_size;
+      srv_uav_heap_size_ = srv_uav_heap_size;
       rtv_heap_size_ = rtv_heap_size;
       dsv_heap_size_ = dsv_heap_size;
 
@@ -74,7 +72,7 @@ namespace sulphur
         if (!device_.CreateDescriptorHeap(
           srv_uav_heap_[i],
           D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-          static_cast<uint32_t>(srv_heap_size + uav_heap_size),
+          static_cast<uint32_t>(srv_uav_heap_size),
           D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE))
         {
           PS_LOG(Error, "Failed to create frame SRV/UAV heap.\n");
@@ -108,8 +106,7 @@ namespace sulphur
     void D3D12FrameDescriptorHeap::StartFrame(uint32_t frame_index)
     {
       current_frame_ = frame_index;
-      current_srv_write_index_ = 0;
-      current_uav_write_index_ = (uint32_t)srv_heap_size_;
+      current_srv_uav_write_index_ = 0;
       current_rtv_write_index_ = 0;
       current_dsv_write_index_ = 0;
     }
@@ -127,7 +124,7 @@ namespace sulphur
       );
 
       out_cpu_handle = srv_uav_heap_[current_frame_]->GetCPUDescriptorHandleForHeapStart();
-      out_cpu_handle.ptr += srv_uav_descriptor_size_ * current_srv_write_index_;
+      out_cpu_handle.ptr += srv_uav_descriptor_size_ * current_srv_uav_write_index_;
 
       device_.CopyDescriptorsSimple(
         1,
@@ -136,10 +133,10 @@ namespace sulphur
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
       );
       out_gpu_handle = srv_uav_heap_[current_frame_]->GetGPUDescriptorHandleForHeapStart();
-      out_gpu_handle.ptr += srv_uav_descriptor_size_ * current_srv_write_index_;
+      out_gpu_handle.ptr += srv_uav_descriptor_size_ * current_srv_uav_write_index_;
 
-      ++current_srv_write_index_;
-      if (current_srv_write_index_ == srv_heap_size_)
+      ++current_srv_uav_write_index_;
+      if (current_srv_uav_write_index_ == srv_uav_heap_size_)
       {
         PS_LOG(Debug, "Uh-oh! Frame SRV/UAV heap is too small! Resize not implemented yet. :(\n");
         // ResizeSRVHeap(size_t new_size);
@@ -159,7 +156,7 @@ namespace sulphur
       );
 
       out_cpu_handle = srv_uav_heap_[current_frame_]->GetCPUDescriptorHandleForHeapStart();
-      out_cpu_handle.ptr += srv_uav_descriptor_size_ * current_uav_write_index_;
+      out_cpu_handle.ptr += srv_uav_descriptor_size_ * current_srv_uav_write_index_;
 
       device_.CopyDescriptorsSimple(
         1,
@@ -169,10 +166,10 @@ namespace sulphur
       );
 
       out_gpu_handle = srv_uav_heap_[current_frame_]->GetGPUDescriptorHandleForHeapStart();
-      out_gpu_handle.ptr += srv_uav_descriptor_size_ * current_uav_write_index_;
+      out_gpu_handle.ptr += srv_uav_descriptor_size_ * current_srv_uav_write_index_;
 
-      ++current_uav_write_index_;
-      if (current_uav_write_index_ == srv_heap_size_ + uav_heap_size_)
+      ++current_srv_uav_write_index_;
+      if (current_srv_uav_write_index_ == srv_uav_heap_size_)
       {
         PS_LOG(Debug, "Uh-oh! Frame SRV/UAV heap is too small! Resize not implemented yet. :(\n");
         // ResizeSRVUAVHeap(size_t new_size);

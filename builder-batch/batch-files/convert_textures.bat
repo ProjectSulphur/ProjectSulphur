@@ -1,0 +1,1 @@
+sulphur-builder.exe --convert_textures -dir %INPUTFOLDER%unprocessed/ -r -output %INPUTFOLDER%processed/

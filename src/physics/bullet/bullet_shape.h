@@ -27,11 +27,10 @@ namespace sulphur
       BulletShape();
 
       /**
-      * @brief Destructs the Bullet shape.
+      * @brief Destroys the Bullet shape.
       */
       virtual ~BulletShape();
 
-    protected:
       btCollisionShape* shape_; //!< The internal base Bullet shape.
     };
   }

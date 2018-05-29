@@ -1,8 +1,4 @@
-﻿using System;
-using System.Windows;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
+﻿using System.Windows;
 
 namespace sulphur
 {
@@ -15,9 +11,17 @@ namespace sulphur
     {
       public MainWindow()
       {
+       
+      }
+
+      public void Initialize()
+      {
         InitializeComponent();
+        SubscriptionHandler.Register(menu_bar);
+        SubscriptionHandler.Register(dynamic_dock);
         SubscriptionHandler.Register(engine);
         SubscriptionHandler.Register(asset_browser);
+        SubscriptionHandler.Register(hierarchy_viewer);
       }
     }
   }

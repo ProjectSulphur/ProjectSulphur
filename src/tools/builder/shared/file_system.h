@@ -1,11 +1,34 @@
 #pragma once
 #include <foundation/containers/vector.h>
 #include <foundation/containers/string.h>
+#include <foundation/io/filesystem.h>
 
 namespace sulphur 
 {
   namespace builder 
   {
+    /**
+    *@class sulphur::builder::Path
+    *@brief class that can do checks on paths
+    *@author Stan Pepels
+    */
+    class Path
+    {
+    public:
+      /**
+      *@brief checks if the path given is a relative path
+      *@param[in] path (const sulphur::foundation::String&) to check;
+      *@return (bool) true if path is relative else false is returned
+      */
+      static bool IsRelative(const foundation::String& path);
+
+      /**
+      *@brief checks if the path given is a absolute path
+      *@param[in] path (const sulphur::foundation::String&) to check;
+      *@return (bool) true if path is absolute else false is returned
+      */
+      static bool IsAbsolute(const foundation::String& path);
+    };
     /**
     *@class sulphur::builder::Directory
     *@brief class for doing directory / filesystem operations
@@ -77,27 +100,27 @@ namespace sulphur
 
       /**
       *@brief get the files in this directory
-      *@return (sulphur::foundation::Vector<sulphur::foundation::String>) vector containing files found in this directory
+      *@return (sulphur::foundation::Vector <sulphur::foundation::Path>) vector containing files found in this directory
       */
-      foundation::Vector<foundation::String> GetFiles() const;
+      foundation::Vector<foundation::Path> GetFiles() const;
 
       /**
       *@brief get the files in this directory and all subdirectories
-      *@return (sulphur::foundation::Vector<sulphur::foundation::String>) vector containing files recursively found from this directory
+      *@return (sulphur::foundation::Vector <sulphur::foundation::Path>) vector containing files recursively found from this directory
       */
-      foundation::Vector<foundation::String> GetFilesRecursive() const;
+      foundation::Vector<foundation::Path> GetFilesRecursive() const;
 
       /**
       *@brief get the path_ parameter
-      *@return (sulphur::foundation::String) relative or absolute path to this directory
+      *@return (sulphur::foundation::Path) relative or absolute path to this directory
       */
-      foundation::String path() const;
+      foundation::Path path() const;
 
       /**
       *@brief get the absolute path to this folder. 
       *@return (sulphur::foundation::String) absolute path to this directory
       */
-      foundation::String GetAbsolutePath() const;
+      foundation::Path GetAbsolutePath() const;
 
       /**
       *@brief check if a folder at the path_ parameter exists
@@ -109,8 +132,9 @@ namespace sulphur
       *@brief create a folder with the path given with path_ if none exists
       */
       void Create() const;
+
     private:
-      foundation::String path_; //<! path to a folder
+      foundation::Path path_; //<! path to a folder
 
       /**
       * @brief checks if the input character is a forward slash

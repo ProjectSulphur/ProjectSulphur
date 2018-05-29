@@ -4,6 +4,7 @@
 
 #include "graphics/platform/pipeline_state.h"
 #include <engine/assets/material.h>
+#include <engine/assets/post_process_material.h>
 #include <engine/graphics/irenderer.h>
 
 namespace sulphur
@@ -23,7 +24,7 @@ namespace sulphur
 
       // Events
       bool IsInitialized() { return initialized_; };
-      void OnInitialize(foundation::NativeWindowHandle hWnd, const glm::ivec2& screen_size = glm::ivec2(1280, 720), bool vsync = false) override;
+      void OnInitialize(void* window_handle, const glm::ivec2& screen_size = glm::ivec2(1280, 720), bool vsync = false) override;
       void OnDestroy() override;
       void OnUpdate() override {};
       void OnResizeWindow(uint width, uint height) override;
@@ -32,8 +33,10 @@ namespace sulphur
 
       // Processing draws
       void SetMesh(const engine::MeshHandle& mesh) override;
+      void SetBoneMatrices(const foundation::Vector<glm::mat4>& bone_matrices)override;
       void SetPipelineState(const PipelineState& pipeline_state) override;
       void SetMaterial(const engine::MaterialPass& pass) override;
+      void SetComputePass(const engine::ComputePass& pass) override;
       void SetCamera(const glm::mat4& view, const glm::mat4& projection, const engine::DepthBuffer& depth_buffer, const engine::RenderTarget& render_target) override;
       void SetModelMatrix(const glm::mat4& model_matrix) override;
       void SetScissorRect(const glm::vec4& rect) override;
@@ -42,11 +45,13 @@ namespace sulphur
       // Execute
       void ClearRenderTarget(const engine::RenderTarget& render_target, const foundation::Color& clear_color) override;
       void ClearDepthBuffer(const engine::DepthBuffer& depth_buffer) override;
-      void Draw() override;
+      void Draw(uint index_count = 0, uint index_offset = 0) override;
+      void CopyToScreen(const engine::RenderTarget& render_target) override;
       void Dispatch(ComputeQueueType type, uint x, uint y, uint z) override;
-
+      
       // Settings
       void SetVsync(bool value) override;
+      void SetStencilRef(uint value) override;
 
     protected:
       void UpdateMaterial();

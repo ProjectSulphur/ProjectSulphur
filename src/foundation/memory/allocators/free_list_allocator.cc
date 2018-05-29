@@ -1,6 +1,8 @@
 #include "foundation/memory/allocators/free_list_allocator.h"
 #include "foundation/auxiliary/pointer_arithmetic.h"
 
+#include <EASTL/utility.h>
+
 #include <inttypes.h>
 
 namespace sulphur
@@ -22,6 +24,15 @@ namespace sulphur
       free_block_ = reinterpret_cast<FreeBlock*>(buffer);
       free_block_->size = size;
       free_block_->next = nullptr;
+    }
+
+    //--------------------------------------------------------------------------
+    FreeListAllocator& FreeListAllocator::operator=(FreeListAllocator&& other)
+    {
+      IAllocator::operator=(eastl::move(other));
+      free_block_ = other.free_block_;
+      other.free_block_ = nullptr;
+      return *this;
     }
 
     //--------------------------------------------------------------------------
@@ -95,6 +106,8 @@ namespace sulphur
     {
       Header* header = reinterpret_cast<Header*>(OffsetBytes(ptr, -static_cast<intptr_t>(sizeof(Header))));
 
+      size_t total_size = header->block_size - header->offset;
+
       size_t block_start = (reinterpret_cast<intptr_t>(ptr)) - header->offset;
       size_t block_size = header->block_size;
       size_t block_end = block_start + block_size;
@@ -142,7 +155,7 @@ namespace sulphur
         prev->next = cur->next;
       }
 
-      return block_size;
+      return total_size;
     }
 
     //--------------------------------------------------------------------------

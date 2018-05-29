@@ -1,5 +1,7 @@
 #include "foundation/memory/allocators/malloc_allocator.h"
 
+#include <EASTL/utility.h>
+
 #include <memory>
 
 #ifdef PS_WIN32
@@ -26,6 +28,13 @@ namespace sulphur
       IAllocator(size)
     {
 
+    }
+
+    //--------------------------------------------------------------------------
+    MallocAllocator& MallocAllocator::operator=(MallocAllocator&& other)
+    {
+      IAllocator::operator=(eastl::move(other));
+      return *this;
     }
 
     //--------------------------------------------------------------------------

@@ -18,8 +18,15 @@ namespace sulphur
     class EntityComponentData
     {
     public:
+      /**
+      * @brief Constructor with an optional argument to indicate who is takes ownership of the entity
+      * @param[in] with_editor (bool) Setting this to true indicates the editor instantiated this entity, rather than the game
+      */
+      EntityComponentData(bool with_editor = false);
+
       foundation::Vector<size_t> component_types;//!< Stores the types of the components
       foundation::Vector<ComponentHandleBase> component_handles;//!< Stores the handles of the components
+      bool with_editor; //!< Indicates that the editor instantiated this entity, rather than the game
     };
   }
 }

@@ -1,18 +1,17 @@
 #pragma once
-#include "engine/networking/message_in.h"
-
+#include "engine/networking/messages.h"
 #include <foundation/containers/list.h>
 
-namespace sulphur 
+namespace sulphur
 {
-  namespace engine 
+  namespace engine
   {
     class IMessageListener;
 
     /**
     * @class sulphur::engine::SubscriptionManager
     * @brief A class that allows listener classes to subscribe to messages and distributes incoming messages amongst them
-    * @see sulphur::engine::IMessageListener
+    * @see sulphur::engine::editor::IMessageListener
     * @author Maarten ten Velden
     */
     class SubscriptionManager
@@ -38,18 +37,19 @@ namespace sulphur
       */
       void UnsubscribeAll(IMessageListener* listener);
 
+    protected:
       /**
       * @brief Notify all subscribers of an incoming message.
       * @param[in] id (sulphur::engine::MessageID) The unique identifier that specifies the message's type
       * @param[in] payload (const sulphur::engine::MessagePayload&) The payload of the message
-      * @remarks The passed payload may be smaller than the sulphur::engine::MessagePayload object
+      * @remarks The passed payload may be smaller than the sulphur::engine::editor::MessagePayload object
       *          (depending on the type) and should be cast to the desired type
       */
       void NotifySubscribers(MessageID id, const MessagePayload& message);
 
     private:
       using SubscriptionList = foundation::List<IMessageListener*>; //!< The container used for tracking subscribers
-      SubscriptionList subscriptions_[kNumMessageTypes]; //!< The subscribers per message type (one for each type)
+      SubscriptionList subscriptions_[static_cast<uint32_t>(MessageID::kNumMessages)]; //!< The subscribers per message type (one for each type)
 
     };
   }

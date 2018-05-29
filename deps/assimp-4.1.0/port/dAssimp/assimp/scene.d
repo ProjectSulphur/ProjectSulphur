@@ -1,4 +1,4 @@
-﻿/*
+/*
 ---------------------------------------------------------------------------
 Open Asset Import Library (ASSIMP)
 ---------------------------------------------------------------------------
@@ -73,12 +73,12 @@ extern ( C ) {
        * by bones (see <code>aiBone</code> and <code>aiMesh.mBones</code>)
        * <em>must</em> be unique.
        *
-       * Cameras and lights are assigned to a specific node name â€“ if there are
+       * Cameras and lights are assigned to a specific node name – if there are
        * multiple nodes with this name, they are assigned to each of them.
        *
        * There are no limitations regarding the characters contained in this
        * string. You should be able to handle stuff like whitespace, tabs,
-       * linefeeds, quotation marks, ampersands, â€¦
+       * linefeeds, quotation marks, ampersands, …
        */
       aiString mName;
 
@@ -175,7 +175,7 @@ extern ( C ) {
        * TER (Terragen) and HMP (3D Game Studio) are height map formats.
        *
        * Note: Assimp is probably not the best choice for loading <em>huge</em>
-       *    terrains â€“ fully triangulated data takes extremely much storage
+       *    terrains – fully triangulated data takes extremely much storage
        *    space and should be avoided as long as possible (typically you will
        *    perform the triangulation when you actually need to render it).
        */

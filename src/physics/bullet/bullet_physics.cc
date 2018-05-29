@@ -1,7 +1,7 @@
 #include "physics/bullet/bullet_physics.h"
-#include "physics/bullet/bullet_include.h"
 #include "physics/bullet/bullet_conversions.h"
 #include "physics/bullet/bullet_allocator.h"
+#include "physics/bullet/bullet_conversions.h"
 
 #include <foundation/memory/memory.h>
 
@@ -48,7 +48,12 @@ namespace sulphur
         constraint_solver_,
         collision_config_);
 
+      bullet_manifolds = foundation::Vector<btPersistentManifold>();
+      dynamics_world_->setInternalTickCallback(InternalTickCallback);
+      dynamics_world_->setWorldUserInfo(reinterpret_cast<void*>(this));
       SetGlobalGravity(IPhysics::kDefaultGravity);
+
+      manifolds_ = foundation::Map<PhysicsBody*, foundation::Vector<PhysicsManifold>>();
 
       return true;
     }
@@ -124,31 +129,73 @@ namespace sulphur
       }
 
       dynamics_world_->stepSimulation(fixed_time_step, 1, fixed_time_step);
+      
+      manifolds_.clear();
+      //btDispatcher* dispatch = dynamics_world_->getDispatcher();
 
-      // As of now the physics callbacks happen at the end of a simulation 
-      // step. Assuming that only one step is done every Fixed frame call.
-      // If this is not the case then the internal tick callback needs to 
-      // be used. Because within those multiple steps contacts might occur
-      // and be deleted, all within one fixed time step. The reason this 
-      // this is currently not implemented is due to the fact that the 
-      // callback has to be static. And by design there can be multiple 
-      // worlds. Meaning multiple physics worlds (and thus multiple instances
-      // of this class where the callback needs to be static)
-      // See http://www.bulletphysics.org/mediawiki-1.5.8/index.php/Simulation_Tick_Callbacks
-
-      int numManifolds = dynamics_world_->getDispatcher()->getNumManifolds();
-      for (int i = 0; i < numManifolds; i++)
+      for (int i = 0; i < bullet_manifolds.size(); i++)
       {
-        btPersistentManifold* contactManifold = dynamics_world_->getDispatcher()->getManifoldByIndexInternal(i);
-        int numContacts = contactManifold->getNumContacts();
-        for (int j = 0; j < numContacts; j++)
+        btPersistentManifold& manifold = bullet_manifolds[i];
+
+        int numberOfContacts = manifold.getNumContacts();
+
+        PhysicsManifold phys_manifold_a = PhysicsManifold(
+          reinterpret_cast<PhysicsBody*>(manifold.getBody0()->getUserPointer()),
+          reinterpret_cast<PhysicsBody*>(manifold.getBody1()->getUserPointer()));
+
+        PhysicsManifold phys_manifold_b = PhysicsManifold(
+          reinterpret_cast<PhysicsBody*>(manifold.getBody1()->getUserPointer()),
+          reinterpret_cast<PhysicsBody*>(manifold.getBody0()->getUserPointer()));
+
+        bool hasContact = false;
+
+        for (int j = 0; j < numberOfContacts; ++j)
         {
-          btManifoldPoint& pt = contactManifold->getContactPoint(j);
-          if (pt.getDistance() < 0.f)
+          btManifoldPoint& point = manifold.getContactPoint(j);
+
+          if (point.getDistance() < 0.f)
           {
+            hasContact = true;
+
+            phys_manifold_a.AddContactPoint(PhysicsManifold::ContactPoint(
+              BulletConversions::ToGlm(point.getPositionWorldOnA()),
+              BulletConversions::ToGlm(point.m_normalWorldOnB),
+              point.getDistance()));
+
+            phys_manifold_b.AddContactPoint(PhysicsManifold::ContactPoint(
+              BulletConversions::ToGlm(point.getPositionWorldOnB()),
+              BulletConversions::ToGlm(point.m_normalWorldOnB * -1.0f),
+              point.getDistance()));
+          }
+        }
+
+        if (hasContact == true)
+        {
+          if (manifolds_.find(phys_manifold_a.body_a()) == manifolds_.end())
+          {
+            foundation::Vector<PhysicsManifold> manifolds = foundation::Vector<PhysicsManifold>();
+            manifolds.push_back(phys_manifold_a);
+            manifolds_.emplace(phys_manifold_a.body_a(), manifolds);
+          }
+          else
+          {
+            manifolds_.at(phys_manifold_a.body_a()).push_back(phys_manifold_a);
+          }
+
+          if (manifolds_.find(phys_manifold_b.body_a()) == manifolds_.end())
+          {
+            foundation::Vector<PhysicsManifold> manifolds = foundation::Vector<PhysicsManifold>();
+            manifolds.push_back(phys_manifold_b);
+            manifolds_.emplace(phys_manifold_b.body_a(), manifolds);
+          }
+          else
+          {
+            manifolds_.at(phys_manifold_b.body_a()).push_back(phys_manifold_b);
           }
         }
       }
+
+      bullet_manifolds.clear();
     }
 
     //-------------------------------------------------------------------------
@@ -174,9 +221,19 @@ namespace sulphur
           out->point = BulletConversions::ToGlm(ray_callback.m_hitPointWorld);
           out->normal = BulletConversions::ToGlm(ray_callback.m_hitNormalWorld);
           out->distance = ray_callback.m_closestHitFraction;
+          out->hit = true;
         }
 
         return true;
+      }
+
+      if (out != nullptr)
+      {
+        out->ray = ray;
+        out->point = glm::vec3();
+        out->normal = glm::vec3();
+        out->distance = 0.0f;
+        out->hit = false;
       }
 
       return false;
@@ -229,6 +286,12 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
+    Manifolds& BulletPhysics::GetManifolds()
+    {
+      return manifolds_;
+    }
+
+    //-------------------------------------------------------------------------
     void BulletPhysics::UpdateBodies()
     {
       dynamics_world_->updateAabbs();
@@ -240,8 +303,30 @@ namespace sulphur
     {
     }
 
-    void TickCallback(btDynamicsWorld * world, btScalar timeStep)
+    //-------------------------------------------------------------------------
+    void BulletPhysics::InternalTickCallback(btDynamicsWorld * world, btScalar time_step)
     {
+      BulletPhysics* that = reinterpret_cast<BulletPhysics*>(reinterpret_cast<btDiscreteDynamicsWorld*>(world)->getWorldUserInfo());
+      if (that != nullptr)
+      {
+        that->SaveManifolds(world, time_step);
+      }
+    }
+
+    //-------------------------------------------------------------------------
+
+    //-------------------------------------------------------------------------
+    void BulletPhysics::SaveManifolds(btDynamicsWorld * world, btScalar time_step)
+    {
+      btDispatcher* dispatch = world->getDispatcher();
+    
+      int num_manifolds = dispatch->getNumManifolds();
+      btPersistentManifold** manifolds = dispatch->getInternalManifoldPointer();
+
+      for (int i = 0; i < num_manifolds; ++i)
+      {
+        bullet_manifolds.push_back(*manifolds[i]);
+      }
     }
   }
 }

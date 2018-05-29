@@ -1,4 +1,4 @@
-﻿xof 0303txt 0032
+xof 0303txt 0032
 template KeyValuePair {
  <26e6b1c3-3d4d-4a1d-a437-b33668ffa1c2>
  STRING key;
@@ -131,7 +131,7 @@ KeyValuePair {
 
 KeyValuePair {
  "File";
- "G:\\Dreamworlds\\Modelling\\B\374\üffel Wuson\\3dsmax\\Wuson_FuerExterneTests.max";
+ "G:\\Dreamworlds\\Modelling\\B\374\�ffel Wuson\\3dsmax\\Wuson_FuerExterneTests.max";
 }
 
 KeyValuePair {

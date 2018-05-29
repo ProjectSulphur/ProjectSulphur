@@ -3,10 +3,58 @@
 #include <foundation/logging/logger.h>
 #include <algorithm>
 
+#include <lua-classes/input.lua.cc>
+#include <lua-classes/mappings.lua.cc>
+
 namespace sulphur
 {
   namespace engine
   {
+    //-------------------------------------------------------------------------
+    Input::Input() :
+      BaseResource("Input")
+    {
+    }
+
+    //-------------------------------------------------------------------------
+    Input* ScriptableInput::input_ = nullptr;
+
+    //-------------------------------------------------------------------------
+    void ScriptableInput::Initialize(Input* input)
+    {
+      input_ = input;
+    }
+
+    //-------------------------------------------------------------------------
+    bool ScriptableInput::IsButtonFalling(Button button)
+    {
+      return input_->IsButtonFalling(button, Input::kAny);
+    }
+
+    //-------------------------------------------------------------------------
+    bool ScriptableInput::IsButtonRising(Button button)
+    {
+      return input_->IsButtonRising(button, Input::kAny);
+    }
+
+    //-------------------------------------------------------------------------
+    bool ScriptableInput::IsButtonUp(Button button)
+    {
+      return input_->IsButtonUp(button, Input::kAny);
+    }
+
+    //-------------------------------------------------------------------------
+    bool ScriptableInput::IsButtonDown(Button button)
+    {
+      return input_->IsButtonDown(button, Input::kAny);
+    }
+
+    //-------------------------------------------------------------------------
+    float ScriptableInput::GetAxis(Axis axis)
+    {
+      return input_->GetAxis(axis);
+    }
+
     //-------------------------------------------------------------------------
     glm::vec2 Input::GetMousePosition() const
     {
@@ -42,7 +90,7 @@ namespace sulphur
         {
           if (value != 0.0f)
           {
-            final_value = 1.0f;
+            final_value = value;
           }
           denominator = 1;
         };
@@ -424,16 +472,11 @@ namespace sulphur
       }
       else if (Gamepad::IsButton(button) == true)
       {
-        assert(device < kMaxGamepads && "Invalid gamepad checked");
         gamepads[device].SetButton(button, down);
       }
       else if (Mouse::IsButton(button) == true)
       {
         mouse.SetButton(button, down);
-      }
-      else
-      {
-        assert(false && "Invalid button-code passed");
       }
 
       // Save input-event

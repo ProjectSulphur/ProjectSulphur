@@ -3,8 +3,11 @@
 #include "physics/raycast.h"
 #include "foundation/memory/memory.h"
 #include "physics/platform_physics_body.h"
+#include "physics/physics_manifold.h"
+#include "physics/platform_physics_constraint.h"
 
 #include <foundation/containers/vector.h>
+#include <foundation/containers/map.h>
 #include <glm/vec3.hpp>
 #include <glm/gtc/quaternion.hpp>
 
@@ -12,6 +15,8 @@ namespace sulphur
 {
   namespace physics
   {
+    using Manifolds = foundation::Map<PhysicsBody*, foundation::Vector<PhysicsManifold>>;
+
     /**
     * @class sulphur::physics::IPhysics
     * @brief The low level physics interface that the physics SDKs should implement
@@ -90,6 +95,26 @@ namespace sulphur
       * @brief The default gravity that all physics implementations should use
       */
       static const glm::vec3 kDefaultGravity;
+
+      /**
+      * @brief Returns a const reference of manifolds from the last simulation
+      * @retrun (foundation::Map<PhysicsBody*, foundation::Vector<PhysicsManifold>>&) The collection of manifolds
+      */
+      virtual Manifolds& GetManifolds() = 0;
+
+      /**
+      * @brief Adds a fixed constraint between body_a and body_b, where body_a is the master
+      * @param[in] body_a (sulphur::physics::PhysicsBody*) body A
+      * @param[in] body_b (sulphur::physics::PhysicsBody*) body B
+      */
+      virtual FixedConstraint* AddFixedConstraint(PhysicsBody* body_a, PhysicsBody* body_b) = 0;
+
+      /**
+      * @brief Adds a hinge constraint between body_a and body_b, where body_a is the master
+      * @param[in] body_a (sulphur::physics::PhysicsBody*) body A
+      * @param[in] body_b (sulphur::physics::PhysicsBody*) body B
+      */
+      virtual HingeConstraint* AddHingeConstraint(PhysicsBody* body_a, PhysicsBody* body_b) = 0;
     };
   }
 }

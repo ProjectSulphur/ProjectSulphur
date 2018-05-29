@@ -18,7 +18,7 @@ namespace sulphur
       /**
       * @see sulphur::engine::BaseAssetManager::ImportAsset.
       */
-      Texture* ImportAsset(const foundation::String& asset_file) override;
+      Texture* ImportAsset(const foundation::Path& asset_file) override;
       /**
       * @see sulphur::engine::BaseAssetManager::GetCacheName.
       */

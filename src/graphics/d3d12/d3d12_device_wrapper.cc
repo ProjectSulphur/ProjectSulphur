@@ -269,9 +269,9 @@ namespace sulphur
     //------------------------------------------------------------------------------------------------------
     bool D3D12Device::CreateCommittedResource(
       ID3D12Resource*& out_resource,
-      D3D12_HEAP_PROPERTIES heap_properties,
+      const D3D12_HEAP_PROPERTIES& heap_properties,
       D3D12_HEAP_FLAGS flags,
-      D3D12_RESOURCE_DESC resource_desc,
+      const D3D12_RESOURCE_DESC& resource_desc,
       D3D12_RESOURCE_STATES initial_state,
       D3D12_CLEAR_VALUE* clear_value)
     {
@@ -293,7 +293,7 @@ namespace sulphur
     //------------------------------------------------------------------------------------------------------
     bool D3D12Device::CreateGraphicsPipelineState(
       ID3D12PipelineState*& out_pso,
-      D3D12_GRAPHICS_PIPELINE_STATE_DESC &desc)
+      const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc)
     {
       if (FAILED(device_->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&out_pso))))
       {
@@ -305,9 +305,23 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
+    bool D3D12Device::CreateComputePipelineState(
+      ID3D12PipelineState*& out_pso,
+      const D3D12_COMPUTE_PIPELINE_STATE_DESC& desc)
+    {
+      if (FAILED(device_->CreateComputePipelineState(&desc, IID_PPV_ARGS(&out_pso))))
+      {
+        PS_LOG(Error, "Failed to create compute pipeline state object");
+        return false;
+      }
+
+      return true;
+    }
+
+    //------------------------------------------------------------------------------------------------------
     bool D3D12Device::CreateVersionedRootSignature(
       ID3D12RootSignature*& out_root_signature,
-      const D3D12_VERSIONED_ROOT_SIGNATURE_DESC desc,
+      const D3D12_VERSIONED_ROOT_SIGNATURE_DESC& desc,
       D3D_ROOT_SIGNATURE_VERSION max_version)
     {
       // Serialize description
@@ -368,20 +382,37 @@ namespace sulphur
         return;
       }
 
-      persistent_descriptor_heap_.AllocateRTVDescriptor(texture->rtv_persistent_index_);
-
       D3D12_RENDER_TARGET_VIEW_DESC rtv_desc = {};
       rtv_desc.Format = texture->format_;
       rtv_desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
       rtv_desc.Texture2D.MipSlice = 0;
 
-      CreateRenderTargetView(texture->resource_, rtv_desc, texture->rtv_persistent_index_);
+      persistent_descriptor_heap_.AllocateRTVDescriptor(texture->rtv_persistent_index());
+      CreateRenderTargetView(
+        texture->buffer()->resource_,
+        rtv_desc,
+        texture->rtv_persistent_index()
+      );
+
+      // Swap buffers and create an RTV for the second buffer.
+      texture->SwapBuffers();
+      persistent_descriptor_heap_.AllocateRTVDescriptor(texture->rtv_persistent_index());
+      CreateRenderTargetView(
+        texture->buffer()->resource_,
+        rtv_desc,
+        texture->rtv_persistent_index()
+      );
+      
+      // Swap back to original state.
+      texture->SwapBuffers();
+
+      texture->has_rtv_ = true;
     }
 
     //------------------------------------------------------------------------------------------------------
     void D3D12Device::CreateRenderTargetView(
       ID3D12Resource* resource,
-      D3D12_RENDER_TARGET_VIEW_DESC desc,
+      const D3D12_RENDER_TARGET_VIEW_DESC& desc,
       uint32_t& out_heap_handle)
     {
       persistent_descriptor_heap_.AllocateRTVDescriptor(out_heap_handle);
@@ -398,11 +429,11 @@ namespace sulphur
         return;
       }
 
-      persistent_descriptor_heap_.AllocateDSVDescriptor(texture->dsv_persistent_index_);
+      persistent_descriptor_heap_.AllocateDSVDescriptor(texture->dsv_persistent_index());
 
       D3D12_CPU_DESCRIPTOR_HANDLE dsv_cpu_handle;
       persistent_descriptor_heap_.GetCPUHandleForDSVDescriptor(
-        texture->dsv_persistent_index_,
+        texture->dsv_persistent_index(),
         dsv_cpu_handle
       );
 
@@ -412,7 +443,7 @@ namespace sulphur
         DXGI_FORMAT_D24_UNORM_S8_UINT;
 
       CreateDepthStencilView(
-        texture->resource_,
+        texture->buffer()->resource_,
         format,
         D3D12_DSV_DIMENSION_TEXTURE2D,
         D3D12_DSV_FLAG_NONE,
@@ -462,14 +493,29 @@ namespace sulphur
       }
 
       D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
-      srv_desc.Format = texture->resource_desc_.Format;
-      srv_desc.Texture2D.MipLevels = texture->mip_count_;
+      srv_desc.Format = texture->buffer()->resource_desc_.Format;
+      srv_desc.Texture2D.MipLevels = texture->buffer()->mip_count_;
       srv_desc.Texture2D.MostDetailedMip = 0;
       srv_desc.Texture2D.ResourceMinLODClamp = 0.0f;
       srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
       srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 
-      CreateShaderResourceView(texture->resource_, srv_desc, texture->srv_persistent_index_);
+      CreateShaderResourceView(
+        texture->buffer()->resource_, 
+        srv_desc, 
+        texture->srv_persistent_index()
+      );
+
+      if (texture->has_ping_pong() == true)
+      {
+        texture->SwapBuffers();
+        CreateShaderResourceView(
+          texture->buffer()->resource_, 
+          srv_desc, 
+          texture->srv_persistent_index()
+        );
+        texture->SwapBuffers();
+      }
 
       texture->has_srv_ = true;
     }
@@ -477,7 +523,7 @@ namespace sulphur
     //------------------------------------------------------------------------------------------------------
     void D3D12Device::CreateShaderResourceView(
       ID3D12Resource* resource,
-      D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc,
+      const D3D12_SHADER_RESOURCE_VIEW_DESC& srv_desc,
       uint32_t& out_srv_persistent_index)
     {
       persistent_descriptor_heap_.AllocateSRVDescriptor(out_srv_persistent_index);
@@ -488,6 +534,56 @@ namespace sulphur
       );
 
       device_->CreateShaderResourceView(resource, &srv_desc, cpu_handle);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void D3D12Device::CreateUnorderedAccessView(
+      ID3D12Resource* resource,
+      const D3D12_UNORDERED_ACCESS_VIEW_DESC& uav_desc,
+      uint32_t& out_uav_persistent_index)
+    {
+      persistent_descriptor_heap_.AllocateUAVDescriptor(out_uav_persistent_index);
+      D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
+      persistent_descriptor_heap_.GetCPUHandleForUAVDescriptor(
+        out_uav_persistent_index,
+        cpu_handle
+      );
+
+      device_->CreateUnorderedAccessView(resource, nullptr, &uav_desc, cpu_handle);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void D3D12Device::CreateUnorderedAccessView(D3D12Texture2D* texture)
+    {
+      if (texture->has_uav_ == true)
+      {
+        return;
+      }
+
+      D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc = {};
+      uav_desc.Format = texture->buffer()->resource_desc_.Format;
+      uav_desc.Texture2D.MipSlice = 0;
+      uav_desc.Texture2D.PlaneSlice = 0;
+      uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+      CreateUnorderedAccessView(
+        texture->buffer()->resource_,
+        uav_desc, 
+        texture->uav_persistent_index()
+      );
+
+      if (texture->has_ping_pong() == true)
+      {
+        texture->SwapBuffers();
+        CreateUnorderedAccessView(
+          texture->buffer()->resource_, 
+          uav_desc, 
+          texture->uav_persistent_index()
+        );
+        texture->SwapBuffers();
+      }
+
+      texture->has_uav_ = true;
     }
 
     //------------------------------------------------------------------------------------------------------
@@ -591,59 +687,51 @@ namespace sulphur
     //------------------------------------------------------------------------------------------------------
     bool D3D12Device::CreateTexture2D(
       const uint8_t* bytes,
-      D3D12_RESOURCE_DESC desc,
+      D3D12_RESOURCE_DESC& desc,
       D3D12_RESOURCE_STATES initial_state,
       D3D12_SUBRESOURCE_DATA* sub_res_data,
       uint32_t mip_count,
       D3D12Texture2D* out_texture,
-      D3D12TextureType texture_type,
-      foundation::Color clear_color)
+      D3D12_CLEAR_VALUE* clear_value)
     {
-      D3D12_CLEAR_VALUE clear_value;
-      bool use_clear_value = false;
-
-      switch (texture_type)
-      {
-      case D3D12TextureType::kTexture:
-        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-        break;
-      case D3D12TextureType::kDepthStencil:
-        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        use_clear_value = true;
-        clear_value = {
-          desc.Format == 
-          DXGI_FORMAT_R32_TYPELESS ?
-          DXGI_FORMAT_D32_FLOAT :
-          DXGI_FORMAT_D24_UNORM_S8_UINT,
-          {1.0f, 0} 
-        };
-        break;
-      case D3D12TextureType::kRenderTarget:
-        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-        use_clear_value = true;
-        clear_value = {desc.Format, {clear_color.r, clear_color.g, clear_color.b, clear_color.a}};
-        break;
-      default:
-        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-        break;
-      }
-
       if (!CreateCommittedResource(
-        out_texture->resource_,
+        out_texture->buffer()->resource_,
         CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
         D3D12_HEAP_FLAG_NONE,
         desc,
         D3D12_RESOURCE_STATE_COPY_DEST,
-        use_clear_value ? &clear_value : nullptr
+        clear_value
       ))
       {
         return false;
       }
 
-      out_texture->current_state_ = D3D12_RESOURCE_STATE_COPY_DEST;
-      out_texture->resource_desc_ = desc;
+      out_texture->buffer()->current_state_ = D3D12_RESOURCE_STATE_COPY_DEST;
+      out_texture->buffer()->resource_desc_ = desc;
       out_texture->format_ = desc.Format;
-      out_texture->mip_count_ = mip_count;
+      out_texture->buffer()->mip_count_ = mip_count;
+
+      // Create second buffer if necessary (for ping-pong)
+      if (out_texture->has_ping_pong() == true)
+      {
+        out_texture->SwapBuffers();
+        if (!CreateCommittedResource(
+          out_texture->buffer()->resource_,
+          CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+          D3D12_HEAP_FLAG_NONE,
+          desc,
+          D3D12_RESOURCE_STATE_COPY_DEST,
+          clear_value
+        ))
+        {
+          return false;
+        }
+
+        out_texture->buffer()->current_state_ = D3D12_RESOURCE_STATE_COPY_DEST;
+        out_texture->buffer()->resource_desc_ = desc;
+        out_texture->buffer()->mip_count_ = mip_count;
+        out_texture->SwapBuffers();
+      }
 
       // If there is no data, exit early
       if (bytes == nullptr)
@@ -652,7 +740,7 @@ namespace sulphur
       }
 
       const uint64_t uploadHeapSize = GetRequiredIntermediateSize(
-        out_texture->resource_,
+        out_texture->buffer()->resource_,
         0,
         mip_count
       );
@@ -680,29 +768,58 @@ namespace sulphur
 
         UpdateSubresources(
           command_list_,
-          out_texture->resource_,
+          out_texture->buffer()->resource_,
           tex_upload_heap,
           0,
           0,
           1,
           &subres_data
         );
+        if (out_texture->has_ping_pong() == true)
+        {
+          out_texture->SwapBuffers();
+          UpdateSubresources(
+            command_list_,
+            out_texture->buffer()->resource_,
+            tex_upload_heap,
+            0,
+            0,
+            1,
+            &subres_data
+          );
+          out_texture->SwapBuffers();
+        }
       }
       else
       {
         UpdateSubresources(
           command_list_,
-          out_texture->resource_,
+          out_texture->buffer()->resource_,
           tex_upload_heap,
           0,
           0,
           mip_count,
           sub_res_data
         );
+
+        if (out_texture->has_ping_pong() == true)
+        {
+          out_texture->SwapBuffers();
+          UpdateSubresources(
+            command_list_,
+            out_texture->buffer()->resource_,
+            tex_upload_heap,
+            0,
+            0,
+            mip_count,
+            sub_res_data
+          );
+          out_texture->SwapBuffers();
+        }
       }
 
       CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        out_texture->resource_,
+        out_texture->buffer()->resource_,
         D3D12_RESOURCE_STATE_COPY_DEST,
         initial_state
       );
@@ -711,6 +828,23 @@ namespace sulphur
         1,
         &barrier
       );
+
+      if (out_texture->has_ping_pong())
+      {
+        out_texture->SwapBuffers();
+        CD3DX12_RESOURCE_BARRIER barrier_2 = CD3DX12_RESOURCE_BARRIER::Transition(
+          out_texture->buffer()->resource_,
+          D3D12_RESOURCE_STATE_COPY_DEST,
+          initial_state
+        );
+
+        command_list_->ResourceBarrier(
+          1,
+          &barrier_2
+        );
+        out_texture->SwapBuffers();
+      }
+
       command_list_->Close();
 
       // Execute the command list.
@@ -728,7 +862,13 @@ namespace sulphur
 
       tex_upload_heap->Release();
 
-      out_texture->current_state_ = initial_state;
+      out_texture->buffer()->current_state_ = initial_state;
+      if (out_texture->has_ping_pong())
+      {
+        out_texture->SwapBuffers();
+        out_texture->buffer()->current_state_ = initial_state;
+        out_texture->SwapBuffers();
+      }
 
       return true;
     }

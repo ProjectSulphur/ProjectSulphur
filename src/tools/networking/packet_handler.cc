@@ -1,6 +1,7 @@
 #include "tools/networking/packet_handler.h"
 #include "tools/networking/networking_system.h"
 #include "tools/networking/value_syncer.h"
+#include "tools/networking/rpc_system.h"
 #include <enet/enet.h>
 #include <foundation/containers/map.h>
 
@@ -123,39 +124,52 @@ namespace sulphur
       switch (value.type)
       {
       case NetworkValueType::kFloat:
-        memcpy(&message.data[2], &value.f, sizeof(float));
-        message.size += sizeof(float);
+        memcpy(&message.data[2], &value.f, value.GetSize());
         break;
       case NetworkValueType::kDouble:
-        memcpy(&message.data[2], &value.d, sizeof(double));
-        message.size += sizeof(double);
+        memcpy(&message.data[2], &value.d, value.GetSize());
         break;
       case NetworkValueType::kInt:
-        memcpy(&message.data[2], &value.i, sizeof(int));
-        message.size += sizeof(int);
+        memcpy(&message.data[2], &value.i, value.GetSize());
         break;
       case NetworkValueType::kUnsignedInt:
-        memcpy(&message.data[2], &value.ui, sizeof(unsigned int));
-
-        message.size += sizeof(unsigned int);
+        memcpy(&message.data[2], &value.ui, value.GetSize());
         break;
       case NetworkValueType::kBool:
-        memcpy(&message.data[2], &value.b, sizeof(bool));
-        message.size += sizeof(bool);
+        memcpy(&message.data[2], &value.b, value.GetSize());
         break;
       case NetworkValueType::kVec2:
-        memcpy(&message.data[2], &value.v2, sizeof(glm::vec2));
-        message.size += sizeof(glm::vec2);
+        memcpy(&message.data[2], &value.v2, value.GetSize());
         break;
       case NetworkValueType::kVec3:
-        memcpy(&message.data[2], &value.v3, sizeof(glm::vec3));
-        message.size += sizeof(glm::vec3);
+        memcpy(&message.data[2], &value.v3, value.GetSize());
         break;
       case NetworkValueType::kVec4:
-        memcpy(&message.data[2], &value.v4, sizeof(glm::vec4));
-        message.size += sizeof(glm::vec4);
+        memcpy(&message.data[2], &value.v4, value.GetSize());
         break;
+      case NetworkValueType::kInt8:
+        memcpy(&message.data[2], &value.i8, value.GetSize());
+        break;
+      case NetworkValueType::kInt16:
+        memcpy(&message.data[2], &value.i16, value.GetSize());
+        break;
+      case NetworkValueType::kUnsignedInt8:
+        memcpy(&message.data[2], &value.ui8, value.GetSize());
+        break;
+      case NetworkValueType::kUnsignedInt16:
+        memcpy(&message.data[2], &value.ui16, value.GetSize());
+        break;
+      case NetworkValueType::kString:
+      {
+        uint8_t str_len = static_cast<uint8_t>(strlen(value.str));
+        memcpy(&message.data[2], &str_len, 1);
+        memcpy(&message.data[3], &value.str, str_len);
+        message.size++; //because we add the length of the string in the packet
       }
+      break;
+      }
+
+      message.size += value.GetSize();
 
       if (peer_to_exclude == nullptr)
       {
@@ -177,6 +191,110 @@ namespace sulphur
       memcpy(&message.data[2], &type, 1);
 
       QueueBroadcastMessage(message, MessageDataType::kValueSyncValidation);
+    }
+
+    //-------------------------------------------------------------------------
+    Message PacketHandler::ClientHostSendRPC(uint16_t id, uint8_t player_id, RPCMode rpc_mode,
+      const foundation::Vector<NetworkValue>& arguments, ENetPeer* peer)
+    {
+      Message message;
+      message.size = 4;
+      memcpy(&message.data[0], &id, 2);
+      memcpy(&message.data[2], &player_id, 1);
+      memcpy(&message.data[3], &rpc_mode, 1);
+      for (unsigned int i = 0; i < arguments.size(); ++i)
+      {
+        const NetworkValue& value = arguments[i];
+        switch (value.type)
+        {
+        case NetworkValueType::kFloat:
+          memcpy(&message.data[message.size], &value.f, value.GetSize());
+          break;
+        case NetworkValueType::kDouble:
+          memcpy(&message.data[message.size], &value.d, value.GetSize());
+          break;
+        case NetworkValueType::kInt:
+          memcpy(&message.data[message.size], &value.i, value.GetSize());
+          break;
+        case NetworkValueType::kUnsignedInt:
+          memcpy(&message.data[message.size], &value.ui, value.GetSize());
+          break;
+        case NetworkValueType::kBool:
+          memcpy(&message.data[message.size], &value.b, value.GetSize());
+          break;
+        case NetworkValueType::kVec2:
+          memcpy(&message.data[message.size], &value.v2, value.GetSize());
+          break;
+        case NetworkValueType::kVec3:
+          memcpy(&message.data[message.size], &value.v3, value.GetSize());
+          break;
+        case NetworkValueType::kVec4:
+          memcpy(&message.data[message.size], &value.v4, value.GetSize());
+          break;
+        case NetworkValueType::kInt8:
+          memcpy(&message.data[message.size], &value.i8, value.GetSize());
+          break;
+        case NetworkValueType::kInt16:
+          memcpy(&message.data[message.size], &value.i16, value.GetSize());
+          break;
+        case NetworkValueType::kUnsignedInt8:
+          memcpy(&message.data[message.size], &value.ui8, value.GetSize());
+          break;
+        case NetworkValueType::kUnsignedInt16:
+          memcpy(&message.data[message.size], &value.ui16, value.GetSize());
+          break;
+        case NetworkValueType::kString:
+        {
+          uint8_t str_len = static_cast<uint8_t>(strlen(value.str));
+          memcpy(&message.data[message.size], &str_len, 1);
+          memcpy(&message.data[message.size + 1], &value.str, value.GetSize());
+          message.size++; //because we add the length of the string in the packet
+        }
+        break;
+
+        }
+        message.size += value.GetSize();
+      }
+
+      if (system_->is_host())
+      {
+        if (rpc_mode != RPCMode::kHost)
+        {
+          QueueBroadcastMessageExceptOne(message, MessageDataType::kRPC, peer);
+        }
+      }
+      else if (system_->is_client())
+      {
+        message.peer = system_->network_player_->peer();
+        QueueMessage(message, MessageDataType::kRPC);
+      }
+
+      return message;
+    }
+
+    //-------------------------------------------------------------------------
+    void PacketHandler::ClientHostSendRPC(Message msg)
+    {
+      if (system_->is_host())
+      {
+        QueueMessage(msg, MessageDataType::kRPC);
+      }
+    }
+
+    //-------------------------------------------------------------------------
+    void PacketHandler::HostValidateRPC(uint16_t id, const foundation::Vector<NetworkValueType>& argument_types)
+    {
+      uint8_t argument_count = static_cast<uint8_t>(argument_types.size());
+      Message message;
+      message.size = 3 + argument_count;
+      memcpy(&message.data[0], &id, 2);
+      memcpy(&message.data[2], &argument_count, 1);
+      for (unsigned int i = 0; i < argument_count; ++i)
+      {
+        memcpy(&message.data[3 + i], &argument_types[i], 1);
+      }
+
+      QueueBroadcastMessage(message, MessageDataType::kRPCValidation);
     }
 
     //-------------------------------------------------------------------------
@@ -448,6 +566,16 @@ namespace sulphur
       {
         system_->value_syncer_->ClientProcessValueValidation(data);
         return 3;
+      }
+      break;
+      case MessageDataType::kRPC:
+      {
+        return system_->rpc_system_->ClientHostProcessRPC(data, peer);
+      }
+      break;
+      case MessageDataType::kRPCValidation:
+      {
+        return system_->rpc_system_->ClientProcessRPCValidation(data);
       }
       break;
       default:

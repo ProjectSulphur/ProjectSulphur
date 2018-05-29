@@ -22,22 +22,22 @@ namespace sulphur
     public:
       /**
        * @brief Creates a texture from the pixel data in an image.
-       * @param[in] image_file (const sulphur::foundation::String&) The image file 
+       * @param[in] image_file (const sulphur::foundation::Path&) The image file 
        * containing the pixel data. 
        * @param[out] texture (sulphur::builder::TextureAsset&) The texture created 
        * from the image.
        * @return (bool) False when there was an error that couldn't be recovered from. 
        * @remark If the function returned false, the texture should be discarded.
        */
-      bool Create(const foundation::String& image_file, foundation::TextureAsset& texture) const;
+      bool Create(const foundation::Path& image_file, foundation::TextureAsset& texture) const;
       /**
        * @brief Adds a texture to the package.
-       * @param[in] asset_origin (const sulphur::foundation::String&) The file the asset was 
+       * @param[in] asset_origin (const sulphur::foundation::Path&) The file the asset was 
        * created from. Should be ASSET_ORIGIN_USER when the asset is created by the user.
        * @param[in] texture (sulphur::builder::TextureAsset&) The texture to add to the package.
        * @return (bool) True if the texture was added to the package succesfully.
        */
-      bool PackageTexture(const foundation::String& asset_origin, foundation::TextureAsset& texture);
+      bool PackageTexture(const foundation::Path& asset_origin, foundation::TextureAsset& texture);
       /**
        * @see sulphur::builder::PipelineBase::GetCacheName
        */
@@ -47,7 +47,6 @@ namespace sulphur
       */
       foundation::String GetPackageExtension() const override;
 
-    protected:
       /**
       * @see sulphur::builder::PipelineBase::PackageDefaultAssets
       */
@@ -56,18 +55,18 @@ namespace sulphur
     private:
       /**
        * @brief Loads an image and creates a texture with the pixel data.
-       * @param[in] image_file (const sulphur::foundation::String&) The image file 
+       * @param[in] image_file (const sulphur::foundation::Path&) The image file 
        * containing the pixel data. 
        * @param[out] texture (sulphur::builder::TextureAsset&) The texture created 
        * from the image.
        * @return (bool) False when there was an error that couldn't be recovered from. 
        * @remark If the function returned false, the texture should be discarded.
        */
-      bool LoadImage(const foundation::String& image_file, foundation::TextureAsset& texture) const;
+      bool LoadImage(const foundation::Path& image_file, foundation::TextureAsset& texture) const;
       /**
        * @brief Loads an image using STB_Image and creates a texture with the pixel data.
        * This is used to load png, bmp, jpg and tga image files.
-       * @param[in] image_file (const sulphur::foundation::String&) The image file 
+       * @param[in] image_file (const sulphur::foundation::Path&) The image file 
        * containing the pixel data. 
        * @param[out] texture (sulphur::builder::TextureAsset&) The texture created 
        * from the image.
@@ -76,12 +75,12 @@ namespace sulphur
        * @return (bool) False when there was an error that couldn't be recovered from. 
        * @remark If the function returned false, the texture should be discarded.
        */
-      bool LoadImageSTBI(const foundation::String& image_file, foundation::TextureAsset& texture,
+      bool LoadImageSTBI(const foundation::Path& image_file, foundation::TextureAsset& texture,
         const unsigned char* image_data, const int size) const;
       /**
       * @brief Loads an image using Nvidia Texture Tools and creates a texture with 
       * the pixel data. This is used to load dds image files.
-      * @param[in] image_file (const sulphur::foundation::String&) The image file
+      * @param[in] image_file (const sulphur::foundation::Path&) The image file
       * containing the pixel data.
       * @param[out] texture (sulphur::builder::TextureAsset&) The texture created
       * from the image.
@@ -90,7 +89,7 @@ namespace sulphur
       * @return (bool) False when there was an error that couldn't be recovered from.
       * @remark If the function returned false, the texture should be discarded.
       */
-      bool LoadImageNVTT(const foundation::String& /*image_file*/, foundation::TextureAsset& /*texture*/,
+      bool LoadImageNVTT(const foundation::Path& /*image_file*/, foundation::TextureAsset& /*texture*/,
         const unsigned char* /*image_data*/, const int /*size*/) const;
 
       /**

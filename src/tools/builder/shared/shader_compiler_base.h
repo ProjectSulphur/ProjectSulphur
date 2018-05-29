@@ -6,6 +6,7 @@ namespace sulphur
 {
   namespace foundation 
   {
+    class Path;
     struct ShaderAsset;
   }
 
@@ -49,13 +50,13 @@ namespace sulphur
       *@brief compiles shader to bytecode for the specified target platform
       *@param[in] shader_source (const sulphur::foundation::String&) shader source data as read from disk
       *@param[in] shader (const sulphur::foundation::ShaderAsset&) shader to convert to bytecode
-      *@param[in] path (const sulphur::foundation::String&) path to the original file
+      *@param[in] path (const sulphur::foundation::Path&) path to the original file
       *@param[out] compiled (sulphur::builder::Vector<unsigned int>&) compiled shader data
       *@return (bool) boolean indicating if the compilation was successfull
       */
       virtual bool CompileShader(const foundation::String& shader_source,
                                  const foundation::ShaderAsset& shader,
-                                 const foundation::String& path,
+                                 const foundation::Path& path,
                                  foundation::Vector<uint8_t>& compiled) = 0;
       /**
       *@brief get the target this compiler compiles for

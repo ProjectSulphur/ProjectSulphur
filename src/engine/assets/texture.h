@@ -3,9 +3,12 @@
 #include "engine/assets/asset_interfaces.h"
 
 #include <foundation/utils/type_definitions.h>
+#include <foundation/utils/flags.h>
 #include <foundation/containers/vector.h>
 
 #include <glm/glm.hpp>
+
+#include <type_traits>
 
 namespace sulphur
 {
@@ -38,6 +41,18 @@ namespace sulphur
     };
 
     /**
+    * @enum sulphur::engine::TextureCreateFlags
+    * @brief Describes way the texture will be created
+    */
+    ENUM_FLAGS(TextureCreateFlags)
+    {
+      kDefault                = 1 << 0,
+      kAllowRenderTarget      = 1 << 1,
+      kAllowUAV               = 1 << 2,
+      kAllowDepthStencil      = 1 << 3
+    };
+
+    /**
      * @author Jelle de Haan
      */
     class Texture
@@ -55,9 +70,11 @@ namespace sulphur
       * @param[in] width (uint) The width of the texture in pixels.
       * @param[in] height (uint) The height of the texture in pixels.
       * @param[in] format (TextureFormat) The format of the texture.
+      * @param[in] create_flags (TextureCreateFlags) Describes way the texture will be created
       */
       Texture(const foundation::Vector<byte>& pixel_data, uint width, uint height,
-        TextureFormat format = TextureFormat::kR8G8B8A8_UNORM);
+        TextureFormat format = TextureFormat::kR8G8B8A8_UNORM,
+        TextureCreateFlags create_flags = TextureCreateFlags::kDefault);
       
       /**
       * @brief Creates a texture from pixel data.
@@ -65,26 +82,32 @@ namespace sulphur
       * data of the texture. Data should be in RGBA8 format.
       * @param[in] size (const glm::u32vec2&) The size of the texture in pixels.
       * @param[in] format (TextureFormat) The format of the texture.
+      * @param[in] create_flags (TextureCreateFlags) Describes way the texture will be created
       */
       Texture(const foundation::Vector<byte>& pixel_data, const glm::u32vec2& size, 
-        TextureFormat format = TextureFormat::kR8G8B8A8_UNORM);
+        TextureFormat format = TextureFormat::kR8G8B8A8_UNORM,
+        TextureCreateFlags create_flags = TextureCreateFlags::kDefault);
 
       /**
       * @brief Creates a texture and sets all bytes to 0u.
       * @param[in] width (uint) The width of the texture in pixels.
       * @param[in] height (uint) The height of the texture in pixels.
       * @param[in] format (TextureFormat) The format of the texture.
+      * @param[in] create_flags (TextureCreateFlags) Describes way the texture will be created
       */
       Texture(uint width, uint height, 
-        TextureFormat format = TextureFormat::kR8G8B8A8_UNORM);
+        TextureFormat format = TextureFormat::kR8G8B8A8_UNORM,
+        TextureCreateFlags create_flags = TextureCreateFlags::kDefault);
 
       /**
       * @brief Creates a texture and sets all bytes to 0u.
       * @param[in] size (const glm::u32vec2& size) The size of the texture in pixels.
       * @param[in] format (TextureFormat) The format of the texture.
+      * @param[in] create_flags (TextureCreateFlags) Describes way the texture will be created
       */
       Texture(const glm::u32vec2& size, 
-        TextureFormat format = TextureFormat::kR8G8B8A8_UNORM);
+        TextureFormat format = TextureFormat::kR8G8B8A8_UNORM,
+        TextureCreateFlags create_flags = TextureCreateFlags::kDefault);
 
       /**
       * @brief Returns the size of the texture in pixels
@@ -116,10 +139,18 @@ namespace sulphur
       */
       TextureFormat format() const { return format_; };
 
+      /**
+      * @brief Returns the creation flags used to create this texture
+      * @return (TextureCreateFlags) The flags
+      */
+      TextureCreateFlags creation_flags() const { return static_cast<TextureCreateFlags>(creation_flags_); };
+
     private:
       const glm::u32vec2 size_;
       foundation::Vector<byte> data_;
+
       const TextureFormat format_;
+      const TextureCreateFlags creation_flags_;
 
       foundation::Vector<byte> GenerateTextureData();
     };

@@ -1,12 +1,13 @@
 #include "tools/builder/pipelines/pipeline_base.h"
 #include "tools/builder/shared/util.h"
+#include "tools/builder/shared/file_system.h"
 
 #include <foundation/io/binary_reader.h>
 #include <foundation/io/binary_writer.h>
 #include <foundation/containers/string.h>
+#include <foundation/io/filesystem.h>
 
 #include <EASTL/functional.h>
-
 
 namespace sulphur 
 {
@@ -20,8 +21,8 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------------             
-    bool PipelineBase::RegisterAsset(const foundation::String& asset_origin, 
-      foundation::AssetName& name, foundation::String& package_path,
+    bool PipelineBase::RegisterAsset(const foundation::Path& asset_origin, 
+      foundation::AssetName& name, foundation::Path& package_path,
       foundation::AssetID& id, bool allow_append_numbers)
     {
       // Generate an id for the name
@@ -60,14 +61,20 @@ namespace sulphur
 
         if(i == 255)
         {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Error, 
+          PS_LOG_BUILDER(Error, 
             "Trying to register a file with a name that is already in use. Can't find a suitable replacement name.");
           return false;
         }
       }
 
+      // Create the output and package directories
+      foundation::Path output_dir = output_path();
+      output_dir.Create();
+      foundation::Path package_dir = output_path() + package_output_path();
+      package_dir.Create();
+
       // Update the package path
-      const foundation::String package_relative_path = package_output_path() + 
+      const foundation::Path package_relative_path = package_output_path().GetString() + 
         name.GetString() + '.' + GetPackageExtension();
       package_path = output_path() + package_relative_path;
 
@@ -77,45 +84,44 @@ namespace sulphur
       package.filepath = package_relative_path;
 
       ExportCache();
+      PackageDefaultAssets();
 
-      return true;
-    }
-
-    //--------------------------------------------------------------------------------
-    bool PipelineBase::PackageDefaultAssets()
-    {
       return true;
     }
 
     //--------------------------------------------------------------------------------
     void PipelineBase::Initialize()
     {
-      foundation::String cache_file = output_path() + GetCacheName() + ".cache";
+      packaged_assets_.clear();
+      foundation::Path cache_file = output_path().GetString() + GetCacheName() + ".cache";
       foundation::BinaryReader reader(cache_file, false);
       if (reader.is_ok())
       {
         // Load the cached package information
         packaged_assets_ = reader.ReadMap<foundation::AssetID, foundation::PackagePtr>();
-      }
-      else
-      {
-        PackageDefaultAssets();
+        RemoveDeletedAssets();
       }
     }
 
     //--------------------------------------------------------------------------------
-    void PipelineBase::ExportCache()
+    void PipelineBase::ExportCache() const
     {
-      foundation::String cache_file = output_path() + GetCacheName() + ".cache";
+      foundation::Path cache_file = output_path().GetString() + GetCacheName() + ".cache";
       foundation::BinaryWriter writer(cache_file);
 
       writer.Write(packaged_assets_);
 
       if(writer.Save() == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Warning, 
+        PS_LOG_BUILDER(Warning, 
           "Failed to write %s cache.", GetCacheName().c_str());
       }
+    }
+
+    //--------------------------------------------------------------------------------
+    bool PipelineBase::PackageDefaultAssets()
+    {
+      return true;
     }
 
     //--------------------------------------------------------------------------------
@@ -143,8 +149,8 @@ namespace sulphur
       PackagedAssetsIterator it = packaged_assets_.find(id);
       if (it != packaged_assets_.end())
       {
-        foundation::String package = output_path() + it->second.filepath;
-        if (remove(package.c_str()) != 0)
+        foundation::Path package = output_path() + it->second.filepath;
+        if (remove(package.GetString().c_str()) != 0)
         {
           return false;
         }
@@ -167,39 +173,68 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------------
-    void PipelineBase::SetOutputLocation(const foundation::String& output_path)
+    void PipelineBase::SetOutputLocation(const foundation::Path& output_path)
     {
       output_path_ = output_path;
-      eastl::replace(output_path_.begin(), output_path_.end(), '\\', '/');
-      if (output_path_.back() != '/' && output_path_.empty() == false)
-      {
-        output_path_ += '/';
-      }
-
       Initialize();
     }
 
     //--------------------------------------------------------------------------------
-    void PipelineBase::SetPackageOutputLocation(const foundation::String& package_path)
+    void PipelineBase::SetPackageOutputLocation(const foundation::Path& package_path)
     {
       package_output_path_ = package_path;
-      eastl::replace(package_output_path_.begin(), package_output_path_.end(), '\\', '/');
-      if (package_output_path_.back() != '/')
-      {
-        package_output_path_ += '/';
-      }
     }
 
     //--------------------------------------------------------------------------------
-    const foundation::String& PipelineBase::output_path() const
+    const foundation::Path& PipelineBase::output_path() const
     {
       return output_path_;
     }
 
     //--------------------------------------------------------------------------------
-    const foundation::String& PipelineBase::package_output_path() const
+    const foundation::Path& PipelineBase::package_output_path() const
     {
       return package_output_path_;
+    }
+
+    //--------------------------------------------------------------------------------
+    void PipelineBase::RefreshCache()
+    {
+      RemoveDeletedAssets();
+      ExportCache();
+    }
+
+    bool PipelineBase::GetPackagePtrByName(const foundation::String& name, foundation::PackagePtr& ptr)
+    {
+      foundation::AssetID id = foundation::GenerateId(name);
+      ptr = packaged_assets_[id];
+      return true;
+    }
+
+    bool PipelineBase::GetPackagePtrById(const foundation::AssetID& id, foundation::PackagePtr& ptr)
+    {
+      ptr = packaged_assets_[id];
+      return true;
+    }
+
+    //--------------------------------------------------------------------------------
+    void PipelineBase::RemoveDeletedAssets()
+    {
+      foundation::Map<foundation::AssetID, foundation::PackagePtr>::reverse_iterator it;
+      foundation::Vector<foundation::AssetID> remove_list;
+
+      for (it = packaged_assets_.rbegin(); it != packaged_assets_.rend(); ++it)
+      {
+        foundation::Path path(output_path() + it->second.filepath);
+        if(path.Exists() == false)
+        {
+          remove_list.push_back(it->first);
+        }
+      }
+      for (foundation::AssetID id : remove_list)
+      {
+        packaged_assets_.erase(id);
+      }
     }
   }
 }

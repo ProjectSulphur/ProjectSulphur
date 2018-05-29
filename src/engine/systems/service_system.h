@@ -2,8 +2,6 @@
 
 #include "engine/systems/system.h"
 
-#include <foundation/utils/type_set.h>
-
 namespace sulphur 
 {
   namespace engine 
@@ -23,6 +21,14 @@ namespace sulphur
       */
       IServiceSystemBase(const char* name);
 
+      /**
+      * @internal
+      * @brief Call-back which is called after everything system in the caller
+      *        application has been terminated (i.e. termination of the
+      *        platform-layer).
+      */
+      virtual void OnShutdown();
+
     };
 
     /**
@@ -31,7 +37,7 @@ namespace sulphur
     * @author Maarten ten Velden
     */
     template<typename T>
-    class IServiceSystem : public foundation::TypeSet<IServiceSystemBase, T>
+    class IServiceSystem : public IServiceSystemBase
     {
     public:
       /**
@@ -52,7 +58,7 @@ namespace sulphur
     //-------------------------------------------------------------------------
     template<typename T>
     inline IServiceSystem<T>::IServiceSystem(const char* name) :
-      foundation::TypeSet<IServiceSystemBase, T>(name)
+      IServiceSystemBase(name)
     {
     }
   }

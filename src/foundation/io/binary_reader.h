@@ -1,13 +1,15 @@
 #pragma once
-#include "../containers/string.h"
-#include "../containers/vector.h"
-#include "../containers/map.h"
-#include "binary_serializable.h"
+#include "foundation/containers/string.h"
+#include "foundation/containers/vector.h"
+#include "foundation/containers/map.h"
+#include "foundation/io/binary_serializable.h"
 
 namespace sulphur 
 {
   namespace foundation 
   {
+    class Path;
+
     /**
      * @class sulphur::foundation::BinaryReader
      * @brief Helper class for reading binary data from files.
@@ -18,12 +20,12 @@ namespace sulphur
     public:
       /**
        * @brief Create a binary reader and fill its buffer with the contents of a file.
-       * @param[in] file (const sulphur::foundation::String&) The file to read using 
+       * @param[in] file (const sulphur::foundation::Path&) The file to read using 
        * the binary reader.
        * @param[opt in] missing_file_error (bool) If an error should be thrown 
        * if the file doesn't exist.
        */
-      BinaryReader(const String& file, bool missing_file_error = true);
+      BinaryReader(const Path& file, bool missing_file_error = true);
       /**
        * @brief Create a binary reader that reads from a buffer.
        * @param[in] data (unsigned char*) Pointer to the buffer to read.

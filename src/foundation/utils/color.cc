@@ -25,6 +25,9 @@ namespace sulphur
 
     Color const Color::kWhiteTransparent = Color::FromByte(255u, 255u, 255u, 0u);
     Color const Color::kBlackTransparent = Color::FromByte(0u, 0u, 0u, 0u);
+    Color const Color::kGreenTransparent = Color::FromByte(0u, 255u, 0u, 50u);
+    Color const Color::kRedTransparent = Color::FromByte(255u, 0u, 0u, 50u);
+    Color const Color::kBlueTransparent = Color::FromByte(0u, 0u, 255u, 50u);
 
     //--------------------------------------------------------------------------
     Color::Color(foundation::String hex_string)

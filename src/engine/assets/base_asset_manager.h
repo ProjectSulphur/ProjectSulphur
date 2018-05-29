@@ -1,5 +1,8 @@
 #pragma once
+
 #include "asset_interfaces.h"
+#include "engine/application/application.h"
+
 #include <foundation/memory/memory.h>
 #include <foundation/containers/vector.h>
 #include <foundation/containers/map.h>
@@ -32,7 +35,6 @@ namespace sulphur
           ref_count(-1)
         {}
 
-
         /**
          * @brief Creates a reference handle.
          * @param[in] handle (int) The index of the reference of the asset.
@@ -50,14 +52,19 @@ namespace sulphur
 
     public:
       /**
-       * @brief Initializes the manager. Loads the package cache from disk.
+       * @see sulphur::engine::IAssetManager::Initialize
        */
-      void Initialize();
+      void Initialize(Application& application) override;
 
       /**
       * @brief Releases all assets
       */
       void Shutdown() override;
+
+      /**
+      * @brief Re-loads the package cache from disk.
+      */
+      void RefreshCache() override;
 
       /**
        * @brief Adds an asset to the manager.
@@ -154,11 +161,11 @@ namespace sulphur
       void* GetAsset(const BaseAssetHandle& handle) const override;
       /**
        * @brief Function to import an asset from a package.
-       * @param[in] asset_file (const sulphur::foundation::String) The package 
+       * @param[in] asset_file (const sulphur::foundation::Path&) The package 
        * containing the asset.
        * @return (T*) Unmanaged pointer to the imported asset.
        */
-      virtual T* ImportAsset(const foundation::String& asset_file) = 0;
+      virtual T* ImportAsset(const foundation::Path& asset_file) = 0;
       /**
       * @brief Asset pipelines deriving from this class override this method to
       * set the name of the package cache.
@@ -172,6 +179,8 @@ namespace sulphur
       * @remark Location should end with a '/'.
       */
       virtual const foundation::String GetCacheLocation() const;
+
+      Application* application_; //!< Keeps a pointer to the main application that owns everything.
 
     private:
       /**
@@ -211,10 +220,24 @@ namespace sulphur
 
     //--------------------------------------------------------------------------------
     template <class T>
-    void BaseAssetManager<T>::Initialize()
+    void BaseAssetManager<T>::Initialize(Application& application)
     {
-      foundation::BinaryReader reader(GetCacheLocation() + GetCacheName() + ".cache");
-      if(reader.is_ok())
+      application_ = &application;
+      RefreshCache();
+    }
+
+    //--------------------------------------------------------------------------------
+    template <class T>
+    void BaseAssetManager<T>::RefreshCache()
+    {
+      const foundation::String cache_name = GetCacheName();
+      if(cache_name.empty() == true)
+      {
+        return;
+      }
+
+      foundation::BinaryReader reader(application_->project_directory().path() + cache_name + ".cache");
+      if (reader.is_ok() == true)
       {
         packaged_assets_ = reader.ReadMap<foundation::AssetID, foundation::PackagePtr>();
       }

@@ -3,6 +3,7 @@
 #include <EASTL/fixed_map.h>
 #include <EASTL/vector_map.h>
 #include <EASTL/vector_multimap.h>
+#include <EASTL/unordered_map.h>
 #include "foundation/memory/allocators/eastl_allocator.h"
 
 namespace sulphur
@@ -26,5 +27,8 @@ namespace sulphur
     template<typename Key, typename T, typename Compare = eastl::less<Key>,
       typename RandomAccessContainer = eastl::vector<eastl::pair<Key, T>, EASTLAllocator>>
     using VectorMultiMap = eastl::vector_multimap<Key, T, Compare, EASTLAllocator, RandomAccessContainer>;
+    
+    template<typename Key, typename T>
+    using UnorderedMap = eastl::unordered_map<Key, T, eastl::hash<Key>, eastl::equal_to<Key>, EASTLAllocator>;
   }
 }

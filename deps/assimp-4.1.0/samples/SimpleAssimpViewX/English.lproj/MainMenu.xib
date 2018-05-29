@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <archive type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="7.10">
 	<data>
 		<int key="IBDocument.SystemTarget">1060</int>
@@ -83,7 +83,7 @@
 								</object>
 								<object class="NSMenuItem" id="930243026">
 									<reference key="NSMenu" ref="272824431"/>
-									<string key="NSTitle">Preferencesâ€¦</string>
+									<string key="NSTitle">Preferences…</string>
 									<string key="NSKeyEquiv">,</string>
 									<int key="NSKeyEquivModMask">1048576</int>
 									<int key="NSMnemonicLoc">2147483647</int>
@@ -208,7 +208,7 @@
 								</object>
 								<object class="NSMenuItem" id="993481628">
 									<reference key="NSMenu" ref="287065493"/>
-									<string key="NSTitle">Openâ€¦</string>
+									<string key="NSTitle">Open…</string>
 									<string key="NSKeyEquiv">o</string>
 									<int key="NSKeyEquivModMask">1048576</int>
 									<int key="NSMnemonicLoc">2147483647</int>
@@ -274,7 +274,7 @@
 								</object>
 								<object class="NSMenuItem" id="408455980">
 									<reference key="NSMenu" ref="287065493"/>
-									<string key="NSTitle">Save Asâ€¦</string>
+									<string key="NSTitle">Save As…</string>
 									<string key="NSKeyEquiv">S</string>
 									<int key="NSKeyEquivModMask">1048576</int>
 									<int key="NSMnemonicLoc">2147483647</int>
@@ -302,7 +302,7 @@
 								</object>
 								<object class="NSMenuItem" id="115912039">
 									<reference key="NSMenu" ref="287065493"/>
-									<string key="NSTitle">Page Setupâ€¦</string>
+									<string key="NSTitle">Page Setup…</string>
 									<string key="NSKeyEquiv">P</string>
 									<int key="NSKeyEquivModMask">1048576</int>
 									<int key="NSMnemonicLoc">2147483647</int>
@@ -311,7 +311,7 @@
 								</object>
 								<object class="NSMenuItem" id="521888319">
 									<reference key="NSMenu" ref="287065493"/>
-									<string key="NSTitle">Printâ€¦</string>
+									<string key="NSTitle">Print…</string>
 									<string key="NSKeyEquiv">p</string>
 									<int key="NSKeyEquivModMask">1048576</int>
 									<int key="NSMnemonicLoc">2147483647</int>
@@ -438,7 +438,7 @@
 											<bool key="EncodedWithXMLCoder">YES</bool>
 											<object class="NSMenuItem" id="841709161">
 												<reference key="NSMenu" ref="981406077"/>
-												<string key="NSTitle">Findâ€¦</string>
+												<string key="NSTitle">Find…</string>
 												<string key="NSKeyEquiv">f</string>
 												<int key="NSKeyEquivModMask">1048576</int>
 												<int key="NSMnemonicLoc">2147483647</int>
@@ -1108,7 +1108,7 @@
 								</object>
 								<object class="NSMenuItem" id="168339445">
 									<reference key="NSMenu" ref="200699227"/>
-									<string key="NSTitle">Customize Toolbarâ€¦</string>
+									<string key="NSTitle">Customize Toolbar…</string>
 									<string key="NSKeyEquiv"/>
 									<int key="NSKeyEquivModMask">1048576</int>
 									<int key="NSMnemonicLoc">2147483647</int>

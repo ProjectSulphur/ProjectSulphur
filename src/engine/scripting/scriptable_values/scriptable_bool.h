@@ -21,7 +21,7 @@ namespace sulphur
       * @param[in] lua_state() (lua_State*) the Lua state to create the ScriptableBool in
       * @param[in] value (bool) the initial value of the ScriptableBool
       */
-      ScriptableBool(ScriptSystem* script_system, bool value);
+      ScriptableBool(ScriptState* script_state, bool value);
     };
 
   }

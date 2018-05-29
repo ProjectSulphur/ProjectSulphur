@@ -17,11 +17,11 @@ namespace sulphur
       /**
        * @brief Creates and initializes an instance of ModelInfo. The file associated 
        * with or the number of models in this instance cannot be changed.
-       * @param[in] file (onst sulphur::foundation::String&) The file containing the 
+       * @param[in] file (onst sulphur::foundation::Path&) The file containing the 
        * scene this instance will contain information about.
        * @param[in] number_of_models (unsigned int) The number of models to allocate storage for.
        */
-      ModelInfo(const String& file, unsigned int number_of_models);
+      ModelInfo(const Path& file, unsigned int number_of_models);
       /**
        * @brief Default constructor.
        */

@@ -13,6 +13,7 @@ struct ID3D11DeviceContext;
 struct IDXGISwapChain;
 struct IDXGIAdapter;
 struct ID3D11RenderTargetView;
+struct ID3D11Resource;
 struct ID3D11Texture2D;
 struct ID3D11ShaderResourceView;
 struct ID3D11DepthStencilView;
@@ -117,6 +118,9 @@ namespace sulphur
         size_t size, D3D11_BIND_FLAG bindFlags, D3D11_USAGE usage,
         D3D11_CPU_ACCESS_FLAG cpuFlags, uint miscFlags);
 
+      void CopyResource(const Microsoft::WRL::ComPtr<ID3D11Resource>& destination,
+        const Microsoft::WRL::ComPtr<ID3D11Resource>& source);
+
       void CreateVertexShader(const void* src_data, size_t src_size,
         Microsoft::WRL::ComPtr<ID3D11VertexShader>& out_shader);
       void CreateHullShader(const void* src_data, size_t src_size,
@@ -133,8 +137,9 @@ namespace sulphur
       void SetTexture(uint register_id, const D3D11Texture* texture);
       void SetMesh(const D3D11Mesh* mesh);
       void SetShader(const D3D11Shader* shader);
+      void SetStencilRef(uint value);
 
-      void Draw();
+      void Draw(uint index_count = 0, uint index_offset = 0);
       void Present(bool vsync);
 
       const DeviceInfo& device_info() const { return device_info_; };
@@ -143,8 +148,6 @@ namespace sulphur
       ID3D11DeviceContext* GetDeviceContext();
 
     private:
-      uint render_size_;
-
       DeviceInfo device_info_;
       foundation::Vector<DisplayMode> displayModes;
 

@@ -2,6 +2,8 @@
 #include "d3dx12.h"
 
 #include <engine/assets/shader.h>
+#include <engine/assets/compute_shader.h>
+
 #include <d3d12.h>
 
 namespace sulphur //!< Sulphur namespace
@@ -19,8 +21,11 @@ namespace sulphur //!< Sulphur namespace
     {
     public:
       /**
-      * @brief Constructor
-      * @param[in] root_signature (ID3D12RootSignature*) 
+      * @brief Constructor.
+      * @param[in] root_signature (ID3D12RootSignature*) The D3D12 root signature object.
+      * @param[in] num_constant_buffers (uint32_t) The amount of constant buffers.
+      * @param[in] num_descriptor_tables (uint32_t) The amount of descriptor tables.
+      * @param[in] num_constants (uint32_t) The amount of constant variables.
       */
       D3D12RootSignature(
         ID3D12RootSignature* root_signature,
@@ -34,17 +39,28 @@ namespace sulphur //!< Sulphur namespace
       {}
 
       /**
-      * @brief Destructor
+      * @brief Destructor.
       */
       ~D3D12RootSignature();
 
       /**
       * @brief Creates a root signature description based on the shader reflection.
-      * @param[in] shader (const engine::ShaderHandle&) The shader to create a root signature description for.
-      * @return (D3D12_VERSIONED_ROOT_SIGNATURE_DESC) The created root signature description
+      * @param[in] shader (const sulphur::engine::ShaderHandle&) The shader to create a root signature description for.
+      * @param[in] device (sulphur::graphics::D3D12Device&) The D3D12 device object.
+      * @return (sulphur::graphics::D3D12RootSignature*) The created root signature
       */
-      static ID3D12RootSignature* CreateRootSignatureFromShader(
+      static D3D12RootSignature* CreateRootSignatureFromShader(
         const engine::ShaderHandle& shader,
+        D3D12Device& device);
+
+      /**
+      * @brief Creates a root signature description based on the compute shader reflection.
+      * @param[in] compute_shader (const sulphur::engine::ComputeShaderHandle&) The compute shader to create a root signature description for.
+      * @param[in] device (sulphur::graphics::D3D12Device&) The D3D12 device object.
+      * @return (sulphur::graphics::D3D12RootSignature*) The created root signature
+      */
+      static D3D12RootSignature* CreateRootSignatureFromShader(
+        const engine::ComputeShaderHandle& compute_shader,
         D3D12Device& device);
 
       /**

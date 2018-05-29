@@ -1,0 +1,1 @@
+sulphur-builder.exe --convert_animations -dir %INPUTFOLDER%unprocessed/ -r -output %INPUTFOLDER%processed/

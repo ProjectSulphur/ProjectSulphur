@@ -1,0 +1,1 @@
+sulphur-builder.exe --convert_shaders -dir %INPUTFOLDER%unprocessed/ -r -output %INPUTFOLDER%processed/ -include %INPUTFOLDER%/shaders/include/

@@ -8,32 +8,37 @@ namespace sulphur
     Texture::Texture() :
       size_(256u, 256u),
       data_(GenerateTextureData()),
-      format_(TextureFormat::kR8G8B8A8_UNORM)
+      format_(TextureFormat::kR8G8B8A8_UNORM),
+      creation_flags_(TextureCreateFlags::kDefault)
     {}
 
     //--------------------------------------------------------------------------------
     Texture::Texture(const foundation::Vector<byte>& pixel_data, uint width,
-       uint height, TextureFormat format) :
-      Texture(pixel_data, glm::u32vec2(width, height), format)
+       uint height, TextureFormat format, TextureCreateFlags create_flags) :
+      Texture(pixel_data, glm::u32vec2(width, height), format, create_flags)
     {}
 
     //--------------------------------------------------------------------------------
     Texture::Texture(const foundation::Vector<byte>& pixel_data,
-      const glm::u32vec2& size, TextureFormat format) :
+        const glm::u32vec2& size, TextureFormat format, 
+        TextureCreateFlags create_flags) :
       size_(size),
       data_(pixel_data),
-      format_(format)
+      format_(format),
+      creation_flags_(create_flags)
     {}
 
     //--------------------------------------------------------------------------------
-    Texture::Texture(uint width, uint height, TextureFormat format) :
-      Texture(glm::u32vec2(width, height), format)
+    Texture::Texture(uint width, uint height, TextureFormat format,
+        TextureCreateFlags create_flags) :
+      Texture(glm::u32vec2(width, height), format, create_flags)
     {}
 
     //--------------------------------------------------------------------------------
-    Texture::Texture(const glm::u32vec2& size, TextureFormat format) :
+    Texture::Texture(const glm::u32vec2& size, TextureFormat format, TextureCreateFlags create_flags) :
       size_(size),
-      format_(format)
+      format_(format),
+      creation_flags_(create_flags)
     {
       uint elem_size = 1;
       switch (format)

@@ -1,13 +1,18 @@
 #pragma once
-#include <lua.hpp>
-#include <foundation/memory/memory.h>
 #include "engine/scripting/scriptable_value.h"
 #include "engine/scripting/script_utils.h"
+#include "engine/scripting/scriptable_values/scriptable_callback.h"
+
+#include <foundation/memory/memory.h>
+#include <lua.hpp>
 
 namespace sulphur
 {
   namespace engine 
   {
+    class ScriptableObject;
+    class ComponentHandleBase;
+
     /**
     * @class sulphur::engine::ScriptableArgs
     * @brief Various functions to deal with variable arguments and return values from Lua
@@ -16,6 +21,16 @@ namespace sulphur
     class ScriptableArgs
     {
     public:
+
+      /**
+      * @brief Used to check if a T param is an enumerator
+      * @tparam (T) The type to check for
+      * @tparam (C) Should it be an enumerator or not?
+      * @remarks Used with SFINAE to create the appropriate overload for scriptable value conversion
+      */
+      template <typename T, bool C>
+      using is_enum = typename std::enable_if<std::is_enum<T>::value == C, void>::type;
+
       /**
       * @brief Constructs scriptable args
       * @param[in] args (foundation::Vector<foundation::SharedPointer<sulphur::engine::ScriptableValue>>)
@@ -23,8 +38,8 @@ namespace sulphur
       * @param[in] lua_state() (lua_State*) the lua state the function is called from
       */
       ScriptableArgs(
-        foundation::Vector<foundation::SharedPointer<sulphur::engine::ScriptableValue>> args,
-        ScriptSystem* script_system);
+        foundation::Vector<foundation::SharedPointer<sulphur::engine::ScriptableValue>>& args,
+        ScriptState* script_state);
 
       /**
       * @brief Get the number of arguments
@@ -53,18 +68,6 @@ namespace sulphur
       foundation::SharedPointer<ScriptableValue> GetArg(size_t idx);
 
       /**
-      * @brief Gets an argument at index idx a type T
-      * @param[in] idx (int) the index of the argument to fetch
-      * @return (T) the argument
-      */
-      template <typename T>
-      T GetArgAs(size_t idx)
-      {
-        return ScriptUtils::As<T>(GetArg(idx));
-      };
-
-
-      /**
       * @brief Adds a return value
       * @param[in] return_value (foundation::SharedPointer<ScriptableValue>) the value to return
       */
@@ -73,18 +76,66 @@ namespace sulphur
       /**
       * @brief Adds a return value of type T
       * @param[in] return_value (T) the value to return
+      * @remarks Default call when T is not of a supported argument type
       */
       template <typename T>
       void AddReturn(T return_value)
       {
-        AddReturn(ScriptUtils::Instantiate(script_system_, return_value));
+        AddReturn(ScriptUtils::Instantiate(script_state_, return_value));
       };
 
       /**
-      * @brief Get the script state where the function was called from
-      * @return (ScriptSystem*) the lua state
+      * @see https://stackoverflow.com/questions/257288/is-it-possible-to-write-a-template-to-check-for-a-functions-existence
       */
-      ScriptSystem* script_system();
+      template <typename T>
+      struct has_scriptable_name
+      {
+        typedef char one;
+        typedef long two;
+
+        template <typename C> static one test(decltype(&C::Name));
+        template <typename C> static two test(...);
+
+      public:
+        enum { value = sizeof(test<T>(0)) == sizeof(char) };
+      };
+
+      /**
+      * @brief Adds userdata as a return type
+      * @remarks memcpys the data from C++ memory into script state memory, 
+      * don't use objects allocated through our memory interface, use stack allocated objects instead
+      * @param[in] return_value (T) The value to return
+      */
+      template <typename T>
+      is_enum<T, false> AddUserData(T return_value)
+      {
+        static_assert(
+          (std::is_base_of<ScriptableObject, T>::value ||
+          std::is_base_of<ComponentHandleBase, T>::value) &&
+          has_scriptable_name<T>::value,
+          "Argument T for AddUserData is not of a supported scriptable value");
+
+        T* mem = reinterpret_cast<T*>(lua_newuserdata(script_state()->lua_state(), sizeof(T)));
+        mem = new (mem) T();
+        *mem = return_value;
+
+        foundation::SharedPointer<ScriptableValue> ud = script_state()->GetFromStack(-1);
+        ScriptableObject::SetMetaTable(ud, T::Name());
+
+        AddReturn(ud);
+      }
+
+      template <typename T>
+      is_enum<T, true> AddUserData(T return_value)
+      {
+        AddReturn<int>(static_cast<int>(return_value));
+      }
+
+      /**
+      * @brief Get the script state where the function was called from
+      * @return (ScriptState*) the lua state
+      */
+      ScriptState* script_state();
 
       /**
       * @brief Return the current list of return values to Lua
@@ -99,12 +150,11 @@ namespace sulphur
     private:
       foundation::Vector<
         foundation::SharedPointer<sulphur::engine::ScriptableValue>
-      > args_; //!< List of arguments received from Lua
+      >& args_; //!< List of arguments received from Lua
       foundation::Vector<
         foundation::SharedPointer<sulphur::engine::ScriptableValue>
       > return_values_; //!< List of return values to return to Lua
-      ScriptSystem* script_system_; //!< The script state the function is called from
+      ScriptState* script_state_; //!< The script state the function is called from
     };
-
   }
 }

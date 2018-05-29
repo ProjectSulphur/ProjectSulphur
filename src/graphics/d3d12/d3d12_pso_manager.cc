@@ -215,6 +215,41 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
+    void PsoManager::SetPipelineState(const engine::ComputeShaderHandle& compute_shader)
+    {
+      D3D12_COMPUTE_PIPELINE_STATE_DESC compute_ps_desc = {};
+
+      CD3DX12_SHADER_BYTECODE comp(
+        compute_shader->compute_shader()->byte_code_data(),
+        compute_shader->compute_shader()->byte_code_size()
+      );
+
+      compute_ps_desc.CS = comp;
+      D3D12RootSignature* root_sig = device_.shader_asset_manager().GetRootSignatureForShader(
+        compute_shader.GetGPUHandle()
+      );
+      compute_ps_desc.pRootSignature = root_sig->root_signature();
+
+      size_t hash_code = graphics::HashState(&compute_ps_desc);
+
+      pso_iterator it = pipeline_states_.find(hash_code);
+      if (it != pipeline_states_.end())
+      {
+        assert(it->second);
+        current_pipeline_state_ = it->second;
+        return;
+      }
+
+      ID3D12PipelineState*& pso = pipeline_states_[hash_code];
+
+      if (!device_.CreateComputePipelineState(pso, compute_ps_desc))
+      {
+        assert(false && "Could not create pipeline state.");
+      }
+      current_pipeline_state_ = pso;
+    }
+
+    //------------------------------------------------------------------------------------------------------
     D3D12_GRAPHICS_PIPELINE_STATE_DESC ConvertPipelineState(
       const PipelineState& pipeline_state, 
       ID3D12RootSignature* root_signature,

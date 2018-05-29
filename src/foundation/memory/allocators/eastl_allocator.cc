@@ -51,7 +51,7 @@ namespace sulphur
     //--------------------------------------------------------------------------
     void* EASTLAllocator::allocate(size_t n, int)
     {
-      return foundation::Memory::Allocate(n, 16, allocator_);
+      return allocate(n, 16u, 0, 0);
     }
 
     //--------------------------------------------------------------------------
@@ -61,7 +61,7 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------
-    void EASTLAllocator::deallocate(void* ptr, size_t /*size*/)
+    void EASTLAllocator::deallocate(void* ptr, size_t)
     {
       foundation::Memory::Deallocate(ptr);
     }

@@ -1,7 +1,10 @@
 #pragma once
 
 #include "engine/core/entity_system.h"
+
 #include "engine/systems/component_system.h"
+#include "engine/systems/components/transform_system.h"
+
 #include "engine/graphics/irenderer.h"
 
 #include <foundation/utils/color.h>
@@ -101,7 +104,7 @@ namespace sulphur
 
     };
 
-    class LightSystem : public IComponentSystem<LightComponent, LightData>
+    class LightSystem : public IComponentSystem
     {
     public:
       /**
@@ -111,13 +114,16 @@ namespace sulphur
 
       void OnInitialize(Application& app, foundation::JobGraph& job_graph) override;
 
-      LightComponent Create(Entity entity) override;
-      void Destroy(LightComponent handle) override;
+      template<typename ComponentT>
+      ComponentT Create(Entity& entity) {
+        assert(false && "Could not find specialized template function for this component");
+        return ComponentT();
+      };
 
-      void OnUpdate(float) override;
-      void OnPreRender() override;
+      void Destroy(ComponentHandleBase handle) override {
+        component_data_.data.Remove(handle);
+      };
       
-
       //----------------------------------------Component functions------------------------------------------------------
       /**
       * @brief Get function to obtain an element from a component by index
@@ -143,16 +149,36 @@ namespace sulphur
     private:
       IRenderer* renderer_;
 
+      LightData component_data_; //!< An instance of the container that stores per-component data
     };
+
     template<LightComponentElements Index>
     inline LightComponent::Element<Index> LightComponent::Get(LightComponent handle)
     {
       return system_->Get<static_cast<size_t>(Index)>();
     }
+
     template<LightComponentElements Index>
     inline void LightComponent::Set(LightComponent handle, Element<Index> value)
     {
       system_->Set<static_cast<size_t>(Index)>(value);
+    }
+
+    template<>
+    inline LightComponent LightSystem::Create(Entity& entity)
+    {
+      if (!entity.Has<TransformComponent>())
+      {
+        entity.Add<TransformComponent>();
+      }
+
+      return LightComponent(*this, component_data_.data.Add(
+        foundation::Color::kHalfDutchWhite,
+        1.0f,
+        10.0f,
+        30.0f,
+        LightType::kDirectionalLight,
+        entity));
     }
   }
 }

@@ -1,5 +1,6 @@
 #include "tools/builder/shared/shader_compiler_includer.h"
 #include <foundation/io/binary_reader.h>
+#include <foundation/io/filesystem.h>
 
 namespace sulphur 
 {
@@ -60,7 +61,7 @@ namespace sulphur
       {
         foundation::String path = *it + '/' + header_name;
         eastl::replace(path.begin(), path.end(), '\\', '/');
-        foundation::BinaryReader reader(path.c_str(),false);
+        foundation::BinaryReader reader(foundation::Path(path), false);
         if (reader.is_ok() == true)
         {
           directory_stack_.push_back(getDirectory(path));

@@ -1,0 +1,1 @@
+sulphur-builder.exe --convert_scripts -dir %INPUTFOLDER%unprocessed/ -r -output %INPUTFOLDER%processed/

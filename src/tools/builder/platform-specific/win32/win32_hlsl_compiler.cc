@@ -2,8 +2,8 @@
 #include "tools/builder/shared/shader_compiler_includer.h"
 #include "tools/builder/shared/file_system.h"
 #include "tools/builder/pipelines/shader_pipeline_options.h"
+#include "tools/builder/base/logger.h"
 #include <foundation/pipeline-assets/shader.h>
-#include <foundation/logging/logger.h>
 #include <d3dcompiler.h>
 
 namespace sulphur 
@@ -25,13 +25,14 @@ namespace sulphur
     bool Win32HlslCompiler::CompileShader(
       const foundation::String& shader_source,
       const foundation::ShaderAsset& shader,
-      const foundation::String& /*path*/,
+      const foundation::Path& /*path*/,
       foundation::Vector<uint8_t>& out_compiled)
     {
       D3DIncluder includer;
       for (size_t i = 0; i < options().additional_include_dirs.size(); ++i)
       {
-        includer.AddIncludeDirectory(options().additional_include_dirs[i].path().c_str());
+        includer.AddIncludeDirectory(
+          options().additional_include_dirs[i].path().GetString().c_str());
       }
 
 
@@ -84,8 +85,8 @@ namespace sulphur
       bool result = true;
       if (error_messages != nullptr)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error, 
-          "%s\n", static_cast<const char*>(error_messages->GetBufferPointer()));
+        PS_LOG_BUILDER(Error, 
+          "%s", static_cast<const char*>(error_messages->GetBufferPointer()));
         result = false;
         error_messages->Release();
         out_compiled.clear();

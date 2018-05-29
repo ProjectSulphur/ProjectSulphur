@@ -9,7 +9,8 @@ public:
 
   LUA_NAME(MijnKlasse)
 
-  LUA_FUNC() void Test(sulphur::foundation::Vector<T> bleh, float& x, float* y);
+  LUA_FUNC() void Test(float x, Mesh* mesh);
+  LUA_FUNC(static) int StaticTest(const String& str);
 
   LUA_ENUM() enum TestEnum
   {

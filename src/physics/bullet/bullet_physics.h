@@ -2,18 +2,15 @@
 
 #include "physics/iphysics.h"
 #include "physics/bullet/bullet_body.h"
+#include "physics/physics_manifold.h"
+#include "physics/bullet/bullet_fixed_constraint.h"
 
 #include <foundation/containers/map.h>
 #include <foundation/containers/vector.h>
 #include <foundation/memory/memory.h>
+#include "physics/bullet/bullet_include.h"
 
-class btDiscreteDynamicsWorld;
-struct btDbvtBroadphase;
-class btSequentialImpulseConstraintSolver;
-class btCollisionDispatcher;
-class btDefaultCollisionConfiguration;
-
-namespace sulphur 
+namespace sulphur
 {
   namespace physics //!< Physics namespace
   {
@@ -54,7 +51,7 @@ namespace sulphur
       * @see sulphur::physics::IPhysics::AddPhysicsBody()
       */
       BulletBody* AddPhysicsBody(
-        const glm::vec3& translation, 
+        const glm::vec3& translation,
         const glm::quat& rotation) override;
 
       /**
@@ -81,35 +78,78 @@ namespace sulphur
       * @see sulphur::physics::IPhysics::Raycast()
       */
       bool Raycast(
-        const foundation::Ray& ray, 
-        RaycastHitInfo* out, 
+        const foundation::Ray& ray,
+        RaycastHitInfo* out,
         float max_distance) override;
 
       /**
       * @see sulphur::physics::IPhysics::RaycastAll()
       */
       RaycastHits RaycastAll(
-        const foundation::Ray& ray, 
-        bool* hit, 
+        const foundation::Ray& ray,
+        bool* hit,
         float max_distance) override;
+
+      /**
+      * @see sulpur::physics::IPhysics::GetManifolds()
+      */
+      Manifolds& GetManifolds() override;
 
       /**
       * @brief Updates all physics bodies internally without simulating a frame
       */
       void UpdateBodies();
-      
+
       /**
       * @brief Default destructor
       */
       virtual ~BulletPhysics();
 
-    private:
+      /**
+      * @brief Callback for bullet to call when an internal update happens
+      */
+      static void InternalTickCallback(btDynamicsWorld* world, btScalar time_step);
 
+      /**
+      * @brief Adds a fixed constraint bewtween body_a and body_b
+      * @param[in] body_a (sulphur::physics::PhysicsBody*) The A body
+      * @param[in] body_b (sulphur::physics::PhysicsBody*) The B body
+      */
+      virtual FixedConstraint* AddFixedConstraint(PhysicsBody* body_a, PhysicsBody* body_b) override;
+
+      /**
+      * @brief Adds a hinge constraint bewtween body_a and body_b
+      * @param[in] body_a (sulphur::physics::PhysicsBody*) The A body
+      * @param[in] body_b (sulphur::physics::PhysicsBody*) The B body
+      */
+      virtual HingeConstraint* AddHingeConstraint(PhysicsBody* body_a, PhysicsBody* body_b) override;
+
+    private:
+      void SaveManifolds(btDynamicsWorld* world, btScalar time_step); //!< Saves the manifolds that were made during the last internal update
+
+      foundation::Vector<btPersistentManifold> bullet_manifolds; //!< Bullet manifolds caputered from sulphur::physics::BulletPhysics::SaveManifolds
+      Manifolds manifolds_; //!< Collection of manifolds to be forwarded to the engine
       btDiscreteDynamicsWorld* dynamics_world_; //!< The Bullet physics world
       btDbvtBroadphase* broad_phase_; //!< The Bullet broad phase search
       btSequentialImpulseConstraintSolver* constraint_solver_; //!< The Bullet constraint solver
       btCollisionDispatcher* collision_dispatcher_; //!< The Bullet collision dispatcher
       btDefaultCollisionConfiguration* collision_config_; //!< The Bullet collision configuration
     };
+
+    //-------------------------------------------------------------------------
+    inline FixedConstraint*
+      BulletPhysics::AddFixedConstraint(PhysicsBody * body_a, PhysicsBody * body_b)
+    {
+      return foundation::Memory::Construct<FixedConstraint>(
+        body_a->rigid_body(), body_b->rigid_body(), dynamics_world_);
+    }
+
+    //-------------------------------------------------------------------------
+    inline HingeConstraint*
+      BulletPhysics::AddHingeConstraint(PhysicsBody * body_a, PhysicsBody * body_b)
+    {
+      return foundation::Memory::Construct<HingeConstraint>(
+        body_a->rigid_body(), body_b->rigid_body(), dynamics_world_);
+    }
   }
 }

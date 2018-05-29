@@ -1,4 +1,4 @@
-﻿/*
+/*
 ---------------------------------------------------------------------------
 Open Asset Import Library (ASSIMP)
 ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ extern ( C ) {
        * Flat shading.
        *
        * Shading is done on per-face base diffuse only. Also known as
-       * Â»faceted shadingÂ«.
+       * »faceted shading«.
        */
       Flat = 0x1,
 
@@ -336,7 +336,7 @@ extern ( C ) {
       /**
        * Per-pixel toon shading.
        *
-       * Often referred to as Â»comic shadingÂ«.
+       * Often referred to as »comic shading«.
        */
       Toon = 0x5,
 
@@ -401,7 +401,7 @@ extern ( C ) {
        * Mutually exclusive with <code>IgnoreAlpha</code>. These flags are
        * set if the library can say for sure that the alpha channel is used/is
        * not used. If the model format does not define this, it is left to the
-       * application to decide whether the texture alpha channel â€“ if any â€“ is
+       * application to decide whether the texture alpha channel – if any – is
        * evaluated or not.
        */
       UseAlpha = 0x2,

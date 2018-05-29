@@ -5,11 +5,23 @@
 
 #include <foundation/utils/color.h>
 #include <foundation/containers/vector.h>
+#include <foundation/utils/shapes.h>
 
 namespace sulphur 
 {
   namespace engine 
   {
+    /**
+    * @struct SubMeshOffset
+    * @brief A struct to find the offset for a sub-mesh inside of a 'Mesh'
+    * @author Jelle de Haan
+    */
+    struct SubMeshOffset
+    {
+      uint32_t offset;
+      uint32_t size;
+    };
+
     /**
     * @class Mesh
     * @brief A collection of data that forms a model, used for rendering
@@ -33,7 +45,7 @@ namespace sulphur
       * @brief Assigns a copy of the mesh to this mesh
       * @param[in] mesh (const Mesh&) The mesh to copy
       */
-      Mesh& operator=(const Mesh& mesh) { AttachMesh(mesh); return *this; };
+      Mesh& operator=(const Mesh& mesh);
 
       /**
       * @brief Calculates the bounding box of this mesh. (CURRENTLY DOES NOTHING!)
@@ -137,9 +149,11 @@ namespace sulphur
 
       /**
       * @brief Set the index data
+      * @param[in] indices (foundation::Vector<uint32_t>&&) The new indices that define this submesh
+      * @param[in] submesh (uint) The index of the submesh to modify
       * @remarks Must match the data count topology type of the mesh
       */
-      void SetIndices(foundation::Vector<uint32_t>&& indices);
+      void SetIndices(foundation::Vector<uint32_t>&& indices, uint submesh = 0);
 
       /**
       * @brief Set the vertex data
@@ -171,10 +185,55 @@ namespace sulphur
       void SetColors(foundation::Vector<foundation::Color>&& colors);
 
       /**
+      * @brief Set the per-vertex bone weights of this mesh.
+      * @param[in] bone_weights (sulphur::foundation::Vector<glm::vec4>&&) The new bone weights.
+      * @remarks Must match the vertex count of this mesh.
+      */
+      void SetBoneWeights(foundation::Vector<glm::vec4>&& bone_weights);
+
+      /**
+      * @brief Set the per-vertex bone indices of this mesh.
+      * @param[in] bone_indices (sulphur::foundation::Vector<glm::vec<4, uint32_t>>&&) The new bone indices.
+      * @remarks Must match the vertex count of this mesh.
+      */
+      void SetBoneIndices(foundation::Vector<glm::vec<4, uint32_t>>&& bone_indices);
+
+      /**
+       * @brief Sets the bounding box of the mesh.
+       * @param[in] bounding_box (const sulphur::foundation::AABB&) The new bounding box.
+       */
+      void SetBoundingBox(const foundation::AABB& bounding_box);
+      /**
+      * @brief Sets the bounding sphere of the mesh.
+      * @param[in] bounding_sphere (const sulphur::foundation::Sphere&) The new bounding sphere.
+      */
+      void SetBoundingSphere(const foundation::Sphere& bounding_sphere);
+
+      /**
       * @brief Returns all indices this mesh is build out of
       * @return (const foundation::Vector<uint32_t>&) The index list of the mesh
       */
       const foundation::Vector<uint32_t>& GetIndices() const { return indices_; };
+
+      /**
+      * @brief Returns all indices this mesh is build out of
+      * @param[in] submesh (uint) The index of the submesh to get
+      * @return (foundation::Vector<uint32_t>) The index list of the mesh
+      */
+      foundation::Vector<uint32_t> GetIndicesAt(uint submesh = 0) const;
+
+      /**
+      * @brief Returns a submesh struct with offset and size into the index buffer
+      * @param[in] submesh (uint) The index of the submesh to get
+      * @return (const foundation::Vector<uint32_t>&) The index list of the mesh
+      */
+      const SubMeshOffset& GetSubmesh(uint submesh) const;
+
+      /**
+      * @brief Returns the amount of submeshes contained in this mesh
+      * @return (size_t) The amount of submeshes
+      */
+      size_t GetSubmeshCount() const { return submesh_offsets_.size(); };
 
       /**
       * @brief Returns all vertices this mesh is build out of
@@ -207,10 +266,36 @@ namespace sulphur
       const foundation::Vector<foundation::Color>& GetColors() const { return colors_; };
 
       /**
+      * @brief Returns all per-vertex bone weights this mesh is build out of
+      * @return (const sulphur::foundation::Vector<glm::vec4>&) The bone weights list of the mesh
+      */
+      const foundation::Vector<glm::vec4>& GetBoneWeights() const { return bone_weights_; };
+
+      /**
+      * @brief Returns all per-vertex bone indices this mesh is build out of
+      * @return (const sulphur::foundation::Vector<glm::vec<4, uint32_t>>&) The bone indices list of the mesh
+      */
+      const foundation::Vector<glm::vec<4, uint32_t>>& GetBoneIndices() const { return bone_indices_; }
+
+      /**
+       * @brief Getter for the bounding box of the mesh.
+       * @return (const sulphur::foundation::AABB&) The bounding box of the mesh.
+       */
+      const foundation::AABB& bounding_box() const { return bounding_box_; }
+      /**
+      * @brief Getter for the bounding sphere of the mesh.
+      * @return (const sulphur::foundation::Sphere&) The bounding sphere of the mesh.
+      */
+      const foundation::Sphere& bounding_sphere() const { return bounding_sphere_; }
+
+      /**
       * @brief Combines all change flags to test if anything in the mesh has changed
       * @return (bool) Has anything in the mesh changed
       */
-      bool HasChanged() const { return (update_index_ || update_pos_ || update_color_ || update_data_); };
+      bool HasChanged() const { return (update_index_ || update_pos_ || update_color_ || update_data_); }
+
+      // temp func. remove before submit
+      void set_has_changed(bool value) { update_index_ = update_pos_ = update_color_ = update_data_ = value; }
 
       /**
       * @internal
@@ -343,6 +428,13 @@ namespace sulphur
       static Mesh CreateCircle(uint segments = 24);
 
       /**
+      * @brief Creates a line circle, facing towards negative z
+      * @param[in] segments (uint) The amount of sub divisions around the circle (on the X and Y axis)
+      * @return (Mesh) The line circle mesh
+      */
+      static Mesh CreateLineCircle(uint segments = 24);
+
+      /**
       * @brief Creates a hex mesh, with a pointy top
       * @return (Mesh) The hex mesh
       */
@@ -362,19 +454,42 @@ namespace sulphur
       */
       static Mesh CreateSphere(uint slice_count = 24, uint stack_count = 24);
 
+
+
     private:
-      foundation::Vector<uint32_t> indices_;
-      foundation::Vector<glm::vec3> vertices_;
-      foundation::Vector<glm::vec2> uvs_;
-      foundation::Vector<glm::vec3> normals_;
-      foundation::Vector<glm::vec3> tangents_;
-      foundation::Vector<foundation::Color> colors_;
+      foundation::Vector<uint32_t> indices_;                      //!< Set of indices for this Mesh.
+      foundation::Vector<glm::vec3> vertices_;                    //!< Set of positions for this Mesh.
+      foundation::Vector<glm::vec2> uvs_;                         //!< Set of UV coordinates for this Mesh.
+      foundation::Vector<glm::vec3> normals_;                     //!< Set of normals for this Mesh.
+      foundation::Vector<glm::vec3> tangents_;                    //!< Set of tangents for this Mesh.
+      foundation::Vector<foundation::Color> colors_;              //!< Set of colors for this Mesh.
+      foundation::Vector<glm::vec4> bone_weights_;                //!< Set of bone weights for this Mesh.
+      foundation::Vector<glm::vec<4, uint32_t>> bone_indices_;    //!< Set of bone indices for this Mesh.
 
-      graphics::TopologyType topology_;
-      bool update_index_, update_pos_, update_color_, update_data_;
-      bool static_mesh_, always_on_top_;
+      /**
+      * Offsets to be used by the renderer. Each offset is a subsection of the triangles in this
+      * Mesh. Each different offset therefore represents only a part of the entire Mesh. With these
+      * different parts of the mesh, it is possible to apply a variable number of materials to this
+      * Mesh. Therefore, each offset == one material. The number of materials applied to this Mesh 
+      * must therefore be exactly equal to the number of individual submesh offsets in the Mesh.
+      * The order of the materials versus the order of submesh offsets is also relevant. The first
+      * material gets applied to the first submesh offset, the second material gets applied to the
+      * second submesh offset, etc. 
+      */   
+      foundation::Vector<SubMeshOffset> submesh_offsets_;
 
-      // - Bounds
+      graphics::TopologyType topology_; //!< The topology type of this mesh.
+
+      bool update_index_;
+      bool update_pos_;
+      bool update_color_;
+      bool update_data_;
+      bool static_mesh_;
+      bool always_on_top_;
+
+      foundation::AABB bounding_box_;     //!< The bounding box of the mesh
+      foundation::Sphere bounding_sphere_;//!< The bounding sphere of the mesh
+
       //Functions:
       // Recalculate normals
 

@@ -1,4 +1,4 @@
-#include "canvas_system.h"
+#include "engine/systems/components/canvas_system.h"
 
 #include "engine/core/entity_system.h"
 #include "engine/application/application.h"
@@ -6,9 +6,15 @@
 #include "engine/assets/asset_system.h"
 #include "engine/assets/shader.h"
 
-#include <foundation/pipeline-assets/material.h>
+#include "engine/systems/components/transform_system.h"
+#include "engine/graphics/irenderer.h"
+#include "engine/application/window.h"
+
 #include <foundation/pipeline-assets/shader.h>
 #include <foundation/memory/memory.h>
+#include <foundation/job/data_policy.h>
+#include <foundation/job/job.h>
+#include <foundation/job/job_graph.h>
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -20,21 +26,49 @@ namespace sulphur
   {
     //-------------------------------------------------------------------------
     CanvasSystem::CanvasSystem() :
-      IComponentSystem<CanvasComponent, CanvasData>("CanvasSystem")
+      IComponentSystem("CanvasSystem")
     {
     }
 
-    //-------------------------------------------------------------------------
-    void CanvasSystem::OnInitialize(Application& app, foundation::JobGraph&)
+    void CanvasSystem::OnTerminate()
     {
+      for (int i = 0; i < component_data_.data.size(); ++i)
+      {
+        CanvasComponent component(camera_system_, *this, component_data_.data.GetSparseFromDataIndex(i));
+        CanvasDataRef data = component_data_.data.GetObjectAsStruct<CanvasDataRef>(component);
+
+        for (eastl::pair<Entity, BaseUIElementData*> pair : data.elements)
+        {
+          foundation::Memory::Destruct(pair.second);
+        }
+        data.elements.clear();
+        data.base_to_entity.clear();
+      }
+      component_data_.data.Clear();
+    }
+
+    //-------------------------------------------------------------------------
+    void CanvasSystem::OnInitialize(Application& app, foundation::JobGraph& job_graph)
+    {
+      window_ = &app.platform().window();
       World& world = app.GetService<WorldProviderSystem>().GetWorld();
-      camera_system_ = &world.GetSystem<CameraSystem>();
-      transform_system_ = &world.GetSystem<TransformSystem>();
+      camera_system_ = &world.GetComponent<CameraSystem>();
+      transform_system_ = &world.GetComponent<TransformSystem>();
       renderer_ = &app.platform_renderer();
+
+      const auto render = [](CanvasSystem& canvas_system)
+      {
+        canvas_system.Render();
+      };
+
+      foundation::Job render_job = make_job("canvassystem_render", "render",
+                                            render, bind_write(*this));
+      render_job.set_blocker("meshrendersystem_apply_post_processing");
+      job_graph.Add(std::move(render_job));
     }
 
     //-------------------------------------------------------------------------
-    CanvasComponent CanvasSystem::Create(Entity entity)
+    CanvasComponent CanvasSystem::Create(Entity& entity)
     {
       if (false == entity.Has<TransformComponent>())
       {
@@ -43,22 +77,30 @@ namespace sulphur
 
       // TODO (Hilze): Stop hard coding the camera.
       //! Start section here.
-      //data.render_target = RenderTarget(RenderTargetType::kTexture2D, glm::vec2(1920.0f, 1080.0f), TextureFormat::kR8G8B8A8_UNORM);
-      
+
       if (false == entity.Has<CameraComponent>())
       {
+        glm::ivec2 size = window_->GetSize();
         CameraComponent camera = entity.Add<CameraComponent>();
-        camera.SetOrthographicSize(glm::vec2(1920.0f, 1080.0f) / 2.0f);
-        camera.SetProjectionMode(ProjectionMode::kOrthographic);
-        //camera.SetRenderTarget(RenderTarget());
-        //camera.SetClearMode(ClearMode::kDepthOnly);
+        camera.SetOrthographicSize(glm::vec2(size.x, size.y) / 2.0f);
+        camera.SetProjectionMode(CameraEnums::ProjectionMode::kOrthographic);
+        camera.SetRenderTarget(RenderTarget(RenderTargetType::kTexture2D, glm::vec2(size.x, size.y), TextureFormat::kR8G8B8A8_UNORM));
+        camera.SetClearMode(CameraEnums::ClearMode::kColor);
       }
 
       //! End section here.
 
-      CanvasComponent component = CanvasComponent(*this, component_data_.data.Add(
+      foundation::Vector<MeshHandle> meshes = GetMeshes();
+      for (MeshHandle mesh : meshes)
+      {
+        mesh->AttachMesh(Mesh::CreateQuad());
+      }
+
+      CanvasComponent component = CanvasComponent(camera_system_, *this, component_data_.data.Add(
         CanvasData::UIElementMap(),
         CanvasData::BaseToEntity(),
+        meshes,
+        0u,
         entity.Get<CameraComponent>().GetRenderTarget(),
         entity
       ));
@@ -67,36 +109,56 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void CanvasSystem::Destroy(CanvasComponent handle)
+    void CanvasSystem::Destroy(ComponentHandleBase handle)
     {
       component_data_.data.Remove(handle);
     }
 
     //-------------------------------------------------------------------------
-    void CanvasSystem::OnRender()
+    void CanvasSystem::Render()
     {
       for (int i = 0; i < component_data_.data.size(); ++i)
       {
-        CanvasComponent component(*this, component_data_.data.GetSparseFromDataIndex(i));
+        CanvasComponent component(camera_system_, *this, component_data_.data.GetSparseFromDataIndex(i));
         component.OnRender(*renderer_);
       }
     }
 
     //-------------------------------------------------------------------------
-    void CanvasSystem::SetCamera(CameraComponent camera)
+    foundation::Vector<MeshHandle> CanvasSystem::GetMeshes()
+    {
+      foundation::Vector<MeshHandle> meshes(kMaxMeshCount);
+      
+      for (uint8_t i = 0; i < kMaxMeshCount; ++i)
+      {
+        meshes.at(i) = AssetSystem::Instance().AddAsset(foundation::Memory::Construct<Mesh>(),
+          "__ui_element_" + foundation::to_string(current_mesh_count_ + i) + "__"
+        );
+        meshes.at(i)->MarkDynamic(true);
+      }
+      
+      current_mesh_count_ += kMaxMeshCount;
+      
+      return meshes;
+    }
+
+    //-------------------------------------------------------------------------
+    void CanvasSystem::SetCamera(CameraComponent& camera)
     {
       camera_system_->set_current_camera(camera);
+
+      renderer_->SetCamera(
+        camera.GetViewMatrix(),
+        camera.GetProjectionMatrix(),
+        camera.GetDepthBuffer(),
+        camera.GetRenderTarget()
+      );
     }
 
     //-------------------------------------------------------------------------
     CanvasDataRef CanvasSystem::GetData(CanvasComponent handle)
     {
-      return CanvasDataRef(
-        component_data_.data.Get<static_cast<size_t>(CanvasDataElements::kElements)>(handle),
-        component_data_.data.Get<static_cast<size_t>(CanvasDataElements::kBaseToElement)>(handle),
-        component_data_.data.Get<static_cast<size_t>(CanvasDataElements::kRenderTarget)>(handle),
-        component_data_.data.Get<static_cast<size_t>(CanvasDataElements::kCanvasId)>(handle)
-      );
+      return component_data_.data.GetObjectAsStruct<CanvasDataRef>(handle);
     }
 
     //-------------------------------------------------------------------------
@@ -107,15 +169,15 @@ namespace sulphur
 
     //-------------------------------------------------------------------------
     CanvasComponent::CanvasComponent(System& system, size_t handle) :
-      ComponentHandleBase(handle),
-      system_(&system)
+      CanvasComponent(nullptr, system, handle)
     {
     }
 
-    //-------------------------------------------------------------------------
-    ImageUIElementComponent CanvasComponent::CreateImage(Entity & entity)
+    CanvasComponent::CanvasComponent(CameraSystem* camera_system, System& system, size_t handle) :
+      ComponentHandleBase(handle),
+      system_(&system),
+      camera_system_(camera_system)
     {
-      return Create<ImageUIElementComponent, ImageUIElementData>(entity);
     }
 
     //-------------------------------------------------------------------------
@@ -130,7 +192,6 @@ namespace sulphur
       foundation::Memory::Destruct(canvas_data.elements.at(entity));
       canvas_data.elements.erase(entity);
     }
-
 
     //-------------------------------------------------------------------------
     bool ElementSortFunction(BaseUIElementData* lhs, BaseUIElementData* rhs)
@@ -147,95 +208,119 @@ namespace sulphur
       CameraComponent camera = canvas_data.canvas_id.Get<CameraComponent>();
       system_->SetCamera(camera);
 
-      renderer.SetCamera(
-        camera.GetViewMatrix(),
-        camera.GetProjectionMatrix(),
-        camera.GetDepthBuffer(),
-        camera.GetRenderTarget());
-
       //renderer->ClearDepthBuffer(canvas_data.canvas_id.Get<CameraComponent>().GetDepthBuffer());
       // TODO (Hilze): Figure out why this clear does not work. Can it only happen once?
 
       // TODO (Hilze): Add alpha blending.
-      /*PipelineState pso;
-      pso.blend_state.render_target_blend_states[0] = RenderTargetBlendState{
+      /*graphics::PipelineState pso;
+      pso.blend_state.render_target_blend_states[0] = graphics::RenderTargetBlendState{
         true,
         false,
-        BlendFunc::kSrcAlpha,
-        BlendFunc::kInvSrcAlpha,
-        BlendOp::kAdd,
-        BlendFunc::kZero,
-        BlendFunc::kOne,
-        BlendOp::kAdd
+        graphics::BlendFunc::kSrcAlpha,
+        graphics::BlendFunc::kInvSrcAlpha,
+        graphics::BlendOp::kAdd,
+        graphics::BlendFunc::kZero,
+        graphics::BlendFunc::kOne,
+        graphics::BlendOp::kAdd,
+        graphics::LogicOp::kNoop,
+        graphics::ColorWriteEnable::kEnableAll
       };
 
-      renderer->SetPipelineState(pso);*/
+      renderer.SetPipelineState(pso);*/
 
+      // Do a simple depth sort.
       foundation::Vector<BaseUIElementData*> depth_sort(canvas_data.elements.size());
       int idx = 0;
       for (eastl::pair<Entity, BaseUIElementData*> it : canvas_data.elements)
       {
         depth_sort.at(idx++) = it.second;
       }
-
       std::sort(depth_sort.begin(), depth_sort.end(), ElementSortFunction);
 
+      // Add each element to the mesh.
       for (BaseUIElementData* element : depth_sort)
       {
         Rect bounds = element->GetGlobalBounds();
 
-        // # Please make sure that you do not release resources that are still in use. #screw_the_100_character_mark
-        foundation::String name = "ui_mesh_" + foundation::to_string(rand());
-        MeshHandle mesh_handle = AssetSystem::Instance().AddAsset(
-          foundation::Memory::Construct<Mesh>(element->GetMesh(bounds)),
-          name
-        );
+        // Create the mesh that is going to be renderered.
+        element->meshes.at(element->mesh_index)->Clear();
+        element->meshes.at(element->mesh_index)->AttachMesh(element->GetMesh(bounds));
+        renderer.SetMesh(element->meshes.at(element->mesh_index));
+        if (++element->mesh_index >= element->meshes.size())
+        {
+          element->mesh_index = 0;
+        }
 
+        // Set the mesh, model matrix, material and render it.
         renderer.SetModelMatrix(glm::mat4(1.0f));
         
         renderer.SetMaterial(element->GetMaterial());
 
-        renderer.SetMesh(mesh_handle);
-        
         renderer.Draw();
       }
+
+      // Render the UI to the screen.
+      // --------------------------------------------------
+      // Setup camera.
+      camera_system_->set_current_camera(camera_system_->main_camera());
+      renderer.SetCamera(
+        glm::mat4(1.0f),
+        glm::mat4(1.0f),
+        camera_system_->main_camera().GetDepthBuffer(),
+        camera_system_->main_camera().GetRenderTarget()
+      );
+      // Setup screen quad.
+      renderer.SetMesh(canvas_data.meshes.at(canvas_data.mesh_index));
+      if (++canvas_data.mesh_index >= canvas_data.meshes.size())
+      {
+        canvas_data.mesh_index = 0;
+      }
+      renderer.SetModelMatrix(
+        glm::translate(
+          glm::scale(
+            glm::mat4(1.0f), 
+            glm::vec3(2.0f, 2.0f, 1.0f)
+          ), 
+          glm::vec3(-0.5f, -0.5f, -0.5f)
+        )
+      );
+      // Setup texture.
+      MaterialPass material_pass(AssetSystem::Instance().GetHandle<Shader>("Default_Shader"));
+      material_pass.SetTexture(0, canvas_data.render_target.GetTextureResource());
+      renderer.SetMaterial(material_pass);
+      // Render.
+      renderer.Draw();
     }
 
     //-------------------------------------------------------------------------
-    BaseUIElementData * CanvasComponent::GetData(BaseUIElementComponent element_handle)
+    BaseUIElementData* CanvasComponent::GetData(BaseUIElementComponent element_handle)
     {
       CanvasDataRef canvas_data = system_->GetData(*this);
       Entity entity = canvas_data.base_to_entity.at(element_handle);
       return canvas_data.elements.at(entity);
     }
 
-    //-------------------------------------------------------------------------
-    void ImageUIElementComponent::SetColor(const foundation::Color & color)
+    foundation::Vector<MeshHandle> CanvasComponent::GetMeshes()
     {
-      ImageUIElementData* data = static_cast<ImageUIElementData*>(GetData());
-      data->color = color;
+      return system_->GetMeshes();
     }
 
     //-------------------------------------------------------------------------
-    void ImageUIElementComponent::SetTexture(const TextureHandle & texture)
+    void CanvasComponent::SetupComponent(Entity& entity, BaseUIElementComponent& component)
     {
-      ImageUIElementData* data = static_cast<ImageUIElementData*>(GetData());
-      data->texture = texture;
+      if (false == entity.Has<TransformComponent>())
+      {
+        entity.Add<TransformComponent>();
+      }
+      component.handle = entity.handle;
     }
 
+    
     //-------------------------------------------------------------------------
-    void ImageUIElementComponent::SetTextureRect(const Rect & texture_rect)
+    BaseUIElementComponent::BaseUIElementComponent(CanvasSystem* system, CanvasComponent& canvas) :
+      canvas(canvas),
+      system(system)
     {
-      ImageUIElementData* data = static_cast<ImageUIElementData*>(GetData());
-      data->texture_rect = texture_rect;
-    }
-
-    //-------------------------------------------------------------------------
-    BaseUIElementComponent::BaseUIElementComponent(Application& app, CanvasComponent& canvas) :
-      canvas(canvas)
-    {
-      World& world = app.GetService<WorldProviderSystem>().GetWorld();
-      system = &world.GetSystem<CanvasSystem>();
     }
 
     //-------------------------------------------------------------------------
@@ -263,9 +348,9 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    Mesh BaseUIElementData::GetMesh(const Rect &)
+    Mesh BaseUIElementData::GetMesh(const Rect&)
     {
-      return Mesh();
+      return Mesh::CreateCircle();
     }
 
     //-------------------------------------------------------------------------
@@ -284,63 +369,6 @@ namespace sulphur
     BaseUIElementData * BaseUIElementComponent::GetData()
     {
       return canvas.GetData(*this);
-    }
-
-    //-------------------------------------------------------------------------
-    Rect ImageUIElementData::GetGlobalBounds(const bool & clipped)
-    {
-      return BaseUIElementData::GetGlobalBounds(clipped);
-    }
-
-    //-------------------------------------------------------------------------
-    Mesh ImageUIElementData::GetMesh(const Rect & clipped_bounds)
-    {
-      // TODO (Hilze): Do something with the clipped bounds.
-
-      glm::vec2 min = clipped_bounds.Min();
-      glm::vec2 max = clipped_bounds.Max();
-
-      glm::vec2 tex_min = texture_rect.Min();
-      glm::vec2 tex_max = texture_rect.Max();
-
-      Mesh mesh;
-
-      mesh.SetVertices({
-        glm::vec3(min.x, max.y, 0.0f),
-        glm::vec3(min.x, min.y, 0.0f),
-        glm::vec3(max.x, min.y, 0.0f),
-        glm::vec3(max.x, max.y, 0.0f)
-      });
-      mesh.SetNormals({
-        glm::vec3(0.0f, 0.0f, -1.0f),
-        glm::vec3(0.0f, 0.0f, -1.0f),
-        glm::vec3(0.0f, 0.0f, -1.0f),
-        glm::vec3(0.0f, 0.0f, -1.0f)
-      });
-      mesh.SetUVs({
-        glm::vec2(tex_min.x, tex_max.y),
-        glm::vec2(tex_min.x, tex_min.y),
-        glm::vec2(tex_max.x, tex_min.y),
-        glm::vec2(tex_max.x, tex_max.y)
-      });
-
-      mesh.SetIndices({
-        0, 1, 2,
-        0, 2, 3
-      });
-
-      //glm::vec3 scale = glm::vec3(max - min, 1.0f);
-      //glm::vec3 center = glm::vec3((min + max) / 2.0f, 1.0f);
-
-      return mesh;// .CreateQuad().TransformMesh(center, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), scale);
-    }
-
-    //-------------------------------------------------------------------------
-    MaterialPass ImageUIElementData::GetMaterial()
-    {
-      MaterialPass pass = BaseUIElementData::GetMaterial();
-      pass.SetTexture(0, texture);
-      return pass;
     }
   }
 }

@@ -33,7 +33,7 @@ namespace sulphur
       */
       bool CompileShader(const foundation::String& shader_source,
                          const foundation::ShaderAsset& shader,
-                         const foundation::String& /*path*/,
+                         const foundation::Path& /*path*/,
                          foundation::Vector<uint8_t>& out_compiled) final;
 
       /**

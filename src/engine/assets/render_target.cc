@@ -5,24 +5,30 @@ namespace sulphur
 {
   namespace engine
   {
+    //-------------------------------------------------------------------------
     RenderTarget::RenderTarget() :
-      type_(RenderTargetType::kBackBuffer)
-    {
-    }
+      type_(RenderTargetType::kBackBuffer),
+      swapped_buffers_(false)
+    {}
 
+    //-------------------------------------------------------------------------
     RenderTarget::RenderTarget(RenderTargetType type, const glm::u32vec2& size, TextureFormat format) :
       RenderTarget(type, size.x, size.y, format)
-    {
-    }
+    {}
 
-    RenderTarget::RenderTarget(RenderTargetType type, uint width, uint height, 
+    //-------------------------------------------------------------------------
+    RenderTarget::RenderTarget(RenderTargetType type, uint width, uint height,
         TextureFormat format) :
-      type_(type)
+      type_(type),
+      swapped_buffers_(false)
     {
       static int idx = 0;
       
-      Texture* texture_01 = foundation::Memory::Construct<Texture>(width, height, format);
-      Texture* texture_02 = foundation::Memory::Construct<Texture>(width, height, format);
+      Texture* texture_01 = foundation::Memory::Construct<Texture>(width, height, format, 
+        TextureCreateFlags::kAllowRenderTarget | TextureCreateFlags::kAllowUAV);
+
+      Texture* texture_02 = foundation::Memory::Construct<Texture>(width, height, format, 
+        TextureCreateFlags::kAllowRenderTarget | TextureCreateFlags::kAllowUAV);
 
       buffers_[0] = AssetSystem::Instance().AddAsset(
         texture_01,
@@ -34,20 +40,17 @@ namespace sulphur
 
       idx++;
     }
-
-    TextureHandle RenderTarget::GetTarget(bool use_copy)
+    
+    //-------------------------------------------------------------------------
+    void RenderTarget::SwapBuffers()
     {
-      if (use_copy == true)
-      {
-        using_copy_ = !using_copy_;
-      }
-
-      return using_copy_ ? buffers_[1] : buffers_[0];
+      swapped_buffers_ = !swapped_buffers_;
     }
 
-    TextureHandle RenderTarget::GetTarget() const
+    //-------------------------------------------------------------------------
+    TextureHandle RenderTarget::GetTextureResource() const
     {
-      return using_copy_ ? buffers_[1] : buffers_[0];
+      return swapped_buffers_ ? buffers_[1] : buffers_[0];
     }
   }
 }

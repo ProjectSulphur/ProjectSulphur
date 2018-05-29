@@ -4,15 +4,17 @@
 #include <foundation/pipeline-assets/material.h>
 #include <foundation/memory/memory.h>
 #include <foundation/pipeline-assets/shader.h>
+#include <foundation/io/filesystem.h>
 
 namespace sulphur
 {
   namespace engine
   {
     //--------------------------------------------------------------------------------
-    Material* MaterialManager::ImportAsset(const foundation::String& asset_file)
+    Material* MaterialManager::ImportAsset(const foundation::Path& asset_file)
     {
-      foundation::BinaryReader reader(asset_file);
+      foundation::BinaryReader reader(
+        foundation::Path(application_->project_directory()) + asset_file);
       if (reader.is_ok())
       {
         foundation::MaterialData asset_material = reader.Read<foundation::MaterialData>();
@@ -70,7 +72,7 @@ namespace sulphur
         }
 
         ShaderHandle shader_handle = asset_system.AddAsset(shader,
-          asset_file); // TODO: Shader should be given a proper name
+          asset_file.GetString()); // TODO: Shader should be given a proper name
 
         Material* material = foundation::Memory::Construct<Material>();
 

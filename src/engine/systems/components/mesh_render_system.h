@@ -6,6 +6,7 @@
 
 #include "engine/assets/mesh.h"
 #include "engine/assets/material.h"
+#include "engine/scripting/scriptable_object.h"
 
 #include <foundation/containers/vector.h>
 #include <foundation/containers/hash_map.h>
@@ -18,15 +19,20 @@ namespace sulphur
     class CameraSystem;
     class TransformSystem;
     class MeshRenderSystem;
+    class ScriptableAsset;
 
     /**
-    * @class MeshRenderComponent
+    * @class sulphur::engine::MeshRenderComponent
     * @brief The component type used by the MeshRenderSystem to link meshes to materials and any additional render settings
     * @author Jelle de Haan
     */
-    class MeshRenderComponent : public ComponentHandleBase
+    SCRIPT_CLASS() class MeshRenderComponent : public ComponentHandleBase
     {
     public:
+
+      SCRIPT_NAME(MeshRenderComponent);
+      SCRIPT_COMPONENT();
+
       using System = MeshRenderSystem; //!< System type define
       
       /**
@@ -51,19 +57,33 @@ namespace sulphur
       * @brief Returns the handle to the mesh used by this component
       * @return (sulphur::engine::MeshHandle) The mesh
       */
-      MeshHandle GetMesh() const;
+      MeshHandle GetMesh(MeshHandle* handle = nullptr) const;
 
       /**
-      * @brief Links a material to this component 
+      * @brief Sets the mesh of this component from script
+      * @param[in] mesh (sulphur::engine::ScriptableAsset*) The mesh to set
+      * @return (sulphur::engine::MeshRenderComponent) This MeshRenderComponent, used for chaining
+      */
+      SCRIPT_FUNC() MeshRenderComponent SetMesh(ScriptableAsset* mesh);
+
+      /**
+      * @brief Sets the model of this component from script
+      * @param[in] mesh (sulphur::engine::ScriptableAsset*) The model to set
+      * @return (sulphur::engine::MeshRenderComponent) This MeshRenderComponent, used for chaining
+      */
+      SCRIPT_FUNC() MeshRenderComponent SetModel(ScriptableAsset* mesh);
+
+      /**
+      * @brief Links a material at a specific submesh index to this component 
       * @param[in] material (const sulphur::engine::MaterialHandle&) The material to link
-      * @param[in] index (size_t) Unused, can't use until we figure out to do multi-material meshes
+      * @param[in] index (size_t) The index of the submesh
       * @return (sulphur::engine::MeshRenderComponent) The caller node (for chaining)
       */
       MeshRenderComponent SetMaterial(const MaterialHandle& material, size_t index = 0);
 
       /**
-      * @brief Returns the handle to the material used by this component
-      * @param[in] index (const sulphur::engine::MaterialHandle&) Unused, can't use until we figure out to do multi-material meshes
+      * @brief Returns the handle to the material at a specific submesh index used by this component
+      * @param[in] index (size_t) The index of the submesh
       * @return (sulphur::engine::MaterialHandle) The material
       */
       MaterialHandle GetMaterial(size_t index = 0) const;
@@ -86,26 +106,26 @@ namespace sulphur
       * @param[in] value (bool) True if the component should be visible
       * @return (sulphur::engine::MeshRenderComponent) The caller node (for chaining)
       */
-      MeshRenderComponent SetVisible(bool value);
+      SCRIPT_FUNC() MeshRenderComponent SetVisible(bool value);
 
       /**
       * @brief Returns if this component is rendered or not
       * @return (bool) Is the component visible?
       */
-      bool IsVisible() const;
+      SCRIPT_FUNC() bool IsVisible() const;
 
       /**
       * @brief Define if this component casts shadows or not
       * @param[in] value (bool) True if the component should cast shadows
       * @return (sulphur::engine::MeshRenderComponent) The caller node (for chaining)
       */
-      MeshRenderComponent SetCastShadows(bool value);
+      SCRIPT_FUNC() MeshRenderComponent SetCastShadows(bool value);
 
       /**
       * @brief Returns if this component casts shadows or not
       * @return (bool) Does the component cast shadows?
       */
-      bool CastsShadows() const;
+      SCRIPT_FUNC() bool CastsShadows() const;
 
     private:
       MeshRenderSystem* system_;
@@ -152,7 +172,7 @@ namespace sulphur
     * @see sulphur::engine::MeshRenderComponent
     * @author Jelle de Haan
     */
-    class MeshRenderSystem : public IComponentSystem<MeshRenderComponent, MeshRenderSystemData>
+    class MeshRenderSystem : public IComponentSystem
     {
     public:
       /**
@@ -173,31 +193,25 @@ namespace sulphur
       void OnTerminate() override;
 
       /**
-      * @brief Create a new mesh renderer component for this entity and also creates a TransformComponent if it wasn't attached yet
-      * @param[in] entity (sulphur::engine::Entity) The entity to create this component for
       * @see sulphur::engine::IComponentSystem::Create
       */
-      MeshRenderComponent Create(Entity entity) override;
+      template<typename ComponentT>
+      ComponentT Create(Entity& entity) { return Create(entity); };
 
       /**
       * @brief Destroys the mesh renderer component
       * @param[in] handle (MeshRenderComponent) The component to destroy
       * @see sulphur::engine::IComponentSystem::Destroy
       */
-      void Destroy(MeshRenderComponent handle) override;
+      void Destroy(ComponentHandleBase handle) override;
+
+      /**
+      * @brief Create a new mesh renderer component for this entity and also creates a TransformComponent if it wasn't attached yet
+      * @param[in] entity (sulphur::engine::Entity) The entity to create this component for
+      * @see sulphur::engine::IComponentSystem::Create
+      */
+      MeshRenderComponent Create(Entity& entity);
       
-      /**
-      * @internal
-      * @see sulphur::engine::IComponentSystem::OnPreRender
-      */
-      void OnPreRender() override;
-
-      /**
-      * @internal
-      * @see sulphur::engine::IComponentSystem::OnRender
-      */
-      void OnRender() override;
-
       /**
       * @brief Links a mesh to this component handle
       * @param[in] handle (MeshRenderComponent) The handle the mesh will be linked to
@@ -271,11 +285,28 @@ namespace sulphur
       bool CastsShadows(MeshRenderComponent handle) const;
 
     private:
+      /**
+      * @brief Render all the meshes
+      */
+      void RenderMeshes();
+
+      /**
+      * @brief Applies post processing to the scene
+      */
+      void ApplyPostProcessing();
+
+      /**
+      * @brief Makes sure all materials are valid
+      */
+      void UpdateMaterials(foundation::Vector<MaterialHandle>& material, size_t expected_count);
+
       CameraSystem* camera_system_;
       TransformSystem* tranform_system_;
       IRenderer* renderer_;
 
       foundation::HashMap<size_t, foundation::Vector<Entity>> camera_entity_map_;
+
+      MeshRenderSystemData component_data_; //!< An instance of the container that stores per-component data
     };
   }
 }

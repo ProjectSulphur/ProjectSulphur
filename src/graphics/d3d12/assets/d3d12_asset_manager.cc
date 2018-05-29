@@ -137,12 +137,12 @@ namespace sulphur
     //------------------------------------------------------------------------------------------------------
     void D3D12TextureAssetManager::Create(
       const engine::TextureHandle& texture,
-      const D3D12TextureType type,
       const foundation::Color clear_color)
     {
       engine::Texture* texture_data = texture.GetRaw();
-
-      D3D12Texture2D* created_texture = foundation::Memory::Construct<D3D12Texture2D>();
+      D3D12_CLEAR_VALUE clear_value;
+      bool use_clear_value = false;
+      bool ping_pong = false;
       
       D3D12_RESOURCE_DESC desc = {};
 
@@ -168,12 +168,47 @@ namespace sulphur
         break;
       }
 
+      if ((texture_data->creation_flags() &
+        engine::TextureCreateFlags::kAllowRenderTarget) != 0)
+      {
+        desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        clear_value = {desc.Format, {clear_color.r, clear_color.g, clear_color.b, clear_color.a}};
+        use_clear_value = true;
+        ping_pong = true;
+      }
+
+      if ((texture_data->creation_flags() &
+        engine::TextureCreateFlags::kAllowDepthStencil) != 0)
+      {
+        desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+        clear_value = {
+          desc.Format ==
+          DXGI_FORMAT_R32_TYPELESS ?
+          DXGI_FORMAT_D32_FLOAT :
+          DXGI_FORMAT_D24_UNORM_S8_UINT,
+          { 1.0f, 0 }
+        };
+        use_clear_value = true;
+      }
+
+      if ((texture_data->creation_flags() &
+        engine::TextureCreateFlags::kAllowUAV) != 0)
+      {
+        desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        ping_pong = true;
+      }
+
       desc.DepthOrArraySize = 1;
       desc.Width = texture_data->width();
       desc.Height = texture_data->height();
       desc.MipLevels = 1;
       desc.SampleDesc.Count = 1;
       desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+
+      D3D12Texture2D* created_texture = foundation::Memory::Construct<D3D12Texture2D>(
+        foundation::Memory::Construct<D3D12Resource>(),
+        ping_pong == true ? foundation::Memory::Construct<D3D12Resource>() : nullptr
+      );
 
       device_.CreateTexture2D(
         texture_data->raw_data().data(),
@@ -182,8 +217,7 @@ namespace sulphur
         nullptr,
         1,
         created_texture,
-        type,
-        clear_color);
+        use_clear_value == true ? &clear_value : nullptr);
       
       engine::GPUAssetHandle& handle = texture.GetGPUHandle();
       handle = engine::GPUAssetHandle(this, static_cast<uintptr_t>(textures_.size()));
@@ -250,20 +284,27 @@ namespace sulphur
     void D3D12ShaderAssetManager::Create(const engine::ShaderHandle& shader)
     {
       // Use shader reflection to create a root signature for the shader
-      ID3D12RootSignature* d3d12_rs = D3D12RootSignature::CreateRootSignatureFromShader(
+      D3D12RootSignature* d3d12_rs = D3D12RootSignature::CreateRootSignatureFromShader(
         shader,
         device_);
-
-      D3D12RootSignature* root_signature = foundation::Memory::Construct<D3D12RootSignature>(
-        d3d12_rs,
-        1,
-        1,
-        0);
 
       engine::GPUAssetHandle& handle = shader.GetGPUHandle();
       handle = engine::GPUAssetHandle(this, static_cast<uintptr_t>(root_signatures_.size()));
 
-      root_signatures_.push_back(root_signature);
+      root_signatures_.push_back(d3d12_rs);
+    }
+
+    void D3D12ShaderAssetManager::Create(const engine::ComputeShaderHandle& compute_shader)
+    {
+      // Use shader reflection to create a root signature for the shader
+      D3D12RootSignature* d3d12_rs = D3D12RootSignature::CreateRootSignatureFromShader(
+        compute_shader,
+        device_);
+
+      engine::GPUAssetHandle& handle = compute_shader.GetGPUHandle();
+      handle = engine::GPUAssetHandle(this, static_cast<uintptr_t>(root_signatures_.size()));
+
+      root_signatures_.push_back(d3d12_rs);
     }
 
     //------------------------------------------------------------------------------------------------------

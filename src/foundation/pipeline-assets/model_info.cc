@@ -6,10 +6,10 @@ namespace sulphur
   namespace foundation 
   {
     //-----------------------------------------------------------------------------------------------
-    ModelInfo::ModelInfo(const String& file,
+    ModelInfo::ModelInfo(const Path& file,
                          unsigned int number_of_models) :
       number_of_models_(number_of_models), 
-      file_(file.c_str())
+      file_(file.GetString().c_str())
     {
       model_names_ = foundation::Vector<foundation::AssetName>(number_of_models_);
       models_to_load_ = foundation::Vector<bool>(number_of_models);

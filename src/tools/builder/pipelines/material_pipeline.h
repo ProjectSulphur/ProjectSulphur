@@ -20,6 +20,7 @@ namespace sulphur
 
   namespace builder
   {
+    enum struct ModelFileType : unsigned char;
     class ShaderPipeline;
     class TexturePipeline;
 
@@ -46,7 +47,7 @@ namespace sulphur
       /**
        * @brief Creates materials from the material information present in the scene.
        * @param[in] scene (const aiScene*) The scene containing the material information.
-       * @param[in] scene_directory (const sulphur::foundation::String&) 
+       * @param[in] scene_directory (const sulphur::foundation::Path&) 
        * Directory of the scene file. Ending with '/'.
        * @param[in] model_file_type (sulpher::builder::ModelFileType) The file type of the scene.
        * @param[in] shader_pipeline (sulphur::builder::ShaderPipeline&) 
@@ -63,7 +64,7 @@ namespace sulphur
        * @remark If the function returned false, the materials should be discarded.
        */
       bool Create(const aiScene* scene, 
-        const foundation::String& scene_directory,
+        const foundation::Path& scene_directory,
         ModelFileType model_file_type,
         ShaderPipeline& shader_pipeline, 
         foundation::ModelTextureCache& texture_cache, 
@@ -190,7 +191,7 @@ namespace sulphur
       /**
        * @brief Creates a texture cache for all materials in the scene.
        * @param[in] scene (const aiScene*) The scene containing the material information.
-       * @param[in] scene_directory (const sulphur::foundation::String&) 
+       * @param[in] scene_directory (const sulphur::foundation::Path&) 
        * Directory of the scene file. Ending with '/'.
        * @param[in] texture_pipeline (sulphur::builder::TexturePipeline&) 
        * The texture pipeline to use to create the textures.
@@ -200,18 +201,18 @@ namespace sulphur
       *  @remark If the function returned false, the texture cache should be discarded.
        */
       bool CreateTextureCache(const aiScene* scene,
-        const foundation::String& scene_directory,
+        const foundation::Path& scene_directory,
         TexturePipeline& texture_pipeline,
         foundation::ModelTextureCache& texture_cache) const;
 
       /**
        * @brief Adds a material to the package.
-       * @param[in] asset_origin (const sulphur::foundation::String&) The file the asset was 
+       * @param[in] asset_origin (const sulphur::foundation::Path&) The file the asset was 
        * created from. Should be ASSET_ORIGIN_USER when the asset is created by the user.
        * @param[in] material (sulphur::foundation::MaterialAsset&) The material to add to the package.
        * @return True if the material was added to the package succesfully.
        */
-      bool PackageMaterial(const foundation::String& asset_origin, foundation::MaterialAsset& material);
+      bool PackageMaterial(const foundation::Path& asset_origin, foundation::MaterialAsset& material);
 
       /**
        * @brief Packages the textures in the texture cache and assigns the 
@@ -235,7 +236,6 @@ namespace sulphur
        */
       foundation::String GetPackageExtension() const override;
 
-    protected:
       /*
       * @see sulphur::builder::PipelineBase::PackageDefaultAssets
       */
@@ -251,7 +251,7 @@ namespace sulphur
        * @brief Loads a texture from an assimp material.
        * @param[in] ai_mat (const aiMaterial*) The assimp material.
        * @param[in] texture_type (aiTextureType) The texture type to load from the material.
-       * @param[in] scene_directory (const sulphur::foundation::String&) 
+       * @param[in] scene_directory (const sulphur::foundation::Path&) 
        * Directory of the scene file. Ending with '/'.
        * @param[in] texture_cache (sulphur::builder::foundation::ModelTextureCache&) 
        * Texture cache containing the texture used in the scene.
@@ -261,7 +261,7 @@ namespace sulphur
        * @return (bool) False when there was an error that couldn't be recovered from.
        */
       bool LoadTexture(const aiMaterial* ai_mat, aiTextureType texture_type,
-        const foundation::String& scene_directory, foundation::ModelTextureCache& texture_cache, 
+        const foundation::Path& scene_directory, foundation::ModelTextureCache& texture_cache, 
         const foundation::Vector<foundation::ShaderResource>& textures,
         foundation::MaterialData& material) const;
 
@@ -407,7 +407,7 @@ namespace sulphur
         {
           if (uniform.concrete_type != concrete_type)
           {
-            PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+            PS_LOG_BUILDER(Error,
               "Shader has a uniform called %s. This is a reserved name. The type must be a %s.",
               uniform_name.c_str(), type_name.c_str());
             return;

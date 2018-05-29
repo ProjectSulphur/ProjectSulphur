@@ -1,4 +1,4 @@
-﻿===============================================================
+===============================================================
 Open Asset Import Library (Assimp)
 Developers and Contributors
 ===============================================================
@@ -41,7 +41,7 @@ Submitted patches to make Assimp compile with GCC-4, a makefile and the xcode3 w
 - Andreas Nagel
 First Assimp testing & verification under Windows Vista 64 Bit.
 
-- Marius Schrï¿½der
+- Marius Schr�der
 Allowed us to use many of his models for screenshots and testing.
 
 - Christian Schubert
@@ -92,7 +92,7 @@ Contributed the 'SimpleTexturedOpenGl' sample.
 - Matthias Fauconneau
 Contributed a fix for the Q3-BSP loader.
 
-- JÃ¸rgen P. TjernÃ¸
+- Jørgen P. Tjernø
 Contributed updated and improved xcode workspaces
 
 - drparallax
@@ -137,7 +137,7 @@ GCC/Linux fixes for the SimpleOpenGL sample.
 - Brian Miller
 Bugfix for a compiler fix for iOS on arm.
 
-- SÃ©verin Lemaignan
+- Séverin Lemaignan
 Rewrite of PyAssimp, distutils and Python3 support
 
 - albert-wang

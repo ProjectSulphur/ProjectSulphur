@@ -2,11 +2,11 @@
 #include "engine/scripting/script_utils.h"
 
 sulphur::engine::ScriptableArgs::ScriptableArgs(
-  foundation::Vector<sulphur::foundation::SharedPointer<sulphur::engine::ScriptableValue>> args,
-  ScriptSystem* script_system)
+  foundation::Vector<sulphur::foundation::SharedPointer<sulphur::engine::ScriptableValue>>& args,
+  ScriptState* script_state) :
+  args_(args)
 {
-  args_ = args;
-  script_system_ = script_system;
+  script_state_ = script_state;
 }
 
 //------------------------------------------------------------------------------
@@ -16,9 +16,9 @@ void sulphur::engine::ScriptableArgs::AddReturn(foundation::SharedPointer<Script
 }
 
 //------------------------------------------------------------------------------
-sulphur::engine::ScriptSystem* sulphur::engine::ScriptableArgs::script_system()
+sulphur::engine::ScriptState* sulphur::engine::ScriptableArgs::script_state()
 {
-  return script_system_;
+  return script_state_;
 }
 
 //------------------------------------------------------------------------------
@@ -37,6 +37,16 @@ void ErrorIfUnexpected(
 {
   if (type != expected)
   {
+    if (
+      (type == sulphur::engine::ScriptableValueType::kNumber &&
+      expected == sulphur::engine::ScriptableValueType::kUserdata) ||
+      (type == sulphur::engine::ScriptableValueType::kObject &&
+        expected == sulphur::engine::ScriptableValueType::kUserdata)
+      )
+    {
+      return;
+    }
+    
     if (type != sulphur::engine::ScriptableValueType::kString)
     {
       luaL_error(
@@ -54,7 +64,7 @@ void ErrorIfUnexpected(
 //------------------------------------------------------------------------------
 void sulphur::engine::ScriptableArgs::Check(const char* format, int check_args)
 {
-  lua_State* lua_state = script_system_->lua_state();
+  lua_State* lua_state = script_state_->lua_state();
   size_t size = strlen(format);
 
   lua_Debug function_info = lua_Debug();

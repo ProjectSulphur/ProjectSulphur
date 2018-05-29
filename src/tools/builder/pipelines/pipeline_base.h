@@ -1,28 +1,29 @@
 #pragma once
+#include "tools/builder/base/logger.h"
 #include <foundation/containers/string.h>
 #include <foundation/utils/asset_definitions.h>
 #include <foundation/containers/map.h>
-#include <foundation/logging/logger.h>
+#include <foundation/io/filesystem.h>
 
 /**
  * @file pipeline_base.h
  * @def ASSET_ORIGIN_USER
  * @brief Use when packaging an asset that doesn't come from a file but is created by the user.
  */
-#define ASSET_ORIGIN_USER "OriginUser"
+#define ASSET_ORIGIN_USER "Origin.User"
 
 namespace sulphur 
 {
-	namespace builder 
+  namespace builder 
   {
-	  /**
+    /**
      * @brief Iterator typdef used when iterating through asset packages.
      */
     using PackagedAssetsIterator =
       foundation::Map<foundation::AssetID, foundation::PackagePtr>::iterator;
 
-	  /**
-	   * @class sulphur::builder::PipelineBase 
+    /**
+     * @class sulphur::builder::PipelineBase 
      * @brief Base class for all asset pipelines.
      * @author Timo van Hees
      */
@@ -34,26 +35,20 @@ namespace sulphur
 
       /**
        * @brief Registers an asset as being part of the package.
-       * @param[in] asset_origin (const sulphur::foundation::String&) The file the asset was 
+       * @param[in] asset_origin (const sulphur::foundation::Path&) The file the asset was 
        * loaded from. Should be ASSET_ORIGIN_USER when the asset is created by the user.
        * @param[in|out] name (sulphur::foundation::String&) The name of the asset. Numbers 
        * can be appended onto the back of the name if another asset with the same name already 
        * exists, doesn't have the same @asset_origin and @allow_append_numbers equals true.
-       * @param[out] package_path (sulphur::foundation::String&) The file 
+       * @param[out] package_path (sulphur::foundation::Path&) The file 
        * of the package the asset should be added to.
        * @param id (sulphur::foundation::AssetID&) The ID that has been assigned to this asset.
        * @param[in] allow_append_numbers If numbers can be appended to the name of the asset.
        * @return (bool) False if the asset failed to register. The asset shouldn't be packaged.
        */
-      bool RegisterAsset(const foundation::String& asset_origin, foundation::AssetName& name,
-        foundation::String& package_path, foundation::AssetID& id, 
+      bool RegisterAsset(const foundation::Path& asset_origin, foundation::AssetName& name,
+        foundation::Path& package_path, foundation::AssetID& id, 
         bool allow_append_numbers = true);
-
-      /**
-       * @brief Adds one or more asset to the package on creation.
-       * @return (bool) True if the assets were added succesfully.
-       */
-      virtual bool PackageDefaultAssets();
 
     public:
       /**
@@ -63,7 +58,13 @@ namespace sulphur
       /**
        * @brief Stores changes in the package on disk.
        */
-      void ExportCache();
+      void ExportCache() const;
+
+      /**
+      * @brief Adds one or more asset to the package if it doesn't already exist.
+      * @return (bool) True if the assets were added succesfully.
+      */
+      virtual bool PackageDefaultAssets();
 
       /**
        * @brief Loads an asset from the package.
@@ -114,33 +115,33 @@ namespace sulphur
 
       /**
        * @brief Set the output location of the cache.
-       * @param[in] output_path (const sulphur::foundation::String&) The new output 
+       * @param[in] output_path (const sulphur::foundation::Path&) The new output 
        * location of the cache.
        * @remark Reinitializes the pipeline automatically. Assets packaged at previous output 
        * location will be saved but won't be accesible through this pipeline. Unless the output 
        * path is changed back.
        */
-      void SetOutputLocation(const foundation::String& output_path);
+      void SetOutputLocation(const foundation::Path& output_path);
 
       /**
       * @brief Set the output location of the packages relative to the output path.
-      * @param[in] package_path (const sulphur::foundation::String&) The new output
+      * @param[in] package_path (const sulphur::foundation::Path&) The new output
       * location of the package.
       */
-      void SetPackageOutputLocation(const foundation::String& package_path);
+      void SetPackageOutputLocation(const foundation::Path& package_path);
 
       /**
        * @brief Getter for the output directory of the caches.
-       * @return (const sulphur::foundation::String&) The current output path of this pipeline.
+       * @return (const sulphur::foundation::Path&) The current output path of this pipeline.
        */
-      const foundation::String& output_path() const;
+      const foundation::Path& output_path() const;
 
       /**
        * @brief Getter for the output directory of the packages.
-       * @return (const sulphur::foundation::String&) The current output path for the packages 
+       * @return (const sulphur::foundation::Path&) The current output path for the packages 
        * relative to the pipeline output path.
        */
-      const foundation::String& package_output_path() const;
+      const foundation::Path& package_output_path() const;
 
       /**
        * @brief Asset pipelines deriving from this class override this method to 
@@ -156,27 +157,42 @@ namespace sulphur
        */
       virtual foundation::String GetPackageExtension() const = 0;
 
+     
+      /**
+      * @brief checks the current in memory packaged assets against the packages on disk and updates the cache file on disk and the packaged assets in memeory accordingly
+      */
+      void RefreshCache();
+
+      bool GetPackagePtrByName(const foundation::String& name, foundation::PackagePtr& ptr);
+
+      bool GetPackagePtrById(const foundation::AssetID& id, foundation::PackagePtr& ptr);
     private:
-      foundation::String output_path_;  //!< The ouput path of the caches exported by this pipeline.
-      foundation::String package_output_path_; //!< The output path of the packaged exported by this pipeline relative to the output path.
+     /**
+       * @brief Checks if the assets in the cache still exist on disk. 
+       * If not, the asset is removed from the cache.
+       */
+      void RemoveDeletedAssets();
+
+      foundation::Path output_path_;  //!< The ouput path of the caches exported by this pipeline.
+      foundation::Path package_output_path_; //!< The output path of the packaged exported by this pipeline relative to the output path.
       foundation::Map<foundation::AssetID, foundation::PackagePtr> packaged_assets_; //!< Map of all assets in the package and information about them.
     };
 
-	  template <typename T>
-	  bool PipelineBase::LoadAssetFromPackage(foundation::AssetID id, T& asset)
-	  {
+    template <typename T>
+    bool PipelineBase::LoadAssetFromPackage(foundation::AssetID id, T& asset)
+    {
       PackagedAssetsIterator it = packaged_assets_.find(id);
       if (it == packaged_assets_.end())
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
+        PS_LOG_BUILDER(Warning,
           "There is no asset with id(%llu) in the package.", id);
         return false;
       }
 
-      foundation::BinaryReader reader(output_path() + it->second.filepath);
+      foundation::BinaryReader reader(output_path() + it->second.filepath, false);
       if(reader.is_ok() == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "The packaged asset can not be found.");
         return false;
       }
@@ -184,14 +200,14 @@ namespace sulphur
       asset = reader.Read<T>();
 
       return true;
-	  }
+    }
 
-	  template <typename T>
-	  bool PipelineBase::LoadAssetFromPackage(const foundation::AssetName& name,
-	    T& asset)
-	  {
+    template <typename T>
+    bool PipelineBase::LoadAssetFromPackage(const foundation::AssetName& name,
+      T& asset)
+    {
       foundation::AssetID id = foundation::GenerateId(name);
       return LoadAssetFromPackage(id, asset);
-	  }
-	}
+    }
+  }
 }

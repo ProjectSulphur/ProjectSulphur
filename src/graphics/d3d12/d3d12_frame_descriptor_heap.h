@@ -44,15 +44,13 @@ namespace sulphur
       /**
       * @brief Initializes the frame descriptor heap. Creates the D3D12 resources required.
       * @param[in] frame_buffer_count (uint32_t) The amount of back buffers used by the swap chain.
-      * @param[in] srv_heap_size (size_t) The amount of reserved descriptors for SRVs in the SRV/UAV heap.
-      * @param[in] uav_heap_size (size_t) The amount of reserved descriptors for UAVs in the SRV/UAV heap.
+      * @param[in] srv_uav_heap_size (size_t) The amount of reserved descriptors for SRVs and UAVs in the SRV/UAV heap.
       * @param[in] rtv_heap_size (size_t) The amount of reserved descriptors for RTVs in the RTV heap.
       * @param[in] dsv_heap_size (size_t) The amount of reserved descriptors for DSVs in the DSV heap.
       */
       void Initialize(
         uint32_t frame_buffer_count,
-        size_t srv_heap_size,
-        size_t uav_heap_size,
+        size_t srv_uav_heap_size,
         size_t rtv_heap_size,
         size_t dsv_heap_size
       );
@@ -123,15 +121,13 @@ namespace sulphur
       foundation::Vector<ID3D12DescriptorHeap*> rtv_heap_; //!< Vector, containing an RTV heap for each back buffer.
       foundation::Vector<ID3D12DescriptorHeap*> dsv_heap_; //!< Vector, containing a DSV heap for each back buffer.
 
-      size_t srv_heap_size_; //!< The amount of reserved descriptors for SRVs in the SRV/UAV heap.
-      size_t uav_heap_size_; //!< The amount of reserved descriptors for UAVs in the SRV/UAV heap.
+      size_t srv_uav_heap_size_; //!< The amount of reserved descriptors for SRVs and UAVs in the SRV/UAV heap.
       size_t rtv_heap_size_; //!< The amount of reserved descriptors for RTVs in the RTV heap.
       size_t dsv_heap_size_; //!< The amount of reserved descriptors for DSVs in the DSV heap.
 
       uint32_t current_frame_; //!< The current back buffer index.
 
-      uint32_t current_srv_write_index_; //!< The current index of the next free SRV descriptor in the SRV/UAV heap.
-      uint32_t current_uav_write_index_; //!< The current index of the next free UAV descriptor in the SRV/UAV heap.
+      uint32_t current_srv_uav_write_index_; //!< The current index of the next free descriptor in the SRV/UAV heap.
       uint32_t current_rtv_write_index_; //!< The current index of the next free RTV descriptor in the RTV heap.
       uint32_t current_dsv_write_index_; //!< The current index of the next free DSV descriptor in the DSV heap.
 

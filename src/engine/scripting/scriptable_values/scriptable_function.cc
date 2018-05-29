@@ -4,18 +4,18 @@
 #include "engine/scripting/script_utils.h"
 
 sulphur::engine::ScriptableFunction::ScriptableFunction(
-  ScriptSystem* script_system,
+  ScriptState* script_state,
   ScriptFunction function,
   bool is_lib)
-  : ScriptableValue(script_system)
+  : ScriptableValue(script_state)
 {
   script_function_ = function;
 
-  lua_pushlightuserdata(script_system->lua_state(), this);
-  lua_pushcclosure(script_system->lua_state(), ScriptableFunction::Call, 1);
+  lua_pushlightuserdata(script_state->lua_state(), this);
+  lua_pushcclosure(script_state->lua_state(), ScriptableFunction::Call, 1);
 
-  ref_ = luaL_ref(script_system->lua_state(), LUA_REGISTRYINDEX);
-  script_system_ = script_system;
+  ref_ = luaL_ref(script_state->lua_state(), LUA_REGISTRYINDEX);
+  script_state_ = script_state;
   is_lib_ = is_lib;
 }
 
@@ -34,13 +34,13 @@ int sulphur::engine::ScriptableFunction::Call(lua_State* lua_state)
   for (int i = 1; i <= argCount; i++)
   {
     foundation::SharedPointer<ScriptableValue> arg
-      = foundation::Memory::ConstructShared<ScriptableValue>(scriptable_function->script_system_, i);
+      = foundation::Memory::ConstructShared<ScriptableValue>(scriptable_function->script_state_, i);
     arglist.push_back(arg);
   }
 
   lua_pop(lua_state, -1);
 
-  ScriptableArgs args = ScriptableArgs(arglist, scriptable_function->script_system_);
+  ScriptableArgs args = ScriptableArgs(arglist, scriptable_function->script_state_);
 
   (scriptable_function->script_function_)(&args);
 

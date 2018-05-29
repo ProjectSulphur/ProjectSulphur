@@ -17,32 +17,62 @@ namespace sulphur
       update_pos_(false),
       update_color_(false),
       update_data_(false),
-	    static_mesh_(true),
-	    always_on_top_(false)
+      static_mesh_(true),
+      always_on_top_(false),
+      bounding_box_({}),
+      bounding_sphere_({})
     {
     }
 
     //--------------------------------------------------------------------------------
-    Mesh::Mesh(const Mesh& mesh):
+    Mesh::Mesh(const Mesh& mesh) :
       indices_(mesh.indices_),
       vertices_(mesh.vertices_),
       uvs_(mesh.uvs_),
       normals_(mesh.normals_),
       tangents_(mesh.tangents_),
       colors_(mesh.colors_),
+      submesh_offsets_(mesh.submesh_offsets_),
       topology_(mesh.topology_),
       update_index_(true),
       update_pos_(true),
       update_color_(true),
       update_data_(true),
       static_mesh_(mesh.static_mesh_),
-      always_on_top_(mesh.always_on_top_)
+      always_on_top_(mesh.always_on_top_),
+      bounding_box_(mesh.bounding_box_),
+      bounding_sphere_(mesh.bounding_sphere_)
     {
+    }
+    
+    //--------------------------------------------------------------------------------
+    Mesh& Mesh::operator=(const Mesh& mesh)
+    {
+      indices_ = mesh.indices_;
+      vertices_ = mesh.vertices_;
+      uvs_ = mesh.uvs_;
+      normals_ = mesh.normals_;
+      tangents_ = mesh.tangents_;
+      colors_ = mesh.colors_;
+      submesh_offsets_ = mesh.submesh_offsets_;
+      topology_ = mesh.topology_;
+      update_index_ = true;
+      update_pos_ = true;
+      update_color_ = true;
+      update_data_ = true;
+      static_mesh_ = mesh.static_mesh_;
+      always_on_top_ = mesh.always_on_top_;
+      bounding_box_ = mesh.bounding_box_;
+      bounding_sphere_ = mesh.bounding_sphere_;
+      return *this;
     }
 
     //--------------------------------------------------------------------------------
     void Mesh::CalculateBounds()
-    {}
+    {
+      bounding_box_ = foundation::AABB::EncapsulatePoints(vertices_);
+      bounding_sphere_ = foundation::Sphere::EncapsulatePoints(vertices_);
+    }
 
     //--------------------------------------------------------------------------------
     void Mesh::RecalculateNormals()
@@ -110,8 +140,11 @@ namespace sulphur
       size_t index_size = mesh.indices_.size();
       foundation::Vector<uint32_t> temp_indices;
       temp_indices.reserve(index_size);
+
       for (size_t i = 0; i < index_size; ++i)
+      {
         temp_indices.emplace_back(mesh.indices_[i] + old_vertex_count);
+      }
 
       vertices_.insert(vertices_.end(), mesh.vertices_.begin(), mesh.vertices_.end());
       indices_.insert(indices_.end(), temp_indices.begin(), temp_indices.end());
@@ -119,6 +152,17 @@ namespace sulphur
       normals_.insert(normals_.end(), mesh.normals_.begin(), mesh.normals_.end());
       tangents_.insert(tangents_.end(), mesh.tangents_.begin(), mesh.tangents_.end());
       colors_.insert(colors_.end(), mesh.colors_.begin(), mesh.colors_.end());
+
+      bounding_box_ += mesh.bounding_box_;
+      bounding_sphere_ += mesh.bounding_sphere_;
+
+      const size_t other_submesh_count = mesh.submesh_offsets_.size();
+      submesh_offsets_.reserve(submesh_offsets_.size() + other_submesh_count);
+      for (size_t i = 0; i < other_submesh_count; ++i)
+      {
+        const SubMeshOffset& submesh = mesh.submesh_offsets_[i];
+        submesh_offsets_.push_back({ submesh.offset + old_vertex_count, submesh.size });
+      }
 
       update_index_ = true;
       update_pos_ = true;
@@ -189,6 +233,14 @@ namespace sulphur
       normals_.insert(normals_.end(), temp_normals.begin(), temp_normals.end());
       tangents_.insert(tangents_.end(), temp_tangents.begin(), temp_tangents.end());
       colors_.insert(colors_.end(), mesh.colors_.begin(), mesh.colors_.end());
+
+      const size_t other_submesh_count = mesh.submesh_offsets_.size();
+      submesh_offsets_.reserve(submesh_offsets_.size() + other_submesh_count);
+      for (size_t i = 0; i < other_submesh_count; ++i)
+      {
+        const SubMeshOffset& submesh = mesh.submesh_offsets_[i];
+        submesh_offsets_.push_back({ submesh.offset + old_vertex_count, submesh.size });
+      }
 
       update_index_ = true;
       update_pos_ = true;
@@ -292,9 +344,59 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------------
-    void Mesh::SetIndices(foundation::Vector<uint32_t>&& i)
+    void Mesh::SetIndices(foundation::Vector<uint32_t>&& indices, uint submesh)
     {
-      indices_ = i;
+      // If there where no elements, simply insert with zero's
+      if (submesh_offsets_.empty())
+      {
+        submesh_offsets_.insert(submesh_offsets_.begin() + submesh, { 0, static_cast<uint32_t>(indices.size()) });
+        indices_ = indices;
+        update_index_ = true;
+        return;
+      }
+
+      // First insert missing elements, by calculating the offset
+      uint32_t offset = 0;
+      const size_t submesh_count = submesh_offsets_.size();
+      for (size_t i = 0; i <= static_cast<size_t>(submesh); ++i)
+      {
+        if (i >= submesh_count) // Insert new element
+        {
+          submesh_offsets_.push_back({offset, 0});
+        }
+        else // Add to offset
+        {
+          offset += submesh_offsets_[i].size;
+        }
+      }
+      
+      SubMeshOffset& offsets = submesh_offsets_[submesh];
+      const int new_index_count = static_cast<int>(indices.size());
+      // Use the previous offset to calculate the delta
+      const int element_delta = new_index_count - static_cast<int>(offsets.size);
+
+      // Update the offset to reflect the new size
+      offsets.size = new_index_count;
+
+      // First resize the index buffer
+      if (element_delta > 0) // Insert `element_delta` new elements
+      {
+        indices_.insert(indices_.begin() + offsets.offset, element_delta, 0ull);
+      }
+      else
+      {
+        indices_.erase(indices_.begin() + offsets.offset, indices_.begin() + offsets.offset + std::abs(element_delta));
+      }
+
+      // Overwrite old data with new vector
+      eastl::move(indices.begin(), indices.end(), indices_.begin() + offsets.offset);
+
+      // Modify the offset of every submesh after this one
+      for (size_t i = submesh; i < submesh_count; ++i)
+      {
+        submesh_offsets_[i].offset += element_delta;
+      }
+
       update_index_ = true;
     }
 
@@ -331,6 +433,57 @@ namespace sulphur
     {
       colors_ = v;
       update_color_ = true;
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void Mesh::SetBoneWeights(foundation::Vector<glm::vec4>&& bone_weights)
+    {
+      bone_weights_ = bone_weights;
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void Mesh::SetBoneIndices(foundation::Vector<glm::vec<4, uint32_t>>&& bone_indices)
+    {
+      bone_indices_ = bone_indices;
+    }
+
+    //--------------------------------------------------------------------------------
+    void Mesh::SetBoundingBox(const foundation::AABB& bounding_box)
+    {
+      bounding_box_ = bounding_box;
+    }
+
+    //--------------------------------------------------------------------------------
+    void Mesh::SetBoundingSphere(const foundation::Sphere& bounding_sphere)
+    {
+      bounding_sphere_ = bounding_sphere;
+    }
+
+    //--------------------------------------------------------------------------------
+    foundation::Vector<uint32_t> Mesh::GetIndicesAt(uint submesh) const
+    {
+      assert(submesh < submesh_offsets_.size());
+
+      const SubMeshOffset& offsets = submesh_offsets_[submesh];
+
+      foundation::Vector<uint32_t> indices(offsets.size);
+
+      const size_t size = offsets.size * sizeof(uint32_t);
+
+      //Added some more things
+      memcpy_s(indices.data(),
+        size,
+        indices_.data() + (offsets.offset * sizeof(uint32_t)),
+        size);
+
+      return indices;
+    }
+
+    //--------------------------------------------------------------------------------
+    const SubMeshOffset& Mesh::GetSubmesh(uint submesh) const
+    {
+      assert(submesh < submesh_offsets_.size());
+      return submesh_offsets_[submesh];
     }
 
     //--------------------------------------------------------------------------------
@@ -498,6 +651,8 @@ namespace sulphur
       cube.SetUVs(eastl::move(uvs));
       cube.SetNormals(eastl::move(normals));
       cube.SetColors(eastl::move(colors));
+      cube.SetBoundingBox(foundation::AABB{ glm::vec3(-0.5f), glm::vec3(0.5f) });
+      cube.SetBoundingSphere(cube.bounding_box().ToSphere());
 
       cube.RecalculateTangents();
 
@@ -566,6 +721,9 @@ namespace sulphur
       triangle.SetUVs(eastl::move(uvs));
       triangle.SetNormals(eastl::move(normals));
       triangle.SetColors(eastl::move(colors));
+      triangle.SetBoundingBox(foundation::AABB{ glm::vec3(-0.25f, -0.25f * aspectRatio, 0.0f), 
+        glm::vec3(0.25f, 0.25f * aspectRatio, 0.0f) });
+      triangle.SetBoundingSphere(triangle.bounding_box().ToSphere());
 
       triangle.RecalculateTangents();
 
@@ -609,6 +767,8 @@ namespace sulphur
       quad.SetUVs(eastl::move(uvs));
       quad.SetNormals(eastl::move(normals));
       quad.SetColors(eastl::move(colors));
+      quad.SetBoundingBox(foundation::AABB{ glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(1.0f) });
+      quad.SetBoundingSphere(quad.bounding_box().ToSphere());
 
       quad.RecalculateTangents();
 
@@ -670,6 +830,9 @@ namespace sulphur
       plane.SetUVs(eastl::move(uvs));
       plane.SetNormals(eastl::move(normals));
       plane.SetColors(eastl::move(colors));
+      plane.SetBoundingBox(foundation::AABB{ glm::vec3(-0.5f, 0.0f, -0.5f), 
+        glm::vec3(0.5f, 0.0f, 0.5f) });
+      plane.SetBoundingSphere(plane.bounding_box().ToSphere());
 
       plane.RecalculateTangents();
 
@@ -821,6 +984,12 @@ namespace sulphur
       cylinder.SetNormals(eastl::move(normals));
       cylinder.SetTangents(eastl::move(tangents));
       cylinder.SetColors(eastl::move(colors));
+
+      const float max_radius = glm::max(bottom_radius, top_radius);
+      cylinder.SetBoundingBox(foundation::AABB{ glm::vec3(-max_radius, -0.5f * height, -max_radius), 
+        glm::vec3(max_radius, 0.5f * height, max_radius) });
+      cylinder.SetBoundingSphere(cylinder.bounding_box().ToSphere());
+
       return cylinder;
     }
 
@@ -871,8 +1040,68 @@ namespace sulphur
       circle.SetUVs(eastl::move(uvs));
       circle.SetNormals(eastl::move(normals));
       circle.SetColors(eastl::move(colors));
+      circle.SetBoundingBox(foundation::AABB{ glm::vec3(-1.0f, 0.0f, -1.0f),
+        glm::vec3(1.0f, 0.0f, 1.0f) });
+      circle.SetBoundingSphere(circle.bounding_box().ToSphere());
 
       circle.RecalculateTangents();
+
+      return circle;
+    }
+
+    //--------------------------------------------------------------------------------
+    Mesh Mesh::CreateLineCircle(uint segments)
+    {
+      Mesh circle;
+
+      foundation::Vector<glm::vec3> vertices;
+      foundation::Vector<glm::vec2> uvs;
+      foundation::Vector<glm::vec3> normals;
+      foundation::Vector<glm::vec3> tangents;
+      foundation::Vector<foundation::Color> colors;
+      foundation::Vector<uint32_t> indices;
+
+      float d_theta = glm::two_pi<float>() / segments;
+
+      for (uint i = 0; i <= segments; ++i)
+      {
+        float x = cosf(i*d_theta);
+        float z = sinf(i*d_theta);
+
+        float u = x + 0.5f;
+        float v = z + 0.5f;
+        vertices.emplace_back(glm::vec3(x, z, 0.0f));
+        colors.emplace_back(foundation::Color(1.0f, 1.0f, 1.0f));
+        normals.emplace_back(glm::vec3(0.0f, 1.0f, 0.0f));
+        tangents.emplace_back(glm::vec3(1.0f, 0.0f, 0.0f));
+        uvs.emplace_back(glm::vec2(u, v));
+      }
+      // Center vertex.
+      vertices.emplace_back(glm::vec3(0.0f, 0.0f, 0.0f));
+      colors.emplace_back(foundation::Color(1.0f, 1.0f, 1.0f));
+      normals.emplace_back(glm::vec3(0.0f, 1.0f, 0.0f));
+      tangents.emplace_back(glm::vec3(1.0f, 0.0f, 0.0f));
+      uvs.emplace_back(glm::vec2(0.5f, 0.5f));
+
+      //uint center_index = (uint)vertices.size() - 1;
+      for (uint i = 0; i < segments; ++i)
+      {
+        // indices.push_back(center_index);
+        indices.push_back(i + 1);
+        indices.push_back(i);
+      }
+
+      circle.SetVertices(eastl::move(vertices));
+      circle.SetIndices(eastl::move(indices));
+      circle.SetUVs(eastl::move(uvs));
+      circle.SetNormals(eastl::move(normals));
+      circle.SetColors(eastl::move(colors));
+      circle.SetBoundingBox(foundation::AABB{ glm::vec3(-1.0f, 0.0f, -1.0f),
+        glm::vec3(1.0f, 0.0f, 1.0f) });
+      circle.SetBoundingSphere(circle.bounding_box().ToSphere());
+
+      circle.RecalculateTangents();
+      circle.SetTopologyType(graphics::TopologyType::kLine);
 
       return circle;
     }
@@ -917,6 +1146,9 @@ namespace sulphur
       hex.SetUVs(eastl::move(uvs));
       hex.SetNormals(eastl::move(normals));
       hex.SetColors(eastl::move(colors));
+      hex.SetBoundingBox(foundation::AABB{ glm::vec3(-0.433012f, 0.0f, -0.5f),
+        glm::vec3(0.433012f, 0.0f, 0.5f) });
+      hex.SetBoundingSphere(hex.bounding_box().ToSphere());
 
       hex.RecalculateTangents();
 
@@ -963,6 +1195,9 @@ namespace sulphur
       hex.SetUVs(eastl::move(uvs));
       hex.SetNormals(eastl::move(normals));
       hex.SetColors(eastl::move(colors));
+      hex.SetBoundingBox(foundation::AABB{ glm::vec3(-0.5f, 0.0f, -0.5f),
+        glm::vec3(0.5f, 0.0f, 0.5f) });
+      hex.SetBoundingSphere(hex.bounding_box().ToSphere());
 
       hex.RecalculateTangents();
 
@@ -1063,6 +1298,8 @@ namespace sulphur
       sphere.SetUVs(eastl::move(uvs));
       sphere.SetNormals(eastl::move(normals));
       sphere.SetColors(eastl::move(colors));
+      sphere.SetBoundingSphere(foundation::Sphere{ glm::vec3(0.0f), 1.0f });
+      sphere.SetBoundingBox(sphere.bounding_sphere().ToBox());
 
       sphere.RecalculateTangents();
 

@@ -1,4 +1,4 @@
-﻿/*
+/*
 ---------------------------------------------------------------------------
 Open Asset Import Library (ASSIMP)
 ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ extern ( C ) {
 
       /**
        * A point light source has a well-defined position in space but no
-       * direction â€“ it emits light in all directions. A normal bulb is a point
+       * direction – it emits light in all directions. A normal bulb is a point
        * light.
        */
       POINT = 0x2,
@@ -83,7 +83,7 @@ extern ( C ) {
     * point and spot lights. All of them are defined with just a single
     * structure and distinguished by their parameters.
     *
-    * Note: Some file formats (such as 3DS, ASE) export a "target point" â€“ the
+    * Note: Some file formats (such as 3DS, ASE) export a "target point" – the
     * point a spot light is looking at (it can even be animated). Assimp
     * writes the target point as a subnode of a spotlights's main node, called
     * <code>[spotName].Target</code>. However, this is just additional

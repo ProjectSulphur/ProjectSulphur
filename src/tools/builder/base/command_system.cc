@@ -1,5 +1,6 @@
 #include "tools/builder/base/command_system.h"
 #include "tools/builder/shared/application.h"
+#include "tools/builder/base/logger.h"
 #include <eastl/algorithm.h>
 #include <iostream>
 
@@ -8,8 +9,23 @@ namespace sulphur
   namespace builder 
   {
     //-----------------------------------------------------------------------------------------------
-    CommandSystem::CommandSystem() 
-      : help_command("--help")
+    CommandSystem::CommandSystem(ModelPipeline* model_pipeline,
+      MeshPipeline* mesh_pipeline, MaterialPipeline* material_pipeline,
+      TexturePipeline* texture_pipeline, ShaderPipeline* shader_pipeline,
+      SkeletonPipeline* skeleton_pipeline, AnimationPipeline* animation_pipeline,
+      ScriptPipeline* script_pipeline_, AudioPipeline* audio_pipeline_, 
+      SceneLoader* scene_loader)
+      : help_command("--help"), 
+    model_pipeline_(model_pipeline), 
+    mesh_pipeline_(mesh_pipeline),
+    material_pipeline_(material_pipeline), 
+    texture_pipeline_(texture_pipeline), 
+    shader_pipeline_(shader_pipeline), 
+    skeleton_pipeline_(skeleton_pipeline), 
+    animation_pipeline_(animation_pipeline),
+    script_pipeline_(script_pipeline_),
+    audio_pipeline_(audio_pipeline_),
+    scene_loader_(scene_loader)
     {
       error_handler_ = DefaultErrorHandler;
     }
@@ -58,9 +74,11 @@ namespace sulphur
       CommandErr result = CommandErr::kNoError;
 
       char tmp[254];
+      std::cout << "command: ";
       std::cin.getline(tmp, 254);
 
       foundation::String command_line = foundation::String(tmp);
+      command_line.erase(eastl::remove_if(command_line.begin(), command_line.end(), [](char c) {return c == '\"'; }), command_line.end());
 
       if (command_line == "--exit")
       {
@@ -99,7 +117,10 @@ namespace sulphur
 
     CommandErr CommandSystem::ExecuteCommandLine(const char* command_line)
     {
-      if (command_line == help_command)
+      foundation::String cmd = command_line;
+      cmd.erase(eastl::remove_if(cmd.begin(), cmd.end(), [](char c) {return c == '\"'; }), cmd.end());
+
+      if (cmd == help_command)
       {
         PrintDescriptions();
         return CommandErr::kNoError;
@@ -108,12 +129,12 @@ namespace sulphur
       CommandErr result;
       for (ICommand* command : registered_commands_)
       {
-        if (*command == command_line)
+        if (*command == cmd.c_str())
         {
           Syntax syntax = command->syntax();
           CommandInput input;
 
-          result = ValidateSyntax(command_line, syntax, &input);
+          result = ValidateSyntax(cmd.c_str(), syntax, &input);
           HandleError(result);
 
           if (result != CommandErr::kNoError)
@@ -133,11 +154,11 @@ namespace sulphur
     void CommandSystem::PrintDescriptions() const
     {
       std::cout << "output dir: " 
-                << Application::out_dir().GetAbsolutePath().c_str() 
+                << Application::out_dir().GetAbsolutePath().GetString().c_str()
                 << "\n";
 
       std::cout << "package output dir: " 
-                << Application::package_dir().GetAbsolutePath().c_str() 
+                << Application::package_dir().GetAbsolutePath().GetString().c_str()
                 << "\n";
 
       std::cout << std::endl;
@@ -167,7 +188,7 @@ namespace sulphur
       foundation::Vector<foundation::String> flag_args;
       foundation::Vector<foundation::String> command_args;
       
-      while (input.find("-") != input.npos)
+      while (input.find(" -") != input.npos)
       {
         bool valid_flag = false;
 
@@ -216,7 +237,21 @@ namespace sulphur
         if (flag->has_argument() == true)
         {
           size_t arg_start = input.find_first_not_of(" ", flag_end);
-          size_t arg_end = input.find_first_of("-", arg_start);
+          size_t arg_end = arg_start;
+          bool found = false;
+          while (found == false)
+          {
+            arg_end = input.find_first_of("-", arg_end);
+            if (arg_end != input.npos && isspace(input[arg_end - 1]) == false)
+            {
+              arg_end++;
+              continue;
+            }
+            else
+            {
+              found = true;
+            }
+          }
 
           if (arg_end - arg_start == 0 || arg_start == input.npos)
           {
@@ -267,17 +302,18 @@ namespace sulphur
       switch (message)
       {
       case CommandErr::kInvalidFlag:
-        std::cout << "invalid flag used in command" << std::endl;
+        PS_LOG_BUILDER(Error, "invalid flag used in command");
         break;
       case CommandErr::kInvalidSyntax:
-        std::cout << "invalid command syntax" << std::endl;
+        PS_LOG_BUILDER(Error, "invalid command syntax");
         break;
       case CommandErr::kUnknownCommand:
-        std::cout << "unknown command" << std::endl;
+        PS_LOG_BUILDER(Error, "unknown command");
         break;
       case CommandErr::kMissingFlag:
-        std::cout << "missing mandatory flag" << std::endl;
+        PS_LOG_BUILDER(Error, "missing mandatory flag");
         break;
+      default: ;
       }
     }
   }

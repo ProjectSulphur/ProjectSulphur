@@ -29,6 +29,10 @@ namespace sulphur
       */
       FreeListAllocator(void* buffer, size_t size);
 
+      /**
+      * @brief Move assignment operator.
+      */
+      FreeListAllocator& operator=(FreeListAllocator&& other);
     private:
 
       /**

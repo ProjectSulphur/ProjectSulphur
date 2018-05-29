@@ -43,22 +43,39 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    D3D12Texture2D::D3D12Texture2D() :
+    D3D12Texture2D::D3D12Texture2D(
+      D3D12Resource* first_buffer,
+      D3D12Resource* second_buffer) :
       has_srv_(false),
       has_dsv_(false),
-      has_rtv_(false)
+      has_rtv_(false),
+      has_uav_(false),
+      buffers_{first_buffer, second_buffer},
+      has_ping_pong_(second_buffer != nullptr)
     {}
 
     //------------------------------------------------------------------------------------------------------
     D3D12Texture2D::~D3D12Texture2D()
     {
-      SafeRelease(resource_);
+		for (uint32_t i = 0; i < 2; ++i)
+		{
+			if (buffers_[i] != nullptr)
+			{
+				foundation::Memory::Destruct(buffers_[i]);
+			}
+		}
     }
 
     //------------------------------------------------------------------------------------------------------
     D3D12Resource::D3D12Resource() :
       resource_(nullptr)
     {}
+
+    //------------------------------------------------------------------------------------------------------
+    D3D12Resource::~D3D12Resource()
+    {
+      SafeRelease(resource_);
+    }
 
     //------------------------------------------------------------------------------------------------------
     bool D3D12Resource::Transition(D3D12_RESOURCE_STATES new_state, D3D12_RESOURCE_BARRIER& out_barrier)

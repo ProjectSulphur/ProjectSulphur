@@ -12,6 +12,7 @@ namespace lua_parser
   {
     public enum SupportedTypes
     {
+      kBool,
       kFloat,
       kDouble,
       kInt,
@@ -22,8 +23,13 @@ namespace lua_parser
       kVector4,
       kMatrix3x3,
       kMatrix4x4,
+      kQuaternion,
+      kColor,
       kVoid,
-      kUserdata
+      kFunction,
+      kUserdata,
+      kArgs,
+      kScriptHandle
     }
 
     public enum RefType
@@ -35,12 +41,14 @@ namespace lua_parser
 
     static Dictionary<string, SupportedTypes> kNameToType = new Dictionary<string, SupportedTypes>
     {
+      { "bool", SupportedTypes.kBool },
       { "float", SupportedTypes.kFloat },
       { "double", SupportedTypes.kDouble },
       { "int", SupportedTypes.kInt },
       { "char", SupportedTypes.kInt },
       { "int32_t", SupportedTypes.kInt },
       { "int64_t", SupportedTypes.kInt },
+      { "size_t", SupportedTypes.kInt },
       { "unsigned int", SupportedTypes.kUnsignedInt },
       { "unsigned char", SupportedTypes.kUnsignedInt },
       { "uint32_t", SupportedTypes.kUnsignedInt },
@@ -50,8 +58,65 @@ namespace lua_parser
       { "vec3", SupportedTypes.kVector3 },
       { "mat3", SupportedTypes.kMatrix3x3 },
       { "mat4", SupportedTypes.kMatrix4x4 },
-      { "void", SupportedTypes.kVoid }
+      { "quat", SupportedTypes.kQuaternion },
+      { "Color", SupportedTypes.kColor },
+      { "void", SupportedTypes.kVoid },
+      { "ScriptableCallback", SupportedTypes.kFunction },
+      { "ScriptHandle", SupportedTypes.kScriptHandle },
+      { "ScriptableArgs", SupportedTypes.kArgs }
     };
+
+    public class TypeDefinition
+    {
+      public TypeDefinition(Json.Object from)
+      {
+        if (from.GetValue("name") != null)
+        {
+          name = ((Json.String)from.GetValue("name")).GetValue();
+          ref_type = RefType.kNormal;
+        }
+        else
+        {
+          string r = ((Json.String)from.GetValue("type")).GetValue();
+
+          switch (r)
+          {
+            case "pointer":
+              ref_type = RefType.kPointer;
+              break;
+
+            case "reference":
+              ref_type = RefType.kReference;
+              break;
+
+            default:
+              ref_type = RefType.kNormal;
+              break;
+          }
+
+          name = ((Json.String)((Json.Object)from.GetValue("baseType")).GetValue("name")).GetValue();
+        }
+
+        unqualified_name = name;
+        type = StringToType(name);
+
+        switch (ref_type)
+        {
+          case RefType.kPointer:
+            name += "*";
+            break;
+
+          case RefType.kReference:
+            name += "&";
+            break;
+        }
+      }
+
+      public string name;
+      public string unqualified_name;
+      public SupportedTypes type;
+      public RefType ref_type;
+    }
 
     public class Enum
     {
@@ -69,29 +134,28 @@ namespace lua_parser
     {
       public class Arg
       {
-        public Arg(string n)
+        public Arg(string n, Json.Object typedef)
         {
           name = n;
-          type_name = "void";
-          type = SupportedTypes.kUserdata;
+          type = new TypeDefinition(typedef);
         }
 
         public string name;
-        public string type_name;
-        public SupportedTypes type;
-        public RefType ref_type;
+        public TypeDefinition type;
       }
 
-      public Function(string n)
+      public Function(string n, Json.Object ret_type)
       {
         name = n;
-        return_type = SupportedTypes.kUserdata;
+        return_type = new TypeDefinition(ret_type);
         args = new List<Arg>();
+        is_static = false;
       }
 
       public string name;
-      public SupportedTypes return_type;
+      public TypeDefinition return_type;
       public List<Arg> args;
+      public bool is_static;
     }
 
     public class Class
@@ -101,6 +165,7 @@ namespace lua_parser
         name = n;
         funcs = new List<Function>();
         enums = new List<Enum>();
+        is_component = false;
       }
 
       public string name;
@@ -108,6 +173,8 @@ namespace lua_parser
 
       public List<Function> funcs;
       public List<Enum> enums;
+      public string namespaces;
+      public bool is_component;
     }
 
     protected static void Error()
@@ -117,9 +184,11 @@ namespace lua_parser
 
     protected static SupportedTypes StringToType(string name)
     {
+      string key;
       foreach (KeyValuePair<string, SupportedTypes> kv in kNameToType)
       {
-        if (kv.Key == name)
+        key = kv.Key;
+        if (key == name || name.Contains(key))
         {
           return kv.Value;
         }
@@ -130,57 +199,30 @@ namespace lua_parser
 
     protected static void AddFunction(Class cl, Json.Object mem, string name)
     {
-      Function f = new Function(name);
+      Function f = new Function(name, ((Json.Object)mem.GetValue("returnType")));
+
+      Json.Value meta;
+      if ((meta = mem.GetValue("meta")) != null)
+      {
+        Dictionary<string, Json.Value>.KeyCollection keys = ((Json.Object)meta).GetKeys();
+        if (keys.Contains("static") == true)
+        {
+          f.is_static = true;
+        }
+      }
 
       Json.Array args = (Json.Array)mem.GetValue("arguments");
 
-      f.return_type = StringToType(((Json.String)((Json.Object)mem.GetValue("returnType"))
-                                                     .GetValue("name")).GetValue());
-
       Json.Object arg;
       Function.Arg farg;
-
-      Json.Object type;
-      string named_type;
-      string ref_type;
 
       for (int i = 0; i < args.GetCount(); ++i)
       {
         arg = (Json.Object)args.GetValue(i);
 
-        farg = new Function.Arg(((Json.String)arg.GetValue("name")).GetValue());
-        farg.ref_type = RefType.kNormal;
-
-        type = ((Json.Object)arg.GetValue("type"));
-
-        if (type.GetValue("name") != null)
-        {
-          named_type = ((Json.String)type.GetValue("name")).GetValue();
-        }
-        else
-        {
-          ref_type = ((Json.String)type.GetValue("type")).GetValue();
-
-          switch (ref_type)
-          {
-            case "pointer":
-              farg.ref_type = RefType.kPointer;
-              break;
-
-            case "reference":
-              farg.ref_type = RefType.kReference;
-              break;
-
-            default:
-              farg.ref_type = RefType.kNormal;
-              break;
-          }
-
-          named_type = ((Json.String)((Json.Object)type.GetValue("baseType")).GetValue("name")).GetValue();
-        }
-
-        farg.type = StringToType(named_type);
-        farg.type_name = named_type;
+        farg = new Function.Arg(
+          ((Json.String)arg.GetValue("name")).GetValue(),
+          ((Json.Object)arg.GetValue("type")));
 
         f.args.Add(farg);
       }
@@ -217,34 +259,35 @@ namespace lua_parser
       cl.enums.Add(e);
     }
 
-    protected static bool AddLuaName(Class cl, Json.Object mem)
+    protected static void CheckMacro(Class cl, Json.Object mem)
     {
-      if (((Json.String)mem.GetValue("name")).GetValue() == "LUA_NAME")
+      string name = ((Json.String)mem.GetValue("name")).GetValue();
+      if (name == "SCRIPT_NAME")
       {
-        Json.Object meta = (Json.Object)mem.GetValue("meta");
-
-        if (meta == null)
-        {
-          return false;
-        }
-
-        cl.lua_name = meta.GetKeys().First();
-        return true;
+        AddLuaName(cl, mem);
       }
-
-      return false;
+      else if (name == "SCRIPT_COMPONENT")
+      {
+        cl.is_component = true;
+      }
     }
 
-    public static bool Parse(string json, out List<Class> classes)
+    protected static bool AddLuaName(Class cl, Json.Object mem)
     {
-      classes = new List<Class>();
+      Json.Object meta = (Json.Object)mem.GetValue("meta");
 
-      Console.Write(json);
-      Json.Value root;
-      Json.Convert(json, out root);
+      if (meta == null)
+      {
+        return false;
+      }
 
-      Json.Array values = (Json.Array)root;
+      cl.lua_name = meta.GetKeys().First();
+      return true;
+    }
 
+    protected static void RecursiveParse(Json.Array root, List<Class> classes, string ns, string json)
+    {
+      bool verbose = false;
       Json.Value v;
       Json.String type, name;
       Json.Object cl;
@@ -256,18 +299,35 @@ namespace lua_parser
       string class_name;
       string mem_type, mem_name;
 
-      bool found_lua_name = false;
-
-      for (int i = 0; i < values.GetCount(); ++i)
+      for (int i = 0; i < root.GetCount(); ++i)
       {
-        if ((v = values.GetValue(i)).IsType<Json.Object>() == true)
+        if ((v = root.GetValue(i)).IsType<Json.Object>() == true)
         {
           cl = (Json.Object)v;
           type = (Json.String)cl.GetValue("type");
 
+          if (type.GetValue() == "include")
+          {
+            continue;
+          }
+
+          if (type.GetValue() == "namespace")
+          {
+            string new_ns = ns + (ns.Length == 0 ? "" : "::") + ((Json.String)cl.GetValue("name")).GetValue();
+            RecursiveParse((Json.Array)cl.GetValue("members"), classes, new_ns, json);
+          }
+
           if (type.GetValue() != "class")
           {
             continue;
+          }
+
+          if (cl.GetKeys().Contains("meta") == true)
+          {
+            if (((Json.Object)cl.GetValue("meta")).GetKeys().Contains("verbose") == true)
+            {
+              verbose = true;
+            }
           }
 
           name = (Json.String)cl.GetValue("name");
@@ -275,7 +335,7 @@ namespace lua_parser
 
           Console.WriteLine("Parsing definition for: " + class_name);
           new_class = new Class(class_name);
-          found_lua_name = false;
+          new_class.namespaces = ns;
 
           members = (Json.Array)cl.GetValue("members");
 
@@ -297,10 +357,7 @@ namespace lua_parser
                 break;
 
               case "macro":
-                if (found_lua_name == false && AddLuaName(new_class, mem) == true)
-                {
-                  found_lua_name = true;
-                }
+                CheckMacro(new_class, mem);
                 break;
             }
           }
@@ -308,12 +365,83 @@ namespace lua_parser
           Console.WriteLine("-- Lua name: " + new_class.lua_name);
           Console.WriteLine("-- Number of functions: " + new_class.funcs.Count);
           Console.WriteLine("-- Number of enums: " + new_class.enums.Count);
+          Console.WriteLine("-- Namespaces: " + new_class.namespaces);
 
           classes.Add(new_class);
         }
       }
 
+      if (verbose == true)
+      {
+        Console.Write(json);
+      }
+    }
+
+    public static bool Parse(string json, out List<Class> classes)
+    {
+      classes = new List<Class>();
+
+      Json.Value root;
+      Json.Convert(json, out root);
+      
+      RecursiveParse((Json.Array)root, classes, "", json);
+     
       return true;
+    }
+    
+    public static string ExpandFile(string input_file, string func_macro)
+    {
+      string lines = "";
+      List<string> to_expand = new List<string>();
+
+      using (StreamReader f = File.OpenText(input_file))
+      {
+        string ex_func = func_macro + "_EX()";
+        string line = "";
+        string func_def = "";
+        int idx;
+
+        while (f.EndOfStream == false)
+        {
+          line = f.ReadLine();
+
+          if (line.Contains(ex_func) == true)
+          {
+            func_def = "";
+            idx = line.IndexOf(ex_func) + ex_func.Length;
+
+            char current = line[idx];
+            while (current != ';')
+            {
+              func_def += current;
+              ++idx;
+              current = line[idx];
+            }
+
+            func_def += ';';
+
+            to_expand.Add(func_def);
+          }
+
+          lines += line + "\n";
+        }
+      }
+
+      string expanded = "";
+
+      foreach (string ex in to_expand)
+      {
+        expanded += func_macro + "() " + ex + "\n";
+      }
+
+      lines = lines.Replace("SCRIPT_EXPAND();", expanded);
+
+      using (StreamWriter f = new StreamWriter(File.OpenWrite("temp.h")))
+      {
+        f.Write(lines);
+      }
+
+      return "temp.h";
     }
   }
 }

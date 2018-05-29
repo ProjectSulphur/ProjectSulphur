@@ -27,6 +27,7 @@ namespace sulphur
       kPlayerDelete, //!< player delete identifier
       kHeartBeat, //!< heartbeat identifier
       kRPC, //!< rpc identifier
+      kRPCValidation, //!< rpc validation identifier
       kValueSync, //!< valuesync identifier
       kValueSyncValidation //!< valuesync validation identifier
     };

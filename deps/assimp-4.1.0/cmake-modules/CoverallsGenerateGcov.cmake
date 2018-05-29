@@ -1,4 +1,4 @@
-﻿#
+#
 # The MIT License (MIT)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,7 +19,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
-# Copyright (C) 2014 Joakim SÃ¶derberg <joakim.soderberg@gmail.com>
+# Copyright (C) 2014 Joakim Söderberg <joakim.soderberg@gmail.com>
 #
 # This is intended to be run by a custom target in a CMake project like this.
 # 0. Compile program with coverage support.

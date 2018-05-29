@@ -1,0 +1,71 @@
+﻿<UserControl x:Class="sulphur.editor.controls.HierarchyViewerControl"
+             Name="hierarchy_viewer"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:sulphur.editor"
+             xmlns:utils="clr-namespace:sulphur.editor.utils"
+             xmlns:controls="clr-namespace:sulphur.editor.controls"
+             mc:Ignorable="d"
+             d:DesignHeight="300" d:DesignWidth="300">
+
+    <UserControl.Resources>
+        <HierarchicalDataTemplate x:Key="node_data_layout"
+                              DataType="{x:Type local:WorldObject}"
+                              ItemsSource="{Binding children}">
+
+            <HierarchicalDataTemplate.Resources>
+                <utils:BindingProxy x:Key="proxy"
+                            data="{StaticResource world_hierarchy}"/>
+            </HierarchicalDataTemplate.Resources>
+
+
+                <!-- Entity name label -->
+            <controls:EditBox Name="hierarchy_item" text_="{Binding Path=name}" AllowDrop="True"
+                                                                                Drop="HierarchyItemDrop">
+
+                <!--- Context menu for a single entity -->
+                <controls:EditBox.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="new child entity"
+                      Command="{Binding Source={StaticResource proxy}, Path=data.new_entity_cmd}"
+                      CommandParameter="{Binding}"/>
+                        <MenuItem Header="delete"
+                      Command="{Binding Source={StaticResource proxy}, Path=data.delete_entity_cmd}"
+                      CommandParameter="{Binding}"/>
+                        <MenuItem Header="un-parent"
+                      Command="{Binding Source={StaticResource proxy}, Path=data.unparent_entity_cmd}"
+                      CommandParameter="{Binding}"/>
+                    </ContextMenu>
+                </controls:EditBox.ContextMenu>
+            </controls:EditBox>
+        </HierarchicalDataTemplate>
+    </UserControl.Resources>
+
+    <!-- Grid is here just in case anything needs to be added to this user control -->
+    <Grid>
+        <TreeView
+        Grid.Column="0"
+        Name="hierarchy_explorer"
+        ItemsSource="{Binding Path=hierarchy.root}"
+        DataContext="{StaticResource world_hierarchy}"
+        ItemTemplate="{StaticResource node_data_layout}"
+        AllowDrop="True">
+
+            <!-- Context menu for the treeview -->
+            <TreeView.ContextMenu>
+                <ContextMenu>
+                    <ContextMenu.Resources>
+                        <utils:BindingProxy x:Key="proxy"
+                                data="{StaticResource world_hierarchy}"/>
+                    </ContextMenu.Resources>
+                    <MenuItem Header="new entity"
+                    Command="{Binding Source={StaticResource proxy}, Path=data.new_root_entity_cmd}"
+                    CommandParameter="{Binding}"/>
+                </ContextMenu>
+            </TreeView.ContextMenu>
+        </TreeView>
+    </Grid>
+
+</UserControl>

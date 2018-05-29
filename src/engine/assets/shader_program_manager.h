@@ -18,7 +18,7 @@ namespace sulphur
       /**
       * @see sulphur::engine::BaseAssetManager::ImportAsset.
       */
-      ShaderProgram* ImportAsset(const foundation::String& asset_file) override;
+      ShaderProgram* ImportAsset(const foundation::Path& asset_file) override;
       /**
       * @see sulphur::engine::BaseAssetManager::GetCacheName.
       */

@@ -2,7 +2,7 @@
 #include "tools/builder/shared/shader_compiler_includer.h"
 #include "tools/builder/pipelines/shader_pipeline_options.h"
 #include "tools/builder/shared/file_system.h"
-#include <foundation/logging/logger.h>
+#include "tools/builder/base/logger.h"
 #include <foundation/pipeline-assets/shader.h>
 #include "../glslang/SPIRV/GlslangToSpv.h"
 #include <Public/ShaderLang.h>
@@ -130,7 +130,7 @@ namespace sulphur
     bool SpvShaderCompiler::CompileShader(
       const foundation::String& shader_source,
       const foundation::ShaderAsset& shader,
-      const foundation::String& /*path*/,
+      const foundation::Path& /*path*/,
       foundation::Vector<uint8_t>& out_compiled)
     {
       glslang::InitializeProcess();
@@ -179,7 +179,8 @@ namespace sulphur
       GLSLangIncluder includer;
       for (size_t i = 0; i < options().additional_include_dirs.size(); ++i)
       {
-        includer.AddIncludeDirectory(options().additional_include_dirs[i].path().c_str());
+        includer.AddIncludeDirectory(
+          options().additional_include_dirs[i].path().GetString().c_str());
       }
 
       EShMessages messages = EShMessages::EShMsgDefault;
@@ -253,7 +254,7 @@ namespace sulphur
     {
       if (msg != nullptr && *msg != '\0')
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error, msg);
+        PS_LOG_BUILDER(Error, msg);
       }
     }
   }

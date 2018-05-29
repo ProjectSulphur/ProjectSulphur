@@ -2,6 +2,7 @@
 #include "tools/builder/pipelines/texture_pipeline.h"
 #include "tools/builder/pipelines/shader_pipeline.h"
 #include "tools/builder/shared/util.h"
+#include "tools/builder/pipelines/scene_loader.h"
 #include <foundation/io/binary_writer.h>
 #include <foundation/logging/logger.h>
 #include <foundation/pipeline-assets/shader.h>
@@ -16,7 +17,7 @@ namespace sulphur
   {
     //--------------------------------------------------------------------------------
     bool MaterialPipeline::Create(const aiScene* scene,
-      const foundation::String& scene_directory,
+      const foundation::Path& scene_directory,
       ModelFileType model_file_type,
       ShaderPipeline& shader_pipeline, 
       foundation::ModelTextureCache& texture_cache,
@@ -26,7 +27,7 @@ namespace sulphur
     {
       if (scene == nullptr)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error, 
+        PS_LOG_BUILDER(Error, 
           "scene == nullptr. No materials created.");
         return false;
       }
@@ -42,7 +43,7 @@ namespace sulphur
       if (GetCombinedReflectedShaderData(shader_pipeline, vertex_shader_id, geometry_shader_id,
         pixel_shader_id, uniform_buffers, textures, samplers) == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "Vertex and fragment shader are incompatible.");
         return false;
       }
@@ -59,7 +60,7 @@ namespace sulphur
         aiString ai_string = {};
         if (ai_mat->Get(AI_MATKEY_NAME, ai_string) != AI_SUCCESS)
         {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+          PS_LOG_BUILDER(Error,
             "Material has no name. All assets must have names. Results should be discarded.");
           return false;
         }
@@ -285,7 +286,7 @@ namespace sulphur
       foundation::ShaderData vertex_shader_asset = {};
       if(shader_pipeline.LoadAssetFromPackage(vertex_shader, vertex_shader_asset) == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "Vertex shader with id(%llu) couldn't be loaded from package.", vertex_shader);
         return false;
       }
@@ -295,7 +296,7 @@ namespace sulphur
       {
         if (shader_pipeline.LoadAssetFromPackage(geometry_shader, geometry_shader_asset) == false)
         {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+          PS_LOG_BUILDER(Error,
             "Geometry shader with id(%llu) couldn't be loaded from package.", geometry_shader);
           return false;
         }
@@ -304,7 +305,7 @@ namespace sulphur
       foundation::ShaderData pixel_shader_asset = {};
       if (shader_pipeline.LoadAssetFromPackage(pixel_shader, pixel_shader_asset) == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "Pixel shader with id(%llu) couldn't be loaded from package.", pixel_shader);
         return false;
       }
@@ -315,7 +316,7 @@ namespace sulphur
         foundation::AssetID id = textures[i];
         if (texture_pipeline.LoadAssetFromPackage(id, texture_assets[i]) == false)
         {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+          PS_LOG_BUILDER(Error,
             "Texture with id(%llu) couldn't be loaded from package.", id);
           return false;
         }
@@ -334,11 +335,11 @@ namespace sulphur
 
     //--------------------------------------------------------------------------------
     bool MaterialPipeline::CreateTextureCache(const aiScene* scene, 
-      const foundation::String& scene_directory,
+      const foundation::Path& scene_directory,
       TexturePipeline& texture_pipeline,
       foundation::ModelTextureCache& texture_cache) const
     {
-      const auto create_texture_func = [](const foundation::String& scene_directory, 
+      const auto create_texture_func = [](const foundation::Path& scene_directory, 
         foundation::ModelTextureCache& texture_cache, 
         TexturePipeline& texture_pipeline, 
         const aiMaterial* ai_mat, 
@@ -348,10 +349,10 @@ namespace sulphur
         {
           aiString ai_string = {};
           ai_mat->GetTexture(texture_type, 0, &ai_string);
-          const foundation::String texture_filepath = scene_directory +
+          const foundation::Path texture_filepath = scene_directory.GetString() +
             foundation::String(ai_string.C_Str());
 
-          if (texture_cache.texture_lookup.find(texture_filepath) ==
+          if (texture_cache.texture_lookup.find(texture_filepath.GetString()) ==
             texture_cache.texture_lookup.end())
           {
             foundation::TextureAsset texture = {};
@@ -390,20 +391,20 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------------
-    bool MaterialPipeline::PackageMaterial(const foundation::String& asset_origin, 
+    bool MaterialPipeline::PackageMaterial(const foundation::Path& asset_origin, 
       foundation::MaterialAsset& material)
     {
       if (material.name.get_length() == 0)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error, 
+        PS_LOG_BUILDER(Error, 
           "Material name not initialized. The material will not be packaged.");
         return false;
       }
 
-      foundation::String output_file = "";
+      foundation::Path output_file = "";
       if(RegisterAsset(asset_origin, material.name, output_file, material.id) == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "Failed to register the material. The material will not be packaged.");
         return false;
       }
@@ -414,7 +415,7 @@ namespace sulphur
 
       if (writer.Save() == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error, 
+        PS_LOG_BUILDER(Error, 
           "Failed to package material.");
         return false;
       }
@@ -427,7 +428,7 @@ namespace sulphur
       TexturePipeline& texture_pipeline,
       foundation::Vector<foundation::MaterialAsset>& materials) const
     {
-      for(const eastl::pair<foundation::String, int> it : texture_cache.texture_lookup)
+      for(const eastl::pair<foundation::Path, int> it : texture_cache.texture_lookup)
       {
         for(foundation::MaterialAsset& material: materials)
         {
@@ -439,7 +440,7 @@ namespace sulphur
               {
                 if(texture_pipeline.AssetExists("ps_default_texture") == false)
                 {
-                  PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+                  PS_LOG_BUILDER(Error,
                     "Default material is not in the cache.");
                   return false;
                 }
@@ -453,7 +454,7 @@ namespace sulphur
                 {
                   if (texture_pipeline.PackageTexture(it.first, texture) == false)
                   {
-                    PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+                    PS_LOG_BUILDER(Error,
                       "Failed to package texture cache.");
                     return false;
                   }
@@ -478,16 +479,19 @@ namespace sulphur
     //--------------------------------------------------------------------------------
     bool MaterialPipeline::PackageDefaultAssets()
     {
-      foundation::MaterialAsset asset = {};
-      asset.name = "ps_default_material";
-      asset.data.vertex_shader_id = foundation::GenerateId("ps_default_vertex_shader");
-      asset.data.pixel_shader_id = foundation::GenerateId("ps_default_pixel_shader");
-
-      if(PackageMaterial(ASSET_ORIGIN_USER, asset) == false)
+      if (AssetExists("ps_default_material") == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
-          "Failed to package default asset.");
-        return false;
+        foundation::MaterialAsset asset = {};
+        asset.name = "ps_default_material";
+        asset.data.vertex_shader_id = foundation::GenerateId("ps_default_vertex_shader");
+        asset.data.pixel_shader_id = foundation::GenerateId("ps_default_pixel_shader");
+
+        if (PackageMaterial(ASSET_ORIGIN_USER, asset) == false)
+        {
+          PS_LOG_BUILDER(Error,
+            "Failed to package default asset.");
+          return false;
+        }
       }
 
       return true;
@@ -502,7 +506,7 @@ namespace sulphur
     //--------------------------------------------------------------------------------
     bool MaterialPipeline::LoadTexture(const aiMaterial* ai_mat, 
       aiTextureType texture_type,
-      const foundation::String& scene_directory,
+      const foundation::Path& scene_directory,
       foundation::ModelTextureCache& texture_cache, 
       const foundation::Vector<foundation::ShaderResource>& textures, 
       foundation::MaterialData& material) const
@@ -520,7 +524,7 @@ namespace sulphur
         case aiTextureType_NORMALS: texture_name = "ps_texture_normals"; break;
         default:
         {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+          PS_LOG_BUILDER(Error,
             "Trying to load a texture of an unknown type.");
           return false;
         }
@@ -528,10 +532,10 @@ namespace sulphur
 
         aiString ai_string = {};
         ai_mat->GetTexture(texture_type, 0, &ai_string);
-        const foundation::String texture_filepath = scene_directory + 
-          foundation::String(ai_string.C_Str());
+        const foundation::Path texture_filepath = scene_directory + 
+          foundation::Path(ai_string.C_Str());
 
-        const eastl::map<foundation::String, int>::iterator it = 
+        const eastl::map<foundation::Path, int>::iterator it = 
           texture_cache.texture_lookup.find(texture_filepath);
 
         foundation::AssetID texture_id = 0;
@@ -561,7 +565,7 @@ namespace sulphur
       foundation::ShaderData vertex_shader_asset = {};
       if (shader_pipeline.LoadAssetFromPackage(vertex_shader, vertex_shader_asset) == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
+        PS_LOG_BUILDER(Warning,
           "Vertex shader with id(%llu) couldn't be loaded from package. Using default shaders instead.", 
           vertex_shader);
 
@@ -572,7 +576,7 @@ namespace sulphur
         vertex_shader_asset = {};
         if (shader_pipeline.LoadAssetFromPackage(vertex_shader, vertex_shader_asset) == false)
         {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+          PS_LOG_BUILDER(Error,
             "Default vertex shader is not in the cache.");
 
           return false;
@@ -584,7 +588,7 @@ namespace sulphur
       {
         if (shader_pipeline.LoadAssetFromPackage(geometry_shader, geometry_shader_asset) == false)
         {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+          PS_LOG_BUILDER(Error,
             "Geometry shader with id(%llu) couldn't be loaded from package.", geometry_shader);
           return false;
         }
@@ -593,7 +597,7 @@ namespace sulphur
       foundation::ShaderData pixel_shader_asset = {};
       if (shader_pipeline.LoadAssetFromPackage(pixel_shader, pixel_shader_asset) == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
+        PS_LOG_BUILDER(Warning,
           "Pixel shader with id(%llu) couldn't be loaded from package. Using default shaders instead.", 
           pixel_shader);
 
@@ -604,7 +608,7 @@ namespace sulphur
         vertex_shader_asset = {};
         if (shader_pipeline.LoadAssetFromPackage(vertex_shader, vertex_shader_asset) == false)
         {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+          PS_LOG_BUILDER(Error,
             "Default vertex shader is not in the cache.");
 
           return false;
@@ -613,7 +617,7 @@ namespace sulphur
         pixel_shader_asset = {};
         if(shader_pipeline.LoadAssetFromPackage(pixel_shader, pixel_shader_asset) == false)
         {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+          PS_LOG_BUILDER(Error,
             "Default pixel shader is not in the cache.");
 
           return false;
@@ -623,7 +627,7 @@ namespace sulphur
       // Check the shader stages
       if (vertex_shader_asset.stage != foundation::ShaderData::ShaderStage::kVertex)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "Vertex shader(%lli) is not a vertex shader.", vertex_shader);
         return false;
       }
@@ -632,7 +636,7 @@ namespace sulphur
       {
         if (geometry_shader_asset.stage != foundation::ShaderData::ShaderStage::kGeometry)
         {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+          PS_LOG_BUILDER(Error,
             "Geometry shader(%lli) is not a geometry shader.", geometry_shader);
           return false;
         }
@@ -640,7 +644,7 @@ namespace sulphur
 
       if (pixel_shader_asset.stage != foundation::ShaderData::ShaderStage::kPixel)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "Pixel shader(%lli) is not a pixel shader.", pixel_shader);
         return false;
       }
@@ -735,7 +739,7 @@ namespace sulphur
           {
             if (geom_resource.LinkerCheck(unique_resource) == false)
             {
-              PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+              PS_LOG_BUILDER(Error,
                 "Geometry shader has resource that is incompatible with the resources defined in the other shaders.");
               return false;
             }
@@ -765,7 +769,7 @@ namespace sulphur
         {
           if (pixel_resource.LinkerCheck(unique_resource) == false)
           {
-            PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+            PS_LOG_BUILDER(Error,
               "Pixel shader has resource that is incompatible with the resources defined in the other shaders.");
             return false;
           }

@@ -14,14 +14,14 @@ namespace sulphur
     */
     class ScriptableString : public ScriptableValue
     {
-      friend class foundation::Memory;
+      friend class sulphur::foundation::Memory;
     protected:
       /**
       * @brief Create a ScriptableString
-      * @param[in] script_system (ScriptSystem*) the script system to create the ScriptableString in
+      * @param[in] lua_state() (lua_State*) the Lua state to create the ScriptableString in
       * @param[in] value (const char*) the initial value of the ScriptableString
       */
-      ScriptableString(ScriptSystem* script_system, const char* value);
+      ScriptableString(ScriptState* script_state, const char * value);
     };
   }
 }

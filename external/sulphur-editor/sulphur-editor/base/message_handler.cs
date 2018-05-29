@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Diagnostics;
 
@@ -9,37 +6,64 @@ namespace sulphur
 {
   namespace editor
   {
+    /**
+     *@class sulphur.editor.MessageHandler : sulphur.editor.ISubscribeable 
+     *@brief handles incomming messages from the sulphur-engine.
+     *@author Stan Pepels  
+     */
     class MessageHandler : ISubscribeable
     {
+      /**
+       *@struct sulphur.editor.MessageHandler.Message 
+       *@brief struct for holding a message retrieved from the networking dll
+       *@author Stan Pepels  
+       */
       public struct Message
       {
-        public native.NetworkMessages id;
-        public object data;
+        public native.NetworkMessages id; //!< message id indicated how to interpret the payload
+        public object data; //!< actual data send with the message
       }
 
+      /**
+       *@brief initializes the system by creating a new thread 
+       */
       public void Initialize()
       {
         message_thread_ = new Thread(Run);
         run_ = false;
       }
 
+      /**
+       *@brief starts the system polling the message queue and connection status 
+       */
       public void Start()
       {
         run_ = true;
-        message_thread_.Start();
+        message_thread_?.Start();
       }
 
+      /**
+       *@brief stops the system polling the message loop and connection status 
+       */
       public void Terminate()
       {
         run_ = false;
-        message_thread_.Abort();
+        message_thread_?.Abort();
       }
 
+      /**
+       *@brief get the subscritions to systems we want recieve notifications from
+       *@return (sulphur.editor.Subscription[]) arrray of subscriptions to systems  
+       *@remark this system is not subscribed to any other system 
+       */
       public Subscription[] GetSubscriptions()
       {
         return null;
       }
 
+      /**
+       *@brief handle connects and disconnects 
+       */
       private void Run()
       {
         byte[] data = new byte[native.Networking.kPacketSize];
@@ -57,7 +81,7 @@ namespace sulphur
           {
             NotificationEventArgs args = new NotificationEventArgs(message,
                                                                     (uint)Notifications.kConnected,
-                                                                    ID.type_id<MessageHandler>.value());
+                                                                    id<MessageHandler>.type_id_);
             OnNotification handler = notify_subscribers;
             handler?.Invoke(this, args);
             ProcessMessages();
@@ -66,6 +90,10 @@ namespace sulphur
         }
       }
 
+      /**
+       *@brief poll the message queue and process the messages.
+       *@remark when a message comes in a notification event is fired to notify other system of the incomming message
+       */
       private void ProcessMessages()
       {
         native.Networking.Packet packet = new native.Networking.Packet();
@@ -86,32 +114,31 @@ namespace sulphur
             {
               switch (message.id)
               {
-                case native.NetworkMessages.kString:
-                  message.data = Utils.BytesToStruct<native.messages.StringMessage>(packet.data);
+                case native.NetworkMessages.kEntityMoved:
+                  message.data = Utils.BytesToStruct<native.messages.EntityMovedMessage>(packet.data);
                   break;
-                case native.NetworkMessages.kRaycastResult:
-                  native.messages.RayCastResultMessage msg =
-                    Utils.BytesToStruct<native.messages.RayCastResultMessage>(packet.data);
-                  break; 
+                case native.NetworkMessages.kEntityRotated:
+                  message.data = Utils.BytesToStruct<native.messages.EntityRotateMessage>(packet.data);
+                  break;
+                case native.NetworkMessages.kEntityScaled:
+                  message.data = Utils.BytesToStruct<native.messages.EntityScaleMessage>(packet.data);
+                  break;
               }
           
               NotificationEventArgs args = 
                 new NotificationEventArgs(message, 
                                           (uint)Notifications.kMessageRecieved,
-                                          ID.type_id<MessageHandler>.value());
+                                          id<MessageHandler>.type_id_);
               handler?.Invoke(this, args);
               break;
             }
           }
-          timer.Stop();
-          if(timer.ElapsedMilliseconds < 1000L / 60L)
-          {
-            Thread.Sleep((int)(1000L / 60L - timer.ElapsedMilliseconds));
-          }
-          timer.Reset();
         }
       }
 
+      /**
+       *@brief notify event
+       */
       event OnNotification ISubscribeable.notify_event
       {
         add
@@ -122,18 +149,24 @@ namespace sulphur
         {
           notify_subscribers -= value;
         }      
-      }
+      } 
 
+      /**
+       *@brief different notifications that can be send from this system 
+       */
       public enum Notifications : uint
       {
-        kConnectionLost,
-        kConnected,
-        kMessageRecieved
-      }
+        kConnectionLost, //<! connection with the engine was lost
+        kConnected, //<! engine got connected to the editor
+        kMessageRecieved //<! engine message recieved
+      } 
 
+      private bool run_; //<! indicates if the system is polling the message queue and managing connects and disconnects
+      private Thread message_thread_; //<! seperate thread to run the message loop on.
 
-      private bool run_;
-      private Thread message_thread_;
+      /**
+       *@brief event for notifying subscribed systems 
+       */
       public event OnNotification notify_subscribers;
     }
   }

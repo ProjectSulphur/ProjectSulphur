@@ -1,5 +1,6 @@
 #pragma once
 #include "EASTL/type_traits.h"
+
 namespace sulphur
 {
   namespace foundation
@@ -45,7 +46,7 @@ namespace sulphur
       /**
       * @brief value indicating if the Function is convertible to a function pointer
       */
-      static const bool value = std::is_convertible<Functor, ReturnType(*)(Args...)>::value;
+      static const bool value = eastl::is_convertible<Functor, ReturnType(*)(Args...)>::value;
     };
 
     /**
@@ -57,7 +58,7 @@ namespace sulphur
     template<typename Lambda>
     struct is_non_capturing_lambda
     {
-      static const bool value = is_convertible_to_function_ptr<Lambda>::value;
+      static const bool value = foundation::is_convertible_to_function_ptr<Lambda>::value;
     };
 
     /**
@@ -106,7 +107,7 @@ namespace sulphur
     * @author Raymi Klingers
     */
     template <typename T, typename... Ts>
-    struct index_of_type<T, T, Ts...> : std::integral_constant<std::size_t, 0> {};
+    struct index_of_type<T, T, Ts...> : eastl::integral_constant<std::size_t, 0> {};
     /**
     * @struct sulphur::foundation::index_of_type
     * @brief Helper specialization
@@ -115,7 +116,7 @@ namespace sulphur
     * @author Raymi Klingers
     */
     template <typename T, typename U, typename... Ts>
-    struct index_of_type<T, U, Ts...> : std::integral_constant<std::size_t, 1 + index_of_type<T, Ts...>::value> {};
+    struct index_of_type<T, U, Ts...> : eastl::integral_constant<std::size_t, 1 + index_of_type<T, Ts...>::value> {};
 
     template <typename T, typename... Ts>
     constexpr std::size_t Index_v = index_of_type<T, Ts...>::value;//<! Create templated variable alias for convenience

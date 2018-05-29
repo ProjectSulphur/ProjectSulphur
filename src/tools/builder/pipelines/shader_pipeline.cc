@@ -4,14 +4,7 @@
 #include "tools/builder/platform-specific/win32/win32_hlsl_compiler.h"
 #include "tools/builder/shared/application.h"
 
-#ifdef PS_PS4_TOOLS
-#include "tools/builder/platform-specific/ps4/ps4_pssl_compiler.h"
-#define ADDITIONALCOMPILERLIST sulphur::builder::PS4PsslCompiler, \
-                     sulphur::builder::Win32HlslCompiler
-
-#else
 #define ADDITIONALCOMPILERLIST sulphur::builder::Win32HlslCompiler
-#endif
 
 #include <foundation/io/binary_writer.h>
 #include <foundation/io/binary_reader.h>
@@ -24,25 +17,33 @@ namespace sulphur
   namespace builder 
   {
     //-----------------------------------------------------------------------------------------------
-    bool ShaderPipeline::Create(const foundation::String& shader_file, 
+    bool ShaderPipeline::Create(const foundation::Path& shader_file, 
       const ShaderPipelineOptions& options, foundation::ShaderAsset& shader)
     {
+      foundation::String extension = shader_file.GetFileExtension();
+      if (extension != "vert" && extension != "pixe" && extension != "geom" &&
+        extension != "comp" && extension != "doma" && extension != "hull")
+      {
+        PS_LOG(Error, 
+          "Shaders should have one of the following extensions: vert, pixe, geom, comp, doma or hull");
+        return false;
+      }
+
       foundation::BinaryReader reader(shader_file, false);
 
       if (reader.is_ok() == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
-          "Failed to load shader. file: %s", shader_file.c_str());
+        PS_LOG_BUILDER(Warning,
+          "Failed to load shader. file: %s", shader_file.GetString().c_str());
         return false;
       }
 
-      foundation::String source_data = reader.GetDataAsString().c_str();
 
       if (GetShaderStage(shader_file, shader.data) == false)
       {
         DeconstructCompilers();
 
-        PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
+        PS_LOG_BUILDER(Warning,
           "Failed to deduce shader stage from file extension.");
 
         return false;
@@ -50,6 +51,10 @@ namespace sulphur
 
       GetShaderName(shader_file, shader);
 
+      
+      foundation::String source_data = GetShaderDefines();
+      source_data += reader.GetDataAsString().c_str();
+      
       CreateFromSource(source_data, shader_file, shader.name.GetString(), 
         shader.data.stage, options, shader);
 
@@ -57,12 +62,12 @@ namespace sulphur
     }
 
     //-----------------------------------------------------------------------------------------------
-    bool ShaderPipeline::PackageShader(const foundation::String& asset_origin,
+    bool ShaderPipeline::PackageShader(const foundation::Path& asset_origin,
       foundation::ShaderAsset& shader)
     {
       if (shader.name.get_length() == 0)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
+        PS_LOG_BUILDER(Warning,
           "Shader name not initialized. The shader will not be packaged.");
         return false;
       }
@@ -71,15 +76,15 @@ namespace sulphur
         shader.data.spirv_data.empty() == true &&
         shader.data.pssl_data.empty() == true)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "Shader holds no binary data. The shader will not be packaged.");
         return false;
       }
 
-      foundation::String output_file = "";
+      foundation::Path output_file = "";
       if (RegisterAsset(asset_origin, shader.name, output_file, shader.id) == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
+        PS_LOG_BUILDER(Warning,
           "Failed to register shader. It will not be packaged.");
 
         return false;
@@ -87,23 +92,11 @@ namespace sulphur
 
       foundation::BinaryWriter writer(output_file);
 
-      writer.Write(shader.data.stage);
-      writer.Write(shader.data.uniform_buffers);
-      writer.Write(shader.data.inputs);
-      writer.Write(shader.data.outputs);
-      writer.Write(shader.data.storage_images);
-      writer.Write(shader.data.sampled_images);
-      writer.Write(shader.data.atomic_counters);
-      writer.Write(shader.data.push_constant_buffers);
-      writer.Write(shader.data.separate_images);
-      writer.Write(shader.data.separate_samplers);
-      writer.Write(shader.data.spirv_data);
-      writer.Write(shader.data.hlsl_data);
-      writer.Write(shader.data.pssl_data);
+      writer.Write(shader.data);
 
       if (writer.Save() == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
+        PS_LOG_BUILDER(Warning,
           "Failed to package shader.");
         return false;
       }
@@ -132,59 +125,154 @@ namespace sulphur
     }
 
     //-----------------------------------------------------------------------------------------------
-    bool ShaderPipeline::GetShaderName(const foundation::String& path, 
-      foundation::ShaderAsset& shader)
+    bool ShaderPipeline::PackageDefaultAssets()
     {
-      foundation::String name = path;
-      size_t divider = name.find_last_of("/");
-      if (divider == name.npos)
+      ShaderPipelineOptions options = {};
+      options.targets = static_cast<int>(ShaderCompilerBase::Target::kAll);
+
+      if (AssetExists("ps_default_vertex_shader") == false)
       {
-        divider = name.find_last_of("\\");
+        // Create default vertex shader
+        foundation::ShaderAsset asset = {};
+        asset.name = "ps_default_vertex_shader";
+        asset.data.stage = foundation::ShaderData::ShaderStage::kVertex;
+
+        foundation::String source = GetShaderDefines() +
+          "PS_CONSTANTBUFFER SceneCB : register(b0)                                       \n"  \
+          "{                                                                              \n"  \
+          "  row_major float4x4 model;                                                    \n"  \
+          "  row_major float4x4 view;                                                     \n"  \
+          "  row_major float4x4 projection;                                               \n"  \
+          "}                                                                              \n"  \
+          "                                                                               \n"  \
+          "struct VS_OUTPUT                                                               \n"  \
+          "{                                                                              \n"  \
+          "  float4 position : PS_VSOUTPUT;                                               \n"
+          "};                                                                             \n"  \
+          "                                                                               \n"  \
+          "struct VS_INPUT                                                                \n"  \
+          "{                                                                              \n"  \
+          "  float3 position : POSITION;                                                  \n"  \
+          "  float3 normal : NORMAL;                                                      \n"  \
+          "  float3 tangent : TANGENT;                                                    \n"  \
+          "  float2 uv : TEXCOORD;                                                        \n"  \
+          "  float4 color : COLOR;                                                        \n"  \
+          "};                                                                             \n"  \
+          "                                                                               \n"  \
+          "VS_OUTPUT main(VS_INPUT input)                                                 \n"  \
+          "{                                                                              \n"  \
+          "  VS_OUTPUT output;                                                            \n"  \
+          "                                                                               \n"  \
+          "  output.position = float4(input.position.xyz, 1.0f);                          \n"  \
+          "  float4 pos = mul(output.position, mul(model, view));                         \n"  \
+          "  output.position = mul(pos, projection);                                      \n"  \
+          "                                                                               \n"  \
+          "  return output;                                                               \n"  \
+          "}                                                                              \n";
+
+        if (CreateFromSource(source, "", asset.name.GetString(), asset.data.stage,
+          options, asset) == false)
+        {
+          PS_LOG_BUILDER(Error,
+            "Failed to create default asset.");
+          return false;
+        }
+
+        if (PackageShader(ASSET_ORIGIN_USER, asset) == false)
+        {
+          PS_LOG_BUILDER(Error,
+            "Failed to package default asset.");
+          return false;
+        }
       }
 
-      if (divider != name.npos)
+      if (AssetExists("ps_default_pixel_shader") == false)
       {
-        name.erase(0, divider + 1);
-      }
+        // Create default pixel shader
+        foundation::ShaderAsset asset = {};
+        asset.name = "ps_default_pixel_shader";
+        asset.data.stage = foundation::ShaderData::ShaderStage::kPixel;
 
-      size_t extension_start = name.find_last_of(".");;
-      if (extension_start != name.npos)
-      {
-        name.erase(extension_start, name.npos);
+        foundation::String source = GetShaderDefines() +
+          "PS_CONSTANTBUFFER SceneCB : register(b0)                                                   \n" \
+          "{                                                                                          \n" \
+          "  row_major float4x4 model;                                                                \n" \
+          "  row_major float4x4 view;                                                                 \n" \
+          "  row_major float4x4 projection;                                                           \n" \
+          "}                                                                                          \n" \
+          "                                                                                           \n" \
+          "struct VS_OUTPUT                                                                           \n" \
+          "{                                                                                          \n" \
+          "  float4 position : PS_VSOUTPUT;                                                           \n" \
+          "};                                                                                         \n" \
+          "Texture2D ps_texture_albedo : register(t0);                                                \n" \
+          "SamplerState g_sampler : register(s0);                                                     \n" \
+          "                                                                                           \n" \
+          "float4 main(VS_OUTPUT input) : PS_PSOUTPUT                                                 \n" \
+          "{                                                                                          \n" \
+          "  float4 sampled_color =  ps_texture_albedo.Sample(g_sampler, float2(0, 0)) * 0.000001;    \n" \
+          "  return float4(1.0, 0.0, 1.0, 1.0) + sampled_color;                                       \n" \
+          "}                                                                                          \n";
+
+        if (CreateFromSource(source, "", asset.name.GetString(), asset.data.stage,
+          options, asset) == false)
+        {
+          PS_LOG_BUILDER(Error,
+            "Failed to create default asset.");
+          return false;
+        }
+
+        if (PackageShader(ASSET_ORIGIN_USER, asset) == false)
+        {
+          PS_LOG_BUILDER(Error,
+            "Failed to package default asset.");
+          return false;
+        }
       }
-      shader.name = name;
 
       return true;
     }
 
     //-----------------------------------------------------------------------------------------------
-    bool ShaderPipeline::GetShaderStage(const foundation::String& path, 
+    bool ShaderPipeline::GetShaderName(const foundation::Path& path, 
+      foundation::ShaderAsset& shader)
+    {
+      if(path.is_file_path() == false)
+      {
+        return false;
+      }
+
+      shader.name = path.GetFileName();
+      return true;
+    }
+
+    //-----------------------------------------------------------------------------------------------
+    bool ShaderPipeline::GetShaderStage(const foundation::Path& path, 
       foundation::ShaderData& shader)
     {
-      size_t ext_start = path.find_last_of(".");
-      foundation::String stage_str = path.substr(ext_start, path.npos);
+      foundation::String stage_str = path.GetFileExtension();
 
-      if (stage_str == ".vert")
+      if (stage_str == "vert")
       {
         shader.stage = foundation::ShaderData::ShaderStage::kVertex;
       }
-      else if (stage_str == ".comp")
+      else if (stage_str == "comp")
       {
         shader.stage = foundation::ShaderData::ShaderStage::kCompute;
       }
-      else if (stage_str == ".doma")
+      else if (stage_str == "doma")
       {
         shader.stage = foundation::ShaderData::ShaderStage::kDomain;
       }
-      else if (stage_str == ".hull")
+      else if (stage_str == "hull")
       {
         shader.stage = foundation::ShaderData::ShaderStage::kHull;
       }
-      else if (stage_str == ".geom")
+      else if (stage_str == "geom")
       {
         shader.stage = foundation::ShaderData::ShaderStage::kGeometry;
       }
-      else if (stage_str == ".pixe")
+      else if (stage_str == "pixe")
       {
         shader.stage = foundation::ShaderData::ShaderStage::kPixel;
       }
@@ -198,7 +286,7 @@ namespace sulphur
     bool ShaderPipeline::ValidateSource(
       const foundation::String& shader_source,
       foundation::ShaderAsset& shader,
-      const foundation::String& path,
+      const foundation::Path& path,
       const ShaderPipelineOptions& options,
       foundation::Vector<uint8_t>& out_compiled)
     {
@@ -319,98 +407,8 @@ namespace sulphur
     }
 
     //-----------------------------------------------------------------------------------------------
-    bool ShaderPipeline::PackageDefaultAssets()
-    {
-      ShaderPipelineOptions options = {};
-      options.targets = static_cast<int>(ShaderCompilerBase::Target::kAll);
-
-      // Create default vertex shader
-      foundation::ShaderAsset asset = {};
-      asset.name = "ps_default_vertex_shader";
-      asset.data.stage = foundation::ShaderData::ShaderStage::kVertex;
-
-      foundation::String source = GetShaderDefines() + 
-        "PS_CONSTANTBUFFER SceneCB : register(b0)               \n"  \
-        "{                                                      \n"  \
-        "  row_major float4x4 model;                            \n"  \
-        "  row_major float4x4 view;                             \n"  \
-        "  row_major float4x4 projection;                       \n"  \
-        "}                                                      \n"  \
-        "                                                       \n"  \
-        "struct VS_OUTPUT                                       \n"  \
-        "{                                                      \n"  \
-        "  float4 position : PS_VSOUTPUT;                       \n"  \
-        "};                                                     \n"  \
-        "                                                       \n"  \
-        "struct VS_INPUT                                        \n"  \
-        "{                                                      \n"  \
-        "  float3 position : POSITION;                          \n"  \
-        "  float3 normal : NORMAL;                              \n"  \
-        "  float2 uv : TEXCOORD;                                \n"  \
-        "};                                                     \n"  \
-        "                                                       \n"  \
-        "VS_OUTPUT main(VS_INPUT input)                         \n"  \
-        "{                                                      \n"  \
-        "  VS_OUTPUT output;                                    \n"  \
-        "                                                       \n"  \
-        "  output.position = float4(input.position.xyz, 1.0f);  \n"  \
-        "  float4 pos = mul(output.position, mul(model, view)); \n"  \
-        "  output.position = mul(pos, projection);              \n"  \
-        "                                                       \n"  \
-        "  return output;                                       \n"  \
-        "}                                                      \n";
-
-      if(CreateFromSource(source, "", asset.name.GetString(), asset.data.stage, 
-        options, asset) == false)
-      {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
-          "Failed to create default asset.");
-        return false;
-      }
-
-      if(PackageShader(ASSET_ORIGIN_USER, asset) == false)
-      {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
-          "Failed to package default asset.");
-        return false;
-      }
-
-      // Create default pixel shader
-      asset.name = "ps_default_pixel_shader";
-      asset.data.stage = foundation::ShaderData::ShaderStage::kPixel;
-
-      source = GetShaderDefines() + 
-        "struct VS_OUTPUT                           \n" \
-        "{                                          \n" \
-        "  float4 position : PS_VSOUTPUT;           \n" \
-        "};                                         \n" \
-        "                                           \n" \
-        "float4 main(VS_OUTPUT input) : PS_PSOUTPUT \n" \
-        "{                                          \n" \
-        "  return float4(1.0, 0.0, 1.0, 1.0);       \n" \
-        "}                                          \n";
-
-      if (CreateFromSource(source, "", asset.name.GetString(), asset.data.stage, 
-        options, asset) == false)
-      {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
-          "Failed to create default asset.");
-        return false;
-      }
-
-      if (PackageShader(ASSET_ORIGIN_USER, asset) == false)
-      {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
-          "Failed to package default asset.");
-        return false;
-      }
-
-      return true;
-    }
-
-    //-----------------------------------------------------------------------------------------------
     bool ShaderPipeline::CreateFromSource(const foundation::String& source, 
-      const foundation::String& shader_file,
+      const foundation::Path& shader_file,
       const foundation::String& name, 
       foundation::ShaderData::ShaderStage shader_stage,
       const ShaderPipelineOptions& options,
@@ -426,8 +424,8 @@ namespace sulphur
       {
         DeconstructCompilers();
 
-        PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
-          "Shader validation failed. file: %s.", shader_file.c_str());
+        PS_LOG_BUILDER(Warning,
+          "Shader validation failed. file: %s.", shader_file.GetString().c_str());
         return false;
       }
 
@@ -488,6 +486,32 @@ namespace sulphur
         return result;
       };
 
+      spirv_cross::SPIREntryPoint& entry = compiler.get_entry_point(compiler.get_entry_points()[0]);
+
+      spirv_cross::SpecializationConstant wg_x, wg_y, wg_z;
+      compiler.get_work_group_size_specialization_constants(wg_x, wg_y, wg_z);
+
+      glm::uvec3 workgroup_size;
+      workgroup_size.x = entry.workgroup_size.x;
+      workgroup_size.y = entry.workgroup_size.y;
+      workgroup_size.z = entry.workgroup_size.z;
+
+      if (wg_x.id != 0)
+      {
+        workgroup_size.x = compiler.get_constant(wg_x.id).scalar();
+      }
+
+      if (wg_y.id != 0)
+      {
+        workgroup_size.y = compiler.get_constant(wg_y.id).scalar();
+      }
+
+      if (wg_z.id != 0)
+      {
+        workgroup_size.z = compiler.get_constant(wg_z.id).scalar();
+      }
+      
+      out_shader.workgroup_size = workgroup_size;
       out_shader.atomic_counters = copy_resources(
         resources.atomic_counters,
         foundation::ShaderResource::Types::kAtomicCounter);

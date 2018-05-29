@@ -1,4 +1,4 @@
-#include "binary_writer.h"
+#include "foundation/io/binary_writer.h"
 #include "foundation/logging/logger.h"
 #include <fstream>
 
@@ -7,44 +7,29 @@ namespace sulphur
   namespace foundation
   {
     //--------------------------------------------------------------------------------
-    BinaryWriter::BinaryWriter(const String& file) : file_(file)
+    BinaryWriter::BinaryWriter(const Path& file) : file_(file)
     {}
 
     //--------------------------------------------------------------------------------
     bool BinaryWriter::Save()
     {
-      if (file_.empty() == true)
-      {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
-          "No file name given. Nothing will be saved.");
-        return false;
-      }
-
-      if (data_.empty() == true)
-      {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
-          "Nothing was written before saving. Nothing will be saved.");
-        return false;
-      }
-
-      std::ofstream out_file(file_.c_str(), std::ios::binary | std::ios::trunc);
-      if (out_file.is_open() == true)
-      {
-        out_file.write(reinterpret_cast<char*>(data_.data()), GetSize());
-        out_file.close();
-      }
-      else
-      {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
-          "Failed to save to file. file: %s", file_.c_str());
-        return false;
-      }
-
-      return true;
+      return SaveCompressed(file_.GetString(), CompressionType::kNone);
     }
 
     //--------------------------------------------------------------------------------
     bool BinaryWriter::Save(const String& file)
+    {
+      return SaveCompressed(file, CompressionType::kNone);
+    }
+
+    //--------------------------------------------------------------------------------
+    bool BinaryWriter::SaveCompressed(CompressionType type)
+    {
+      return SaveCompressed(file_.GetString(), type);
+    }
+
+    //--------------------------------------------------------------------------------
+    bool BinaryWriter::SaveCompressed(const String& file, CompressionType type)
     {
       if (file.empty() == true)
       {
@@ -60,10 +45,30 @@ namespace sulphur
         return false;
       }
 
+      Vector<unsigned char>* data = &data_;
+      Vector<unsigned char> compressed_data = {};
+      if (type != CompressionType::kNone)
+      {
+        if(Compressor::Compress(data_, type, compressed_data) == false)
+        {
+          PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
+            "Data could not be compressed. Nothing will be saved.");
+          return false;
+        }
+        data = &compressed_data;
+      }
+
       std::ofstream out_file(file.c_str(), std::ios::binary | std::ios::trunc);
       if (out_file.is_open() == true)
       {
-        out_file.write(reinterpret_cast<char*>(data_.data()), GetSize());
+        if(type != CompressionType::kNone)
+        {
+          // Write compression header
+          out_file.write(PS_COMPRESSION_PREFIX, sizeof(PS_COMPRESSION_PREFIX));
+        }
+
+        // Write the data
+        out_file.write(reinterpret_cast<char*>(data->data()), data->size());
         out_file.close();
       }
       else
@@ -132,6 +137,12 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------------
+    void BinaryWriter::Write(const Path& val)
+    {
+      Write(val.GetString());
+    }
+
+    //--------------------------------------------------------------------------------
     void BinaryWriter::Write(const char* arrayptr, unsigned int len)
     {
       const size_t offset = data_.size();
@@ -145,7 +156,7 @@ namespace sulphur
       static_cast<const IBinarySerializable*>(serializable)->Write(*this);
     }
 
-	//--------------------------------------------------------------------------------
+  //--------------------------------------------------------------------------------
     void BinaryWriter::Write(const uint8_t* arrayptr, unsigned int len)
     {
       const size_t offset = data_.size();

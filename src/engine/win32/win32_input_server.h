@@ -1,8 +1,5 @@
-
+#pragma once
 #include "engine/application/window.h"
-#include "engine/input/mappings.h"
-
-struct GLFWwindow;
 
 namespace sulphur
 {
@@ -10,28 +7,39 @@ namespace sulphur
   {
     class PlatformInput;
 
-    // NOTE: Forwards GLFW callbacks to the input system
-    class Win32InputServer
+    /**
+     * @class sulphur::engine::Win32InputServer : public sulphur::engine::IWin32EventListener
+     * @brief The input server processes platform input events and relays them to the input system
+     * @author Maarten ten Velden, Kenneth Buijssen
+     */
+    class Win32InputServer : public IWin32EventListener
     {
     public:
-      Win32InputServer(const Win32GLFWWindowWrapper& window, PlatformInput& input_client);
-      ~Win32InputServer();
+      /**
+       * @brief Constructor
+       * @param[in] input_client (sulphur::engine::PlatformInput&)
+       *            The input system to relay the input events to
+       * @param[in] window (sulphur::engine::Win32Window&)
+       *            The window from which to recieve input
+       */
+      Win32InputServer(PlatformInput& input_client, Win32Window& window);
 
+      /**
+       * @brief Deconstructor
+       */
+      ~Win32InputServer();
+      
+      bool OnWin32Event(void* window_handle, uint message, uint64_t word_param,
+        int64_t long_param) override;
+
+      /**
+       * @brief Process any events required at the start of the frame
+       */
       void ProcessEvents();
 
     private:
-      static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
-      static void CharCallback(GLFWwindow* window, unsigned int code_point);
-      static void CursorPosCallback(GLFWwindow* window, double x_pos, double y_pos);
-      static void CursorEnterCallback(GLFWwindow* window, int entered);
-      static void MouseButtonCallback(GLFWwindow* window, int mouse_button, int action, int mods);
-      static void ScrollCallback(GLFWwindow* window, double x_offset, double y_offset);
-      static void JoystickCallback(int joy, int event);
-
-    private:
-      static PlatformInput* input_client_;
-      const Win32GLFWWindowWrapper& window_;
-
+      PlatformInput& input_client_; //!< The input system to which to send the input
+      Win32Window&   window_;       //!< The window from which to recieve input
     };
   }
 }

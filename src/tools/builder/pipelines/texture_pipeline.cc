@@ -19,19 +19,19 @@ namespace sulphur
   namespace builder 
   {
     // ------------------------------------------------------------------------
-    bool TexturePipeline::Create(const foundation::String& image_file,
+    bool TexturePipeline::Create(const foundation::Path& image_file,
       foundation::TextureAsset& texture) const
     {
-      if(image_file.empty() == true)
+      if(image_file.GetString().empty() == true)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error, 
+        PS_LOG_BUILDER(Error, 
           "image_file is empty. Texture should be discarded.");
         return false;
       }
 
       if(LoadImage(image_file, texture) == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "Failed to load the image file. Texture should be discarded.");
         return false;
       }
@@ -40,27 +40,27 @@ namespace sulphur
     }
 
     // ------------------------------------------------------------------------
-    bool TexturePipeline::PackageTexture(const foundation::String& asset_origin, 
+    bool TexturePipeline::PackageTexture(const foundation::Path& asset_origin, 
       foundation::TextureAsset& texture)
     {
       if (texture.name.get_length() == 0)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
+        PS_LOG_BUILDER(Warning,
           "Texture name not initialized. The texture will not be packaged.");
         return false;
       }
 
       if (texture.data.pixel_data.empty() == true)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "Texture holds no pixel data. The texture will not be packaged.");
         return false;
       }
 
-      foundation::String output_file = "";
+      foundation::Path output_file = "";
       if (RegisterAsset(asset_origin, texture.name, output_file, texture.id) == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
+        PS_LOG_BUILDER(Warning,
           "Failed to register texture. It will not be packaged.");
 
         return false;
@@ -68,18 +68,11 @@ namespace sulphur
 
       foundation::BinaryWriter writer(output_file);
 
-      writer.Write(texture.data.pixel_data);
-      writer.Write(texture.data.width);
-      writer.Write(texture.data.height);
-      writer.Write(texture.data.depth);
-      writer.Write(texture.data.mips);
-      writer.Write(texture.data.type);
-      writer.Write(texture.data.format);
-      writer.Write(texture.data.compression);
+      writer.Write(texture.data);
 
-      if (writer.Save() == false)
+      if (writer.SaveCompressed(foundation::CompressionType::kHighCompression) == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
+        PS_LOG_BUILDER(Warning,
           "Failed to package texture.");
         return false;
       }
@@ -102,77 +95,74 @@ namespace sulphur
     // ------------------------------------------------------------------------
     bool TexturePipeline::PackageDefaultAssets()
     {
-      foundation::TextureAsset asset = {};
-      asset.name = "ps_default_texture";
-      asset.data.pixel_data = { 255, 0, 255, 255 };
-      asset.data.width = 1;
-      asset.data.height = 1;
-      asset.data.depth = 0;
-      asset.data.mips = 0;
-      asset.data.type = foundation::TextureType::k2D;
-      asset.data.format = foundation::TexelFormat::kRGBA;
-      asset.data.compression = foundation::TextureCompressionType::kNone;
-
-      if (PackageTexture(ASSET_ORIGIN_USER, asset) == false)
+      if (AssetExists("ps_default_texture") == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
-          "Failed to package default asset.");
-        return false;
+        foundation::TextureAsset asset = {};
+        asset.name = "ps_default_texture";
+        asset.data.pixel_data = { 255, 0, 255, 255 };
+        asset.data.width = 1;
+        asset.data.height = 1;
+        asset.data.depth = 0;
+        asset.data.mips = 0;
+        asset.data.type = foundation::TextureType::k2D;
+        asset.data.format = foundation::TexelFormat::kRGBA;
+        asset.data.compression = foundation::TextureCompressionType::kNone;
+
+        if (PackageTexture(ASSET_ORIGIN_USER, asset) == false)
+        {
+          PS_LOG_BUILDER(Error,
+            "Failed to package default asset.");
+          return false;
+        }
       }
 
       return true;
     }
 
     // ------------------------------------------------------------------------
-    bool TexturePipeline::LoadImage(const foundation::String& image_file,
+    bool TexturePipeline::LoadImage(const foundation::Path& image_file,
       foundation::TextureAsset& texture) const
     {
-      if (image_file.empty() == true)
+      if (image_file.GetString().empty() == true)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "image_file is empty. Image couldn't be loaded.");
         return false;
       }
 
-      foundation::String file = image_file;
-      eastl::replace(file.begin(), file.end(), '\\', '/');
-      size_t extension_start = file.find_last_of('.');
-      size_t name_start = file.find_last_of('/') + 1;
-      foundation::String file_name = file.substr(name_start, extension_start - name_start);
-      foundation::String file_extension = file.substr(extension_start);
+      foundation::String file_name = image_file.GetFileName();
+      foundation::String file_extension = image_file.GetFileExtension();
 
-      char8_t(*to_lower_case)(char in) = eastl::CharToLower;
-      eastl::transform(file_extension.begin(), file_extension.end(), file_extension.begin(), to_lower_case);
-
-      foundation::BinaryReader reader(file);
+      foundation::BinaryReader reader(image_file);
       if(reader.is_ok() == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
-          "Failed to open image file. Image couldn't be loaded. file: %s", file.c_str());
+        PS_LOG_BUILDER(Error,
+          "Failed to open image file. Image couldn't be loaded. file: %s", 
+          image_file.GetString().c_str());
         return false;
       }
 
       const unsigned char* image_data = reader.data().data();
       const int size = static_cast<int>(reader.data().size());
 
-      if(file_extension == ".png" ||
-        file_extension == ".jpg" ||
-        file_extension == ".jpeg" ||
-        file_extension == ".bmp" ||
-        file_extension == ".tga")
+      if(file_extension == "png" ||
+        file_extension == "jpg" ||
+        file_extension == "jpeg" ||
+        file_extension == "bmp" ||
+        file_extension == "tga")
       {
-        if (LoadImageSTBI(file, texture, image_data, size) == false)
+        if (LoadImageSTBI(image_file, texture, image_data, size) == false)
         {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+          PS_LOG_BUILDER(Error,
             "Failed to load image with STBI.");
           return false;
         }
       }
-      else if(file_extension == ".dds")
+      else if(file_extension == "dds")
       {
-        if (LoadImageNVTT(file, texture, image_data, size) == false)
+        if (LoadImageNVTT(image_file, texture, image_data, size) == false)
         {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+          PS_LOG_BUILDER(Error,
             "Failed to load image with NVTT.");
           return false;
         }
@@ -184,7 +174,7 @@ namespace sulphur
     }
 
     // ------------------------------------------------------------------------
-    bool TexturePipeline::LoadImageSTBI(const foundation::String& image_file,
+    bool TexturePipeline::LoadImageSTBI(const foundation::Path& image_file,
       foundation::TextureAsset& texture,
       const unsigned char* image_data,
       const int size) const
@@ -205,8 +195,8 @@ namespace sulphur
         &real_num_channels, num_channels);
       if (texture_data == nullptr)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
-          "Failed to load texture data from image. file: %s", image_file.c_str());
+        PS_LOG_BUILDER(Error,
+          "Failed to load texture data from image. file: %s", image_file.GetString().c_str());
         return false;
       }
 
@@ -243,16 +233,16 @@ namespace sulphur
     }
 
     // ------------------------------------------------------------------------
-    bool TexturePipeline::LoadImageNVTT(const foundation::String& image_file,
+    bool TexturePipeline::LoadImageNVTT(const foundation::Path& image_file,
       foundation::TextureAsset& texture,
       const unsigned char* /*image_data*/,
       const int /*size*/) const
     {
       nv::DirectDrawSurface dds = {};
-      if (dds.load(image_file.c_str()) == false)
+      if (dds.load(image_file.GetString().c_str()) == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
-          "Failed to load texture data from image. file: %s", image_file.c_str());
+        PS_LOG_BUILDER(Error,
+          "Failed to load texture data from image. file: %s", image_file.GetString().c_str());
         return false;
       }
 
@@ -265,7 +255,7 @@ namespace sulphur
       foundation::TextureType type = {};
       if(dds.isTexture1D())
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "1D textures are not supported.");
         return false;
       }
@@ -275,7 +265,7 @@ namespace sulphur
 
         if(LoadSurface(dds, 0, 0, texture.data.pixel_data) == false)
         {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+          PS_LOG_BUILDER(Error,
             "Couldn't load the surface.");
           return false;
         }
@@ -289,7 +279,7 @@ namespace sulphur
           foundation::Vector<byte> pixel_data = {};
           if (LoadSurface(dds, i, 0, pixel_data) == false)
           {
-            PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+            PS_LOG_BUILDER(Error,
               "Couldn't load surface %i.", i);
             return false;
           }
@@ -306,7 +296,7 @@ namespace sulphur
           foundation::Vector<byte> pixel_data = {};
           if (LoadSurface(dds, i, 0, pixel_data) == false)
           {
-            PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+            PS_LOG_BUILDER(Error,
               "Couldn't load surface %i.", i);
             return false;
           }
@@ -323,7 +313,7 @@ namespace sulphur
           foundation::Vector<byte> pixel_data = {};
           if (LoadSurface(dds, i, 0, pixel_data) == false)
           {
-            PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+            PS_LOG_BUILDER(Error,
               "Couldn't load surface %i.", i);
             return false;
           }
@@ -352,7 +342,7 @@ namespace sulphur
       foundation::Vector<byte> data(data_size);
       if (dds.readSurface(face, mip, data.data(), data_size) == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "Failed to read surface from loaded texture.");
         return false;
       }
@@ -391,7 +381,7 @@ namespace sulphur
             }
             else
             {
-              PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+              PS_LOG_BUILDER(Error,
                 "Only DXT1, DXT3 and DXT5 textures are supported.");
               return false;
             }

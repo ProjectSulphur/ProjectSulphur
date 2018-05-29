@@ -16,6 +16,12 @@ namespace warning_parser
       "TeX"
     };
 
+    static string[] kSplitAt =
+    {
+      "src",
+      "external"
+    };
+
     static string StripPath(string input)
     {
       string output = "";
@@ -26,10 +32,21 @@ namespace warning_parser
         return input;
       }
 
+      bool found = false;
       int i = 0;
       for (; i < split.Length; ++i)
       {
-        if (split[i] == "src")
+        found = false;
+        foreach (string s in kSplitAt)
+        {
+          if (split[i] == s)
+          {
+            found = true;
+            break;
+          }
+        }
+
+        if (found == true)
         {
           ++i;
           break;

@@ -53,12 +53,29 @@ namespace sulphur
     TaskHandle JobGraphExt::SubmitSubTreeToPool(const String& job_name, ThreadPool& pool) const
     {
       Map<String, TaskHandle> task_map;
-      TaskHandle handle = SubmitJobToPool(job_name, pool, task_map);
+      const Job* job = FindJob(job_name);
 
-      PS_LOG_IF(handle.id == 0, Error,
-        "Could not submit sub tree of job %s: job not found", job_name.c_str());
+      if (job == nullptr)
+      {
+        PS_LOG(Error, "Could not submit sub tree of job %s: job not found", job_name.c_str());
+        return TaskHandle{ 0 };
+      }
+      
+      // Create a copy of the task to fill out and submit
+      Task task = job->task();
+      const TaskHandle task_handle = pool.Submit(std::move(task));
+      task_map[job_name] = task_handle;
 
-      return handle;
+      // Make tasks for all children
+      for (const Job& potential_child : jobs_)
+      {
+        if (potential_child.parent() == job_name)
+        {
+          SubmitJobToPool(potential_child.name(), job_name, pool, task_map);
+        }
+      }
+
+      return task_handle;
     }
 
     //--------------------------------------------------------------------------
@@ -101,6 +118,7 @@ namespace sulphur
 
     //!-------------------------------------------------------------------------
     TaskHandle JobGraphExt::SubmitJobToPool(const String& name, 
+                                            const String& root,
                                             ThreadPool& pool, 
                                             Map<String, TaskHandle>& task_map) const
     {
@@ -111,7 +129,7 @@ namespace sulphur
         return TaskHandle{0};
       }
 
-      using It = Map<String, TaskHandle>::iterator;
+      using it = Map<String, TaskHandle>::iterator;
       const Job* job = FindJob(name);
 
       if (job == nullptr)
@@ -120,7 +138,9 @@ namespace sulphur
         return TaskHandle{ 0 };
       }
 
-      It job_it = task_map.find(name);
+      PS_LOG_IF(IsJobInSubTree(*job, root) == false, Assert, "Job %s is not in subtree of %s", job->name().c_str(), root.c_str());
+
+      const it job_it = task_map.find(name);
       if (job_it != task_map.end())
       {
         return job_it->second;
@@ -132,14 +152,14 @@ namespace sulphur
       // Make sure that there are tasks for the parent and blocker and submit them
       if (job->parent() != "")
       {
-        TaskHandle parent_handle = SubmitJobToPool(job->parent(), pool, task_map);
+        TaskHandle parent_handle = SubmitJobToPool(job->parent(), root, pool, task_map);
         PS_LOG_IF(parent_handle.id == 0, Assert, "Job %s has invalid parent %s", job->name().c_str(), job->parent().c_str());
         task.set_parent(parent_handle);
       }
 
       if (job->blocker() != "")
       {
-        TaskHandle blocker_handle = SubmitJobToPool(job->blocker(), pool, task_map);
+        TaskHandle blocker_handle = SubmitJobToPool(job->blocker(), root, pool, task_map);
         PS_LOG_IF(blocker_handle.id == 0, Assert, "Job %s has invalid blocker %s", job->name().c_str(), job->parent().c_str());
         task.set_blocker(blocker_handle);
       }
@@ -152,7 +172,7 @@ namespace sulphur
       {
         if (potential_child.parent() == name)
         {
-          SubmitJobToPool(potential_child.name(), pool, task_map);
+          SubmitJobToPool(potential_child.name(), root, pool, task_map);
         }
       }
       
@@ -187,10 +207,27 @@ namespace sulphur
         job.parent().c_str(), job.name().c_str());
 
       PS_LOG_IF(!blocker, Fatal, "Could not find blocker '%s' for '%s'",
-        job.parent().c_str(), job.name().c_str());
+        job.blocker().c_str(), job.name().c_str());
 
       FindDependenciesRecursively(*parent,  dependency_buffer, mask);
       FindDependenciesRecursively(*blocker, dependency_buffer, mask);
+    }
+
+    bool JobGraphExt::IsJobInSubTree(const Job& job, const String& root) const
+    {
+      if (job.name() == root || job.parent() == root)  
+      {
+        return true;
+      }
+      
+      if (job.name().empty()) 
+      {
+        return false;
+      }
+
+      // Recurse up the tree to try and find the parent
+      const Job* parent = FindJob(job.parent());
+      return parent == nullptr ? false : IsJobInSubTree(*parent, root);
     }
 
     //--------------------------------------------------------------------------

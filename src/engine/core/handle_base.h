@@ -91,7 +91,6 @@ namespace sulphur
         return id = unique_id++;
       }
       static size_t unique_id;//!< Counter to obtain unique IDs
-
     };
 
     //-------------------------------------------------------------------------

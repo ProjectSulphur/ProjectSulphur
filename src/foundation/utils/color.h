@@ -388,6 +388,9 @@ namespace sulphur
 
       static const Color kWhiteTransparent;
       static const Color kBlackTransparent;
+      static const Color kGreenTransparent;
+      static const Color kRedTransparent;
+      static const Color kBlueTransparent;
 
       Color Transparent(float opacity = 0.0f) const;
     };

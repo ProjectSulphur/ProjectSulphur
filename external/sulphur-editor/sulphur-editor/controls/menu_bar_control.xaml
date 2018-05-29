@@ -1,0 +1,28 @@
+﻿<UserControl x:Name="root"
+             x:Class="sulphur.editor.controls.MenuBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:sulphur.editor.controls"
+             mc:Ignorable="d" 
+             d:DesignHeight="300" d:DesignWidth="300">
+    <UserControl.Resources>
+        <Style x:Key="view_item_style" TargetType="{x:Type MenuItem}">
+            <Setter Property="IsCheckable" Value="True"/>
+            <Setter Property="IsChecked" Value="{Binding Path=active}"/>
+            <Setter Property="Header" Value="{Binding Path=element.Name}"/>
+        </Style>
+    </UserControl.Resources>
+    <Menu x:Name="menu_bar" DataContext="{Binding ElementName=menu_bar}">
+        <MenuItem Header="file">
+            <MenuItem Header="new project" Command="{Binding ElementName=root, Path=create_cmd}"></MenuItem>
+            <MenuItem Header="open" Command="{Binding ElementName=root, Path=open_file_cmd}"></MenuItem>
+            <MenuItem Header="save"></MenuItem>
+        </MenuItem>
+         <MenuItem Header="view" 
+                   ItemsSource="{Binding Source={StaticResource layout}, Path=elements}" 
+                   ItemContainerStyle="{Binding Source={StaticResource view_item_style}}">
+        </MenuItem>
+    </Menu>
+</UserControl>

@@ -1,9 +1,8 @@
 #include "engine/networking/subscription_manager.h"
-
 #include "engine/networking/message_listener.h"
+#include "engine/networking/messages.h"
 
 #include <foundation/logging/logger.h>
-#include <tools/networking/export.h>
 
 namespace sulphur
 {
@@ -35,7 +34,7 @@ namespace sulphur
     //-------------------------------------------------------------------------
     void SubscriptionManager::UnsubscribeAll(IMessageListener* listener)
     {
-      for (int i = 0; i < kNumMessageTypes; ++i)
+      for (uint32_t i = 0; i < static_cast<uint32_t>(MessageID::kNumMessages); ++i)
       {
         subscriptions_[i].remove(listener);
       }

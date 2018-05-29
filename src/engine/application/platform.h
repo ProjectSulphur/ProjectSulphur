@@ -16,14 +16,3 @@ namespace sulphur
   }
 }
 #endif
-
-#ifdef PS_PS4
-#include "engine/ps4/ps4_platform.h"
-namespace sulphur
-{
-  namespace engine
-  {
-    using Platform = PS4Platform;
-  }
-}
-#endif

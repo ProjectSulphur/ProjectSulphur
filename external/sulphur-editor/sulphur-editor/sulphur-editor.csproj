@@ -18,7 +18,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\x64\Debug\</OutputPath>
+    <OutputPath>$(SolutionDir)\bin\Win64\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <DebugType>full</DebugType>
     <PlatformTarget>x64</PlatformTarget>
@@ -26,9 +26,11 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <Prefer32Bit>true</Prefer32Bit>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DocumentationFile>
+    </DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
-    <OutputPath>bin\x64\Release\</OutputPath>
+    <OutputPath>$(SolutionDir)\bin\Win64\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <Optimize>true</Optimize>
     <DebugType>pdbonly</DebugType>
@@ -37,14 +39,22 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <Prefer32Bit>true</Prefer32Bit>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DocumentationFile>
+    </DocumentationFile>
   </PropertyGroup>
   <PropertyGroup>
     <ApplicationIcon>sulphur-generator-icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="FontAwesome.WPF, Version=4.7.0.37774, Culture=neutral, PublicKeyToken=0758b07a11a4f466, processorArchitecture=MSIL">
+      <HintPath>C:\Users\Stan\Documents\Visual Studio 2015\Projects\SulphurEngine\packages\FontAwesome.WPF.4.7.0.9\lib\net40\FontAwesome.WPF.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json, Version=6.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL" />
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Numerics" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
@@ -69,11 +79,35 @@
     <Compile Include="controls\asset_browser_control.xaml.cs">
       <DependentUpon>asset_browser_control.xaml</DependentUpon>
     </Compile>
+    <Compile Include="controls\editbox.cs" />
     <Compile Include="controls\engine_host_control.cs" />
+    <Compile Include="controls\hierarchy_viewer_control.xaml.cs">
+      <DependentUpon>hierarchy_viewer_control.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\layout\dynamic_dock_splitter.cs" />
+    <Compile Include="controls\layout\dynamic_dock_tabcontrol.cs" />
+    <Compile Include="controls\layout\layout_manager.cs" />
+    <Compile Include="controls\layout\dynamic_dock.cs" />
+    <Compile Include="controls\layout\dynamic_dock_tab.cs" />
+    <Compile Include="controls\layout\tab_window.xaml.cs">
+      <DependentUpon>tab_window.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\logger_control.cs" />
+    <Compile Include="controls\menu_bar_control.xaml.cs">
+      <DependentUpon>menu_bar_control.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\project_window.xaml.cs">
+      <DependentUpon>project_window.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\toolbar_control.xaml.cs">
+      <DependentUpon>toolbar_control.xaml</DependentUpon>
+    </Compile>
     <Compile Include="data\asset_database.cs" />
+    <Compile Include="base\project.cs" />
     <Compile Include="data\workspace.cs" />
     <Compile Include="data\world_object.cs" />
     <Compile Include="data\world_hierarchy.cs" />
+    <Compile Include="doxygen_namespaces.cs" />
     <Compile Include="interfaces\ibinary_serializable.cs" />
     <Compile Include="interfaces\ibyte_convertable.cs" />
     <Compile Include="interfaces\isubscribable.cs" />
@@ -91,6 +125,26 @@
       <SubType>Code</SubType>
     </Compile>
     <Page Include="controls\asset_browser_control.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="controls\hierarchy_viewer_control.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="controls\layout\tab_window.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="controls\menu_bar_control.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="controls\project_window.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="controls\toolbar_control.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -121,6 +175,7 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
+    <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -138,11 +193,10 @@
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>copy /Y "$(ProjectDir)deps\sulphur-networking.dll" "$(ProjectDir)$(OutDir)sulphur-networking.dll"
-copy /Y "$(ProjectDir)deps\sulphur-builder-shared.dll" "$(ProjectDir)$(OutDir)sulphur-builder-shared.dll"
-copy /Y "$(ProjectDir)deps\sulphur-engine.exe" "$(ProjectDir)$(OutDir)sulphur-engine.exe"</PostBuildEvent>
+    <PostBuildEvent>
+    </PostBuildEvent>
   </PropertyGroup>
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it.
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
   </Target>

@@ -9,5 +9,8 @@
     <Application.Resources>
         <local:AssetDatabase x:Key="asset_database"/>
         <local:Workspace x:Key="workspace"/>
+        <local:WorldHierarchy x:Key="world_hierarchy"/>
+        <local:Layout x:Key="layout"/>
     </Application.Resources>
 </Application>
+<!-- ="{Binding Source={StaticResource asset_database}}" -->

@@ -32,4 +32,4 @@ SET(FoundationSources
 
 ADD_LIBRARY(sulphur-foundation STATIC ${FoundationSources})
 
-LINK_LIBS(sulphur-foundation PUBLIC EASTL EAStdC glm)
+LINK_LIBS(sulphur-foundation PUBLIC EASTL EAStdC glm lz4_static)

@@ -10,9 +10,10 @@ namespace sulphur
   namespace engine
   {
     //--------------------------------------------------------------------------------
-    ShaderProgram* ShaderProgramManager::ImportAsset(const foundation::String& asset_file)
+    ShaderProgram* ShaderProgramManager::ImportAsset(const foundation::Path& asset_file)
     {
-      foundation::BinaryReader reader(asset_file);
+      foundation::BinaryReader reader(
+        foundation::Path(application_->project_directory()) + asset_file);
       if (reader.is_ok())
       {
         foundation::ShaderData shader_data = reader.Read<foundation::ShaderData>();

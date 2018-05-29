@@ -1,33 +1,56 @@
-#include "binary_reader.h"
+#include "foundation/io/binary_reader.h"
+#include "foundation/io/filesystem.h"
 #include "foundation/logging/logger.h"
+#include "foundation/io/binary_writer.h"
 #include <fstream>
-#include "filesystem.h"
 
 namespace sulphur
 {
   namespace foundation
   {
     //--------------------------------------------------------------------------------
-    BinaryReader::BinaryReader(const String& file, bool missing_file_error)
+    BinaryReader::BinaryReader(const Path& file, bool missing_file_error)
     {
       read_pos_ = 0;
       is_ok_ = false;
 
-      foundation::SystemPath f(file);
+      foundation::Path f(file);
 
-      std::ifstream in_file(f, std::ios::binary | std::ios::ate);
+      std::ifstream in_file(f.GetString().c_str(), std::ios::binary | std::ios::ate);
       if(in_file.is_open())
       {
-        const unsigned int size = static_cast<unsigned int>(in_file.tellg());
-        data_.resize(size);
+        unsigned int size = static_cast<unsigned int>(in_file.tellg());
         in_file.seekg(0, std::ios::beg);
-        in_file.read(reinterpret_cast<char*>(data_.data()), size);
+        
+        // Read the compression header
+        char compression_prefix[sizeof(PS_COMPRESSION_PREFIX)];
+        in_file.read(compression_prefix, sizeof(PS_COMPRESSION_PREFIX));
+        if(strcmp(compression_prefix, PS_COMPRESSION_PREFIX) != 0)
+        {
+          in_file.seekg(0, std::ios::beg);
+          data_.resize(size);
+          in_file.read(reinterpret_cast<char*>(data_.data()), size);
+        }
+        else
+        {
+          size -= sizeof(PS_COMPRESSION_PREFIX);
+          Vector<unsigned char> compressed_data(size);
+          in_file.read(reinterpret_cast<char*>(compressed_data.data()), size);
+          if(Decompressor::Decompress(compressed_data, data_) == false)
+          {
+            PS_LOG_WITH(foundation::LineAndFileLogger, Error, "Failed to decompress file: %s",
+              file.GetString().c_str());
+          }
+        }
+
         in_file.close();
+
         is_ok_ = true;
       }
       else if(missing_file_error == true)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error, "Failed to read from file: %s", file.c_str());
+        PS_LOG_WITH(foundation::LineAndFileLogger, Error, "Failed to read from file: %s", 
+          file.GetString().c_str());
       }
     }
 
@@ -52,6 +75,11 @@ namespace sulphur
     //--------------------------------------------------------------------------------
     String BinaryReader::GetDataAsString() const
     {
+      if (data_.empty() == true)
+      {
+        return String();
+      }
+
       String result;
       result = reinterpret_cast<const char*>(data_.data());
       result.resize(GetSize());

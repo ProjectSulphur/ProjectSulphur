@@ -12,8 +12,6 @@
 #include "graphics/gnm/ps4_renderer.h"
 #endif
 
-#include <engine/core/world.h>
-
 #include <assert.h>
 
 namespace sulphur

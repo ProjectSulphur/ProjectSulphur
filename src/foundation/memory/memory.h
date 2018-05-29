@@ -108,10 +108,26 @@ namespace sulphur
       * @param[in] size (size_t) Size of the required memory block
       * @param[in] size (size_t) Alignment of the memory block
       * @param[in] size (sulphur::foundation::IAllocator*) Allocator to allocate the memory block which defaults to the default allocator
+      * @returns (void*) The newly allocated memory
       */
       static void* Allocate(size_t size,
         size_t alignment = kDefaultAlignment,
         IAllocator* allocator = nullptr);
+
+      /**
+      * @brief Reallocates a block of memory with specified size and allocator.
+      * @param[in] ptr (void*) A pointer to the source block of memory
+      * @param[in] size (size_t) Size of the required memory block
+      * @param[in] size (size_t) Alignment of the memory block
+      * @param[in] size (sulphur::foundation::IAllocator*) Allocator to allocate the memory block which defaults to the default allocator
+      * @returns (void*) The newly allocated memory
+      */
+      static void* Reallocate(
+        void* ptr,
+        size_t size,
+        size_t alignment = kDefaultAlignment,
+        IAllocator* allocator = nullptr);
+
       /**
       * @brief Deallocates a block of memory
       * @param[in] ptr (const void*) Pointer to memory that needs to be deallocated

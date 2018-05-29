@@ -108,18 +108,21 @@ namespace sulphur
       /**
        * @brief Perform printf style formatting on a string
        * @tparam    Args (typename...) Variadic list of argument types
+      * @param[in] verbosity (sulphur::foundation::Verbosity) The verbosity
        * @param[in] message (const sulphur::foundation::String&) The printf style format string
        * @param[in] args (Args&&...) Arguments to insert into the formatted string
        * @return (sulphur::foundation::String) The formatted string
        * @author Raymi Klingers
        */
       template<typename ...Args>
-      static String Format(const sulphur::foundation::String& message, Args&&... args)
+      static String Format(Verbosity /*verbosity*/, 
+        const sulphur::foundation::String& message, Args&&... args)
       {
         char buff[1024];// Extent string class?
 #ifdef PS_PS4
 #pragma clang diagnostic push 
 #pragma clang diagnostic ignored "-Wformat-security"
+#pragma clang diagnostic ignored "-Wnon-pod-varargs"
 #endif
         sprintf_s(buff, message.c_str(), args...);// Make this typesafe?
 #ifdef PS_PS4
@@ -140,13 +143,14 @@ namespace sulphur
       * @brief Perform printf style formatting on string,
       *        while also postfixing it with the file and line
       * @tparam    Args (typename...) Variadic list of argument types
+      * @param[in] verbosity (sulphur::foundation::Verbosity) The verbosity
       * @param[in] message (const sulphur::foundation::String&) The printf style format string
       * @param[in] args    (Args&&...) Arguments to insert into the formatted string
       * @return (sulphur::foundation::String) The formatted string
       * @author Raymi Klingers
       */
       template<typename ...Args>
-      static String Format(const String& message, Args&&... args)
+      static String Format(Verbosity /*verbosity*/, const String& message, Args&&... args)
       {
         String formatted_message = message + " at %s - line #%i in file : \n%s\n";
         char buff[2048];// Extent string class?
@@ -259,17 +263,17 @@ namespace sulphur
         case sulphur::foundation::Verbosity::kInfo:
         case sulphur::foundation::Verbosity::kWarning:
         case sulphur::foundation::Verbosity::kError:
-          Target::Print(Format::Format(message, args...));
+          Target::Print(Format::Format(verbosity, message, args...));
           break;
         case sulphur::foundation::Verbosity::kFatal:
-          Target::Print(Format::Format(message, args...));
+          Target::Print(Format::Format(verbosity, message, args...));
           exit(-1);
           break;
         case sulphur::foundation::Verbosity::kAssert:
           assert(verbosity != Verbosity::kAssert && verbosity != Verbosity::kFatal);
         case sulphur::foundation::Verbosity::kDebug:
 #ifdef _DEBUG
-          Target::Print(Format::Format(message, args...));
+          Target::Print(Format::Format(verbosity, message, args...));
 #endif
           break;
         default:

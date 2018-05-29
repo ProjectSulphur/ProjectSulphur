@@ -18,6 +18,7 @@ namespace sulphur
     enum struct RenderTargetType
     {
       kBackBuffer,
+      kGBuffer,
       kCubemap,
       kTexture2D,
       kTexture2DArray
@@ -53,47 +54,45 @@ namespace sulphur
       */
       RenderTarget(RenderTargetType type, uint width, uint height, TextureFormat format);
 
-      void set_post_process_material(const MaterialHandle& post_process_material)
-      {
-        post_process_material_ = post_process_material;
-      };
+      /**
+      * @brief This is needed for some reason, else it won't compile
+      */
+      virtual ~RenderTarget() {};
 
-      MaterialHandle post_process_material() const
-      {
-        return post_process_material_;
-      };
-
+      glm::vec4 scissor_rect() const { return scissor_rect_; };
       void set_scissor_rect(const glm::vec4& scissor_rect)
       {
         scissor_rect_ = scissor_rect;
       };
+      
+      /**
+      * @brief Swaps the two texture buffers so you can use it as a shader resource
+      */
+      virtual void SwapBuffers();
 
-      glm::vec4 scissor_rect() const
-      {
-        return scissor_rect_;
-      };
+      /**
+      * @brief Returns a handle to a texture resource (Should only be used by the renderers)
+      * @return (TextureHandle) The texture resource
+      */
+      virtual TextureHandle GetTextureResource() const;
 
-      TextureHandle GetTarget(bool use_copy = false);
-      TextureHandle GetTarget() const;
 
-      glm::u32vec2 GetTextureSize() const
+      virtual glm::u32vec2 GetTextureSize() const
       {
         return buffers_[0]->size();
       };
       
-      RenderTargetType render_target_type() const
+      virtual RenderTargetType render_target_type() const
       {
         return type_;
       }
 
-    private:
-      RenderTargetType type_;
-      bool using_copy_;
+    protected:
+      RenderTargetType type_; //<! The type of the render target
+      bool swapped_buffers_; //<! Indicates what index to use for `buffers_`
 
-      TextureHandle buffers_[2];
-      glm::vec4 scissor_rect_;
-
-      MaterialHandle post_process_material_;
+      TextureHandle buffers_[2]; //<! The texture buffers
+      glm::vec4 scissor_rect_; //<! The scissor rect
     };
   }
 }

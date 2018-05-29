@@ -6,11 +6,6 @@ namespace sulphur
 {
   namespace builder 
   {
-    class ModelPipeline;
-    class MaterialPipeline;
-    class MeshPipeline;
-    class ShaderPipeline;
-    class TexturePipeline;
     class Directory;
     enum struct Error;
 
@@ -25,15 +20,8 @@ namespace sulphur
       /**
       *@brief constructor
       *@param[in] key (const char*) key to identify this command
-      *@param[in] model_pipeline (sulphur::builder::ModelPipeline*) a model pipeline
-      *@param[in] mesh_pipeline (sulphur::builder::MeshPipeline*) a mesh pipeline
-      *@param[in] material_pipeline (sulphur::builder::MaterialPipeline*) a material pipeline
-      *@param[in] texture_pipeline (sulphur::builder::TexturePipeline*) a texture pipeline
-      *@param[in] shader_pipeline (sulphur::builder::ShaderPipeline*) a shader pipeline
       */
-      Convert(const char* key, ModelPipeline* model_pipeline,
-        MeshPipeline* mesh_pipeline, MaterialPipeline* material_pipeline,
-        TexturePipeline* texture_pipeline, ShaderPipeline* shader_pipeline);
+      Convert(const char* key);
 
       /**
       *@see sulphur::builder::Command::GetDescription
@@ -48,7 +36,6 @@ namespace sulphur
     protected:
       /**
       *@brief process all files inside folders passed via he command line
-      *@param[in] count (const unsigned int) number of times the flag specifying the directory is in the sulphur::builder::CommandInput structure
       *@param[in] input (const sulphur::builder::CommandInput&) parsed command line input containing the folders to be searched
       *@param[in] func (const eastl::function<bool(const foundation::String&)>&) function to use for converting the files
       */
@@ -77,12 +64,6 @@ namespace sulphur
       *@remark this also changes the package output location
       */
       void ResetOutputLocation();
-
-      ModelPipeline* model_pipeline_;       //!< a model pipeline passed by the constructor
-      MeshPipeline* mesh_pipeline_;         //!< a mesh pipeline passed by the constructor
-      MaterialPipeline* material_pipeline_; //!< a material pipeline passed by the constructor
-      TexturePipeline* texture_pipeline_;   //!< a texture pipeline passed by the constructor
-      ShaderPipeline* shader_pipeline_;     //!< a shader pipeline passed by the constructor
     };
 
     /**
@@ -97,15 +78,8 @@ namespace sulphur
       /**
       *@brief constructor
       *@param[in] key (const char*) key to identify this command
-      *@param[in] model_pipeline (sulphur::builder::ModelPipeline*) a model pipeline
-      *@param[in] mesh_pipeline (sulphur::builder::MeshPipeline*) a mesh pipeline
-      *@param[in] material_pipeline (sulphur::builder::MaterialPipeline*) a material pipeline
-      *@param[in] texture_pipeline (sulphur::builder::TexturePipeline*) a texture pipeline
-      *@param[in] shader_pipeline (sulphur::builder::ShaderPipeline*) a shader pipeline
       */
-      ConvertModels(const char* key, ModelPipeline* model_pipeline,
-        MeshPipeline* mesh_pipeline, MaterialPipeline* material_pipeline,
-        TexturePipeline* texture_pipeline, ShaderPipeline* shader_pipeline);
+      ConvertModels(const char* key);
 
       /**
       *@see sulphur::builder::Command::GetDescription
@@ -129,15 +103,8 @@ namespace sulphur
       /**
       *@brief constructor
       *@param[in] key (const char*) key to identify this command
-      *@param[in] model_pipeline (sulphur::builder::ModelPipeline*) a model pipeline
-      *@param[in] mesh_pipeline (sulphur::builder::MeshPipeline*) a mesh pipeline
-      *@param[in] material_pipeline (sulphur::builder::MaterialPipeline*) a material pipeline
-      *@param[in] texture_pipeline (sulphur::builder::TexturePipeline*) a texture pipeline
-      *@param[in] shader_pipeline (sulphur::builder::ShaderPipeline*) a shader pipeline
       */
-      CompileShaders(const char* key, ModelPipeline* model_pipeline,
-        MeshPipeline* mesh_pipeline, MaterialPipeline* material_pipeline,
-        TexturePipeline* texture_pipeline, ShaderPipeline* shader_pipeline);
+      CompileShaders(const char* key);
 
       /**
       *@see sulphur::builder::Command::Run
@@ -161,15 +128,108 @@ namespace sulphur
       /**
       *@brief constructor
       *@param[in] key (const char*) key to identify this command
-      *@param[in] model_pipeline (sulphur::builder::ModelPipeline*) a model pipeline
-      *@param[in] mesh_pipeline (sulphur::builder::MeshPipeline*) a mesh pipeline
-      *@param[in] material_pipeline (sulphur::builder::MaterialPipeline*) a material pipeline
-      *@param[in] texture_pipeline (sulphur::builder::TexturePipeline*) a texture pipeline
-      *@param[in] shader_pipeline (sulphur::builder::ShaderPipeline*) a shader pipeline
       */
-      ConvertTextures(const char* key, ModelPipeline* model_pipeline,
-        MeshPipeline* mesh_pipeline, MaterialPipeline* material_pipeline,
-        TexturePipeline* texture_pipeline, ShaderPipeline* shader_pipeline);
+      ConvertTextures(const char* key);
+
+      /**
+      *@see sulphur::builder::Command::Run
+      */
+      void Run(const CommandInput& input) final;
+
+      /**
+      *@see sulphur::builder::Command::GetDescription
+      */
+      const char* GetDescription() const final;
+    };
+
+    /**
+    *@class sulphur::builder::ConvertSkeletons : sulphur::builder::Convert
+    *@brief command to convert bone data from models to an engine readable binary format
+    *@author Timo van Hees
+    */
+    class ConvertSkeletons : public Convert
+    {
+    public:
+      /**
+      *@brief constructor
+      *@param[in] key (const char*) key to identify this command
+      */
+      ConvertSkeletons(const char* key);
+
+      /**
+      *@see sulphur::builder::Command::Run
+      */
+      void Run(const CommandInput& input) final;
+
+      /**
+      *@see sulphur::builder::Command::GetDescription
+      */
+      const char* GetDescription() const final;
+    };
+
+    /**
+    *@class sulphur::builder::ConvertAnimations : sulphur::builder::Convert
+    *@brief command to convert keyframe animations from models to an engine readable binary format
+    *@author Timo van Hees
+    */
+    class ConvertAnimations : public Convert
+    {
+    public:
+      /**
+      *@brief constructor
+      *@param[in] key (const char*) key to identify this command
+      */
+      ConvertAnimations(const char* key);
+
+      /**
+      *@see sulphur::builder::Command::Run
+      */
+      void Run(const CommandInput& input) final;
+
+      /**
+      *@see sulphur::builder::Command::GetDescription
+      */
+      const char* GetDescription() const final;
+    };
+
+    /**
+    *@class sulphur::builder::ConvertScript : sulphur::builder::Convert
+    *@brief command to convert lua scripts to compiled engine readable binary format
+    *@author Timo van Hees
+    */
+    class ConvertScript : public Convert
+    {
+    public:
+      /**
+      *@brief constructor
+      *@param[in] key (const char*) key to identify this command
+      */
+      ConvertScript(const char* key);
+
+      /**
+      *@see sulphur::builder::Command::Run
+      */
+      void Run(const CommandInput& input) final;
+
+      /**
+      *@see sulphur::builder::Command::GetDescription
+      */
+      const char* GetDescription() const final;
+    };
+
+    /**
+    *@class sulphur::builder::ConvertAudioBank : sulphur::builder::Convert
+    *@brief command to convert FMOD audio bank to audio bank asset.
+    *@author Timo van Hees
+    */
+    class ConvertAudioBank : public Convert
+    {
+    public:
+      /**
+      *@brief constructor
+      *@param[in] key (const char*) key to identify this command
+      */
+      ConvertAudioBank(const char* key);
 
       /**
       *@see sulphur::builder::Command::Run

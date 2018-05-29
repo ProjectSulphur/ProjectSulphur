@@ -1,6 +1,8 @@
 #pragma once
 
 #include "engine/core/handle_base.h"
+#include "engine/rewinder/rewindable_storage_base.h"
+#include "engine/rewinder/frame_storage.h"
 
 #include <foundation/utils/type_definitions.h>
 #include <foundation/utils/template_util.h>
@@ -31,14 +33,14 @@ namespace sulphur
       * @todo This should only be used in the system data.
       * @return (sulphur::engine::SparseHandle) A handle with the given index.
       */
-      explicit SparseHandle(size_t handle) :inner_handle(handle) {}
+      explicit SparseHandle( size_t handle = kInvalidHandle ) :inner_handle( handle ) {}
       /*
       * @brief Compares two handles
       * @param[in] other (const sulphur::engine::SparseHandle& other) The other handle to compare to.
       * @todo Figure out if this is still required
       * @return (bool) Are the handles identical?
       */
-      bool operator==(const SparseHandle& other) const { return inner_handle == other.inner_handle; }
+      bool operator==( const SparseHandle& other ) const { return inner_handle == other.inner_handle; }
 
       size_t inner_handle;//!< The index   
     };
@@ -57,7 +59,7 @@ namespace sulphur
       * @todo This should only be used in the system data.
       * @return (sulphur::engine::DenseHandle) A handle with the given index.
       */
-      explicit DenseHandle(size_t handle) :to_sparse_handle(handle) {}
+      explicit DenseHandle( size_t handle = kInvalidHandle ) :to_sparse_handle( handle ) {}
 
       /*
       * @brief Compares two handles
@@ -65,7 +67,7 @@ namespace sulphur
       * @todo Figure out if this is still required
       * @return (bool) Are the handles identical?
       */
-      bool operator==(const DenseHandle& other) const { return to_sparse_handle == other.to_sparse_handle; }
+      bool operator==( const DenseHandle& other ) const { return to_sparse_handle == other.to_sparse_handle; }
 
       size_t to_sparse_handle;//!< The index   
     };
@@ -86,7 +88,7 @@ namespace sulphur
       * @todo Bounds checking in debug
       * @return (T&) The element and the index.
       */
-      T& operator[](size_t index) const
+      T& operator[]( size_t index ) const
       {
         return buffer[index];
       }
@@ -96,7 +98,7 @@ namespace sulphur
       * @param[in] new_size (size_t) The size of the buffer.
       * @todo Only allow ptr to be nullptr if new_size == 0
       */
-      void set_buffer(T* ptr, size_t new_size)
+      void set_buffer( T* ptr, size_t new_size )
       {
         capacity_ = new_size;
         buffer = ptr;
@@ -106,7 +108,7 @@ namespace sulphur
       * @remarks Only use this if you store the actual size somewhere else.
       * @param[in] new_size (size_t) The size of the buffer.
       */
-      void set_capacity(size_t new_size)
+      void set_capacity( size_t new_size )
       {
         capacity_ = new_size;
       }
@@ -118,7 +120,7 @@ namespace sulphur
         return capacity_;
       }
     public:
-      T* buffer;//!< The buffer of the array
+      T * buffer;//!< The buffer of the array
     protected:
       size_t capacity_;//!< The capacity of the buffer
     };
@@ -129,19 +131,45 @@ namespace sulphur
     struct Index<T, T, Ts...> : std::integral_constant<std::size_t, 0> {};
 
     template <typename T, typename U, typename... Ts>
-    struct Index<T, U, Ts...> : std::integral_constant<std::size_t, 1 + Index<T, Ts...>::value> {}; 
+    struct Index<T, U, Ts...> : std::integral_constant<std::size_t, 1 + Index<T, Ts...>::value> {};
 
     template <typename T, typename... Ts>
     constexpr std::size_t Index_v = Index<T, Ts...>::value;
+    /*
+    * @class SystemDataBase : public RewindStorageBase
+    * @brief A class to abstract some of the non templated code out of the SystemData class. This way it can be referenced without having to template it
+    * @author Raymi Klingers
+    */
+    class SystemDataBase : public RewindStorageBase
+    {
+    public:
+      /*
+      * @brief Constructor of the systemdata that also updates a given pointer list for easy access to the internal data.
+      * @param[in] element_list_ (void**) A list that will contain pointers to the element buffers for easy access
+      * @param[in] element_sizes (uint64_t*) A pointer to the buffer sizes array
+      * @param[in] num_elements (uint64_t) Number of elements stored in the rewindable storage
+      * @return (sulphur::engine::SystemDataBase) The system data container base.
+      */
+      SystemDataBase( void** element_list, uint64_t* element_sizes, uint64_t num_elements )
+        :
+        RewindStorageBase( element_list, element_sizes, num_elements )
+      {}
+      foundation::Vector<SparseHandle> sparse_array_;//!< Array with indices that maps to the actual data indices.
+      foundation::Vector<DenseHandle> dense_to_sparse_array_;//!< Array with indices that maps from the actual data index to its sparse array index.
+      foundation::Vector<unsigned char> generation_;//!< generation of the sparse handles.
+      foundation::Vector<size_t> free_list_;//!< Free list of sparse handles.
+    };
+
 
     /*
-    * @class sulphur::engine::SystemData <...Types>
+    * @class sulphur::engine::SystemData <...Types> : public SystemDataBase
     * @brief A vector like container that stores the types in SoA format and uses a slot map to access the elements. Currently tuned towards the entity systems so it should be templatized on the variables of a component
-    * @remarks Assumes POD like elements.
+    * @remarks Assumed POD like elements but we're using it like a general container now so...
+    * @todo Improve the freelist as it should be possible to implement it without having to waste some memory
     * @author Raymi Klingers
     */
     template<typename ... Types>
-    class SystemData
+    class SystemData : public SystemDataBase
     {
     private:
       constexpr const static int kReuseThreshold = 1024;//!< How many empty slots we need before we start reusing
@@ -156,12 +184,17 @@ namespace sulphur
       * @param[in] element_list_ (void**) A list that will contain pointers to the element buffers for easy access
       * @return (sulphur::engine::SystemData) The system data container.
       */
-      SystemData(void** element_list_ = nullptr) :
-        size_(0),
-        capacity_(0),
+      SystemData(void** element_list = nullptr) :
+        SystemDataBase( buffers_, buffer_sizes_, ElementCount + 1 ),
         buffer_(nullptr),
-        element_list_(element_list_)
-      {}
+        external_element_list(element_list)
+      {
+        for ( int i = 0; i < ElementCount; ++i )
+        {
+          buffers_[i] = element_list[i];
+        }
+        buffers_[ElementCount] = this;
+      }
 
       /*
       * @brief Destructor of the systemdata that releases the data buffer
@@ -247,7 +280,7 @@ namespace sulphur
         if (free_list_.size() >= kReuseThreshold)
         {
           ret = free_list_.front();
-          free_list_.pop_front();
+          free_list_.erase( free_list_.begin() );
           dense_to_sparse_array_.emplace_back(ret);
         }
         else
@@ -278,7 +311,7 @@ namespace sulphur
         if (free_list_.size() >= kReuseThreshold)
         {
           ret = free_list_.front();
-          free_list_.pop_front();
+          free_list_.erase(free_list_.begin());
           dense_to_sparse_array_.emplace_back(ret);
         }
         else
@@ -310,7 +343,7 @@ namespace sulphur
       * @return (sulphur::engine::SystemData <typename...>::element_type <size_t>&) A reference to the variable of the component.
       */
       template<size_t Index>
-      element_type<Index>& Get(ComponentHandleBase component_handle) const 
+      element_type<Index>& Get(ComponentHandleBase component_handle) const
       {
         return eastl::get<Index>(elements_)
           .buffer[sparse_array_[component_handle.GetIndex()].inner_handle];
@@ -417,7 +450,6 @@ namespace sulphur
       {
         Resize(0);
       }
-
     private:
       /*
       * @struct sulphur::foundation::SystemData::for_each_element_method_base
@@ -525,7 +557,7 @@ namespace sulphur
         {
           using Type = element_type<Index>;
           ArrayPtr<Type>& elements = this_ptr->GetElements<Index>();
-          elements.buffer[index_to_replace] = std::move( elements.buffer[this_ptr->size_ - 1] );
+          elements.buffer[index_to_replace] = std::move(elements.buffer[this_ptr->size_ - 1]);
           elements.set_capacity(this_ptr->size_ - 1);
         }
         /*
@@ -558,7 +590,7 @@ namespace sulphur
         * @brief Removes the last index as we just moved it somewhere else.
         * @param[in] this_ptr (sulphur::engine::SystemData<Types...>*) The container that this is being called on
         */
-        inline void End(SystemData<Types...>* this_ptr) const 
+        inline void End(SystemData<Types...>* this_ptr) const
         {
           --this_ptr->size_;
         }
@@ -582,7 +614,7 @@ namespace sulphur
         {
           element_type<Index>*& elements = this_ptr->GetElement<Index>();
           elements = (element_type<Index>*)((size_t)elements + (size_t)offset);
-          this_ptr->element_list_[Index] = elements;
+          this_ptr->external_element_list[Index] = elements;
         }
       };
       /*
@@ -604,8 +636,8 @@ namespace sulphur
         {
           this_ptr->GetElements<Index>()
             .set_buffer((element_type<Index>*)buffer_size, size);
-          
-          buffer_size += 
+
+          buffer_size +=
             AlignUp((const void*)(size * sizeof(element_type<Index>)), 64);
         }
       };
@@ -629,7 +661,7 @@ namespace sulphur
         {
           for (int i = 0; i < this_ptr->size_; ++i)
           {
-            new (&(this_ptr->ElementBuffer<Index>()[i])) 
+            new (&(this_ptr->ElementBuffer<Index>()[i]))
               element_type<Index>(eastl::move(eastl::get<Index>(old_elements).buffer[i]));
           }
         }
@@ -753,7 +785,8 @@ namespace sulphur
       {
         return eastl::get<Index>(elements_);
       }
-      private:
+
+    private:
       /*
       * @brief Reallocates the memory buffer with the given size.
       * @param new_size (size_t) The new size of the buffer.
@@ -781,17 +814,50 @@ namespace sulphur
         }
         buffer_ = new_buffer;
       }
+      void PrepareRestore( const FrameStorage& storage) override
+      {
+        // Destroy all data
+        for (size_t i = 0; i < size(); ++i)
+        {
+          RemoveLast();
+        }
+        // If our capacity is big enough don't allocate something new
+        if (storage.data[0].size >= capacity())
+        {
+          // Allocate the new data
+          size_t buffer_size = 0;
+          eastl::tuple<ArrayPtr<Types>...> old_elements = elements_;
+          elements_ = eastl::tuple<ArrayPtr<Types>...>();
+
+          // Initialize the new buffer
+          ForEachElement<calculate_element_buffer_size>( storage.data[0].size, buffer_size);
+          void* new_buffer = foundation::Memory::Allocate(buffer_size);
+          ForEachElement<offset_element_buffer>(new_buffer);
+          // Set the new data
+          capacity_ = storage.data[0].size;
+          if (buffer_ != nullptr)
+          {
+            foundation::Memory::Deallocate(buffer_);
+          }
+          buffer_ = new_buffer;
+        }
+        buffers_[ElementCount] = this;
+      }      
+      virtual void PrepareStore() override
+      {
+        for ( size_t i = 0; i < ElementCount; ++i )
+        {
+          buffers_[i] = external_element_list[i];
+          element_sizes_[i] = size_;
+        }
+        buffers_[ElementCount] = this;
+      }
     private:
-      size_t size_;//!< Size of the current storage.
-      size_t capacity_;//!< Capacity of the current storage.
       void* buffer_;//!< The memory buffer that contains all the data.
       eastl::tuple<ArrayPtr<Types>...> elements_;//!< Typed element list.
-      void** element_list_;//!< Pointer to an external list which gives simple access to the data.
-      foundation::Vector<SparseHandle> sparse_array_;//!< Array with indices that maps to the actual data indices.
-      foundation::Vector<DenseHandle> dense_to_sparse_array_;//!< Array with indices that maps from the actual data index to its sparse array index.
-      foundation::Vector<unsigned char> generation_;//!< generation_ of the sparse handles.
-      foundation::Deque<size_t> free_list_;//!< Free list of sparse handles.
-      
+      size_t buffer_sizes_[ElementCount];//!< Information for the rewind storage base
+      void* buffers_[ElementCount + 1];//!< Information for the rewind storage base
+      void** external_element_list;//!< Temporary hack for easy access outside of the container
     };
   }
 }

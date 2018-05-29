@@ -3,6 +3,7 @@
 #include <foundation/io/binary_serializable.h>
 #include <foundation/containers/string.h>
 #include <foundation/utils/asset_definitions.h>
+#include <glm/glm.hpp>
 
 namespace sulphur 
 {
@@ -147,14 +148,16 @@ namespace sulphur
       };
 
       String name;                                  //!< shader name created from original fine name
-      ShaderStage stage;                            //!< specific shader stage 
+      ShaderStage stage;                            //!< specific shader stage
+      
+      glm::uvec3 workgroup_size;                    //!< Workgroup size use in a compute shader
       Vector<ShaderResource> uniform_buffers;       //!< uniform buffers used in shader
       Vector<ShaderResource> inputs;                //!< shader input resources
       Vector<ShaderResource> outputs;               //!< shader output resources
       Vector<ShaderResource> storage_images;        //!< shader image resources
       Vector<ShaderResource> sampled_images;        //!< shader sampled images resources
       Vector<ShaderResource> atomic_counters;       //!< shader atomic counters
-      Vector<ShaderResource> push_constant_buffers; //!< shader puch constant buffers
+      Vector<ShaderResource> push_constant_buffers; //!< shader push constant buffers
       Vector<ShaderResource> separate_images;       //!< hlsl texture2d resources
       Vector<ShaderResource> separate_samplers;     //!< hlsl sampler resources
 

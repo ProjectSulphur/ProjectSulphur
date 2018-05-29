@@ -3,6 +3,7 @@
 #include "foundation/containers/string.h"
 #include "foundation/io/binary_reader.h"
 #include "foundation/io/binary_writer.h"
+#include "foundation/io/filesystem.h"
 
 namespace sulphur
 {
@@ -19,8 +20,8 @@ namespace sulphur
      */
     struct PackagePtr : public IBinarySerializable
     {
-      String asset_origin;  //!< The file path of the file the asset was created from.
-      String filepath;      //!< The file path to the packaged file.
+      Path asset_origin;  //!< The file path of the file the asset was created from.
+      Path filepath;      //!< The file path to the packaged file.
 
       /**
        * @see sulphur::foundation::IBinarySerializable::Write

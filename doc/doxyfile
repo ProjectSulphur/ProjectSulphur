@@ -790,7 +790,7 @@ WARN_LOGFILE           = "warnings.txt"
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = "../src"
+INPUT                  = "../src" "../external/sulphur-editor"
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses
@@ -894,6 +894,7 @@ EXCLUDE_PATTERNS      += */imgui/*
 EXCLUDE_PATTERNS      += */test/*
 EXCLUDE_PATTERNS      += */ps4_toolkit*
 EXCLUDE_PATTERNS      += */ps4_gnf_loader*
+EXCLUDE_PATTERNS      += */sulphur-editor/obj*
 
 # The EXCLUDE_SYMBOLS tag can be used to specify one or more symbol names
 # (namespaces, classes, functions, etc.) that should be excluded from the

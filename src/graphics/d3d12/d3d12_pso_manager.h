@@ -4,6 +4,7 @@
 
 #include <foundation/containers/map.h>
 #include <engine/assets/shader.h>
+#include <engine/assets/compute_shader.h>
 
 struct ID3D12PipelineState;
 struct ID3D12RootSignature;
@@ -64,6 +65,12 @@ namespace sulphur
       * @param[in] shader (const sulphur::engine::ShaderHandle&) A shader to use with this pipeline state.
       */
       void SetPipelineState(const PipelineState& pipeline_state, const engine::ShaderHandle& shader);
+
+      /**
+      * @brief Sets the current pipeline state. This will be a compute pipeline state. Generates D3D12 resources if necessary.
+      * @param[in] compute_shader (const sulphur::engine::ComputeShaderHandle&) The compute shader to use for this pipeline state.
+      */
+      void SetPipelineState(const engine::ComputeShaderHandle& compute_shader);
 
     private:
       ID3D12PipelineState* current_pipeline_state_; //!< The currently set pipeline state.

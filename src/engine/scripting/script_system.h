@@ -1,121 +1,81 @@
 #pragma once
 #include "engine/systems/service_system.h"
 
-#include <foundation/memory/memory.h>
-#include <foundation/containers/map.h>
-#include <foundation/containers/string.h>
+#include "engine/scripting/script_state.h"
+#include "engine/scripting/script_register.h"
 
-#include <lua.hpp>
-
-namespace sulphur 
+namespace sulphur
 {
-  namespace engine 
+  namespace engine
   {
-    class Application;
-    class ScriptableValue;
-    class ScriptableCallback;
-
     /**
-    * @class sulphur::engine::ScriptSystem
-    * @brief Handles the state of the scripting environment
-    * @author Rodi Lankester
+    * @class sulphur::engine::ScriptSystem : sulphur::engine::IServiceSystem <sulpur::engine::ScriptSystem>
+    * @brief A service that acts as a manager for the script state
+    * @author Maarten ten Velden
     */
     class ScriptSystem : public IServiceSystem<ScriptSystem>
     {
     public:
       /**
-      * @brief Default constructor.
+      * @brief Default constructor
       */
       ScriptSystem();
 
       /**
-      * @see IServiceSystem::OnInitialize
+      * @see sulphur::engine::IServiceSystem::OnInitialize
       */
       void OnInitialize(Application& app, foundation::JobGraph& job_graph) override;
+
       /**
-      * @see IServiceSystem::OnTerminate
+      * @brief Initializes the script state. This function can be used reintitialze the script state when the application is allready running.
+      * @param[in] app (sulphur::engine::Application) Current running application instance.
+      */
+      void InitializeScriptState(Application& app);
+
+
+      /**
+      * @see sulphur::engine::IServiceSystem::OnTerminate
       */
       void OnTerminate() override;
-      /**
-      * @see IServiceSystem::OnUpdate
-      */
-      void OnUpdate(float delta_time) override;
-      /**
-      * @see IServiceSystem::OnFixedUpdate
-      */
-      void OnFixedUpdate() override;
 
       /**
-      * @brief Registers all callbacks in the loaded scripts
+      * @brief Registers all exposed classes to the scripting environment 
+      * @param[in] app (sulphur::engine::Application&) The application this system was created from
+      * @param[in] job_graph (sulphur::foundation::JobGraph&) The job graph of the application
+      * @remarks Static interfaces are also initialized here (e.g. sulphur::engine::ScriptableWorld)
       */
-      void RegisterCallbacks();
+      void RegisterClasses(Application& app);
 
       /**
-      * @brief Force the scripting environment to run garbage collection
+      * @brief Loads "main.lua" from the current project directory
+      * @param[in] app (sulphur::engine::Application&) The application this system was created from
       */
-      void CollectGarbage();
+      void LoadMain(Application& app);
 
       /**
-      * @brief Compiles and runs a script
-      * @param[in] data (const char*) The script data
-      * @param[in] size (size_t) The size of the script data
-      * @param[in] context (const char*) The context/name of the script
-      * @returns (bool) Did the script compile and run without errors
+      * @brief "Starts" the scripting application
+      * @param[in] project_dir (const sulphur::foundation::String&) The current project directory
       */
-      bool CompileAndRun(
-        const char* data,
-        size_t size,
-        const char* context
-      );
+      void Start(const foundation::String& project_dir);
 
       /**
-      * @brief Register a ScriptableValue to the global namespace of the scripting environment
-      * @param[in] name (const char*) The name of the global variable
-      * @param[in] value (foundation::SharedPointer <ScriptableValue>) The ScriptableValue to register
+      * @brief Get a reference to the internal script state
+      * @return (sulphur::engine::ScriptState) The active script state
       */
-      void RegisterValue(const char* name, foundation::SharedPointer<ScriptableValue> value);
-      /**
-      * @brief Get a ScriptableValue from the global namespace of the scripting environment
-      * @param[in] name (cont char*) The name of the ScriptableValue in the global namespace
-      * @return (foundation::SharedPointer <ScriptableValue>) The scriptable value
-      */
-      foundation::SharedPointer<ScriptableValue> GetValue(const char* name);
-
-      /**
-      * @brief Get a ScriptableValue from the stack
-      * @param[in] idx (int) The index of the ScriptableValue on the stack
-      * @return (foundation::SharedPointer <ScriptableValue>) The scriptable value
-      */
-      foundation::SharedPointer<ScriptableValue> GetFromStack(int idx);
-
-      /**
-      * @brief Get the lua state
-      * @return (lua_State*) The lua state
-      */
-      lua_State* lua_state()
+      ScriptState* script_state()
       {
-        return lua_state_;
-      }
-      /**
-      * @brief Get the application that this system was initialized with
-      * @return (Application&) The current application
-      */
-      Application& application()
-      {
-        return *application_;
+        return &script_state_;
       }
 
-    protected:
-      foundation::Map<
-        foundation::String,
-        foundation::SharedPointer<ScriptableValue>
-      > globals_; //!< list of globals in Lua
+    private:
+      ScriptState script_state_; //!< The script state corresponding to this ScriptSystem
+     
+      /**
+      * @brief The register used to register all exposed classes to the scripting environment
+      */
+      ScriptRegister register_;
 
-      lua_State* lua_state_; //!< The Lua state
-      Application* application_;
-
-      foundation::SharedPointer<ScriptableCallback> update_; //!< temporary update from Lua global 
-      foundation::SharedPointer<ScriptableCallback> fixed_update_; //!< temporary update from Lua global 
+      foundation::Resource<ScriptState*> script_resource_; //!< The resource for the system to use
     };
   }
 }

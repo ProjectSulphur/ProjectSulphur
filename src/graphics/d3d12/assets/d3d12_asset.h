@@ -21,9 +21,9 @@ namespace sulphur
       D3D12Resource();
 
       /**
-      * @brief Virtual destructor.
+      * @brief Destructor.
       */
-      virtual ~D3D12Resource() = 0 {}
+      ~D3D12Resource();
 
       /**
       * @brief Provides a resource barrier to transition this resource to a new state.
@@ -37,6 +37,11 @@ namespace sulphur
       D3D12_RESOURCE_STATES current_state_; //!< The current state of this resource.
       D3D12_RESOURCE_DESC resource_desc_; //!< The resource description.
       uint32_t mip_count_; //!< The amount of mip levels for this resource.
+
+      uint32_t srv_persistent_index_; //!< The handle for this texture's shader resource view/s in the persistent descriptor heap.
+      uint32_t dsv_persistent_index_; //!< The handle for this texture's depth_stencil view/s in the persistent descriptor heap.
+      uint32_t rtv_persistent_index_; //!< The handle for this texture's render target view/s in the persistent descriptor heap.
+      uint32_t uav_persistent_index_; //!< The handle for this texture's unordered access view/s in the persistent descriptor heap.
     };
 
     /**
@@ -94,17 +99,22 @@ namespace sulphur
     };
 
     /**
-    * @struct sulphur::graphics::D3D12Texture2D : sulphur::graphics::D3D12Resource
+    * @struct sulphur::graphics::D3D12Texture2D
     * @brief GPU texture 2D asset
     * @author Yana Mateeva
     */
-    struct D3D12Texture2D : public D3D12Resource
+    struct D3D12Texture2D
     {
       /**
       * @brief Constructor.
+      * @param[in] first_buffer (D3D12Resource*) The first buffer for this texture
+      * @param[in] second_buffer (D3D12Resource*) The second buffer for this texture
+      * @remarks Only specify a second buffer if this texture will/might be used as ping-pong.
       */
-      D3D12Texture2D();
-      
+      D3D12Texture2D(
+        D3D12Resource* first_buffer,
+        D3D12Resource* second_buffer = nullptr);
+
       /**
       * @brief Destructor.
       */
@@ -116,11 +126,49 @@ namespace sulphur
       bool has_srv_; //!< Does this texture have a shader resource view created?
       bool has_dsv_; //!< Does this texture have a depth-stencil view created?
       bool has_rtv_; //!< Does this texture have a render target view created?
+      bool has_uav_; //!< Does this texture have an unordered access view created?
 
-      // TODO: add handles for other descriptor types if necessary
-      uint32_t srv_persistent_index_; //!< The handle for this texture's shader resource view in the persistent descriptor heap
-      uint32_t dsv_persistent_index_; //!< The handle for this texture's depth_stencil view in the persistent descriptor heap
-      uint32_t rtv_persistent_index_; //!< The handle for this texture's render target view in the persistent descriptor heap
+      /**
+      * @return (D3D12Resource*) The current buffer.
+      */
+      D3D12Resource* buffer() { return buffers_[current_index_]; }
+
+      /**
+      * @return (uint32_t&) The current buffer resource's persistent SRV index in the persistent descriptor heap.
+      */
+      uint32_t& srv_persistent_index() { return buffer()->srv_persistent_index_; }
+
+      /**
+      * @return (uint32_t&) The current buffer resource's persistent DSV index in the persistent descriptor heap.
+      */
+      uint32_t& dsv_persistent_index() { return buffer()->dsv_persistent_index_; }
+
+      /**
+      * @return (uint32_t&) The current buffer resource's persistent RTV index in the persistent descriptor heap.
+      */
+      uint32_t& rtv_persistent_index() { return buffer()->rtv_persistent_index_; }
+
+      /**
+      * @return (uint32_t&) The current buffer resource's persistent UAV index in the persistent descriptor heap.
+      */
+      uint32_t& uav_persistent_index() { return buffer()->uav_persistent_index_; }
+
+      /**
+      * @brief Swaps the destination/source buffers
+      * @remarks Used for ping-pong textures
+      */
+      void SwapBuffers() { current_index_ = 1 - current_index_; }
+
+      /**
+      * @return (bool) Does this texture have ping-pong buffers enabled?
+      */
+      bool has_ping_pong() { return has_ping_pong_; }
+
+    private:
+      D3D12Resource* buffers_[2]; //!< The buffers associated with this texture. Two if the texture will be used as ping-pong.
+      uint32_t current_index_ = 0; //!< The currently used buffer.
+
+      bool has_ping_pong_; //!< Does this texture have ping-pong buffers enabled?
     };
 
   }

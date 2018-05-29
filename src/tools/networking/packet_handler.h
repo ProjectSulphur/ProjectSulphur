@@ -3,6 +3,7 @@
 #include "tools/networking/message.h"
 #include "tools/networking/message_type.h"
 #include "tools/networking/network_value.h"
+#include "tools/networking/rpc_data.h"
 #include <foundation/containers/deque.h>
 
 namespace sulphur
@@ -87,6 +88,28 @@ namespace sulphur
       * @param[in] type (const sulphur::networking::NetworkValueType) The type we need to check
       */
       void HostValidateValue(uint16_t id, NetworkValueType type);
+      /**
+      * @brief Send RPC to another machine
+      * @param[in] id (uint16_t) The id of the rpc we are sending
+      * @param[in] player_id (uint8_t) The id of the player (sender)
+      * @param[in] rpc_mode (sulphur::networking::RPCMode) The mode we are gonna send
+      * @param[in] arguments (const sulphur::foundation::Vector<NetworkValue>&) The arguments attached
+      * @param[in] peer (ENetPeer*) The peer we want to exclude in RPCMode::KAll and RPCMode::kOthers
+      */
+      Message ClientHostSendRPC(uint16_t id, uint8_t player_id, RPCMode rpc_mode, 
+        const foundation::Vector<NetworkValue>& arguments, ENetPeer* peer);
+      /**
+      * @brief Send RPC to another machine with a pre-created message
+      * @param[in] msg (sulphur::networking::Message) The pre-created message
+      */
+      void ClientHostSendRPC(Message msg);
+      /**
+      * @brief Send a validation message
+      * @param[in] id (uint16_t) The id of the rpc we are validating
+      * @param[in] argument_types (const sulphur::foundation::Vector<sulphur::networking::NetworkValueType>&) The argument types of the rpc
+      */
+      void HostValidateRPC(uint16_t id, 
+        const foundation::Vector<NetworkValueType>& argument_types);
       /**
       * @brief Process all incomming packets
       * @param[in] peer (ENetPeer*) The peer associated with the message

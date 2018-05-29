@@ -47,8 +47,14 @@ add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS)
 
 file(GLOB HEADERS enet/*.h)
 
+if(PS_PS4)
+	file(GLOB PS4 ps4.c)
+elseif(!PS_PS4)
+	file(GLOB PS4)
+endif(PS_PS4)
+
 add_library(enet STATIC
-		${HEADERS}
+	${HEADERS}
         callbacks.c
         compress.c
         host.c
@@ -58,5 +64,5 @@ add_library(enet STATIC
         protocol.c
         unix.c
         win32.c
-		ps4.c
+	${PS4}
     )

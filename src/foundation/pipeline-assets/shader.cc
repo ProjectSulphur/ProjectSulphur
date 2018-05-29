@@ -93,6 +93,7 @@ namespace sulphur
     void ShaderData::Write(BinaryWriter& binary_writer) const
     {
       binary_writer.Write(stage);
+      binary_writer.Write(workgroup_size);
       binary_writer.Write(uniform_buffers);
       binary_writer.Write(inputs);
       binary_writer.Write(outputs);
@@ -111,6 +112,7 @@ namespace sulphur
     void ShaderData::Read(BinaryReader& binary_reader)
     {
       stage = binary_reader.Read<ShaderStage>();
+      workgroup_size = binary_reader.Read<glm::uvec3>();
       uniform_buffers = binary_reader.ReadVector<ShaderResource>();
       inputs = binary_reader.ReadVector<ShaderResource>();
       outputs = binary_reader.ReadVector<ShaderResource>();

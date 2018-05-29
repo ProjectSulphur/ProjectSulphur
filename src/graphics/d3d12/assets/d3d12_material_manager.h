@@ -11,10 +11,12 @@ namespace sulphur
   namespace engine
   {
     class MaterialPass;
+    class ComputePass;
   }
   namespace graphics
   {
     class D3D12Device;
+    struct D3D12Resource;
     class D3D12FrameDescriptorHeap;
     class D3D12ConstantBufferHeap;
 
@@ -28,11 +30,17 @@ namespace sulphur
     {
     public:
       /**
-      * @brief Constructor.
-      * @param[in] device (sulphur::graphics::D3D12Device&) The DirectX 12 device object.
-      * @param[in] material (sulphur::engine::MaterialPass&) The engine-side representation of this material.
+      * @brief Constructor. Creates a material from a list of SRV and UAV resources.
+      * @param[in] srvs (const sulphur::foundation::Vector<sulphur::graphics::D3D12Resource*>&) The list of SRV resources for this material.
+      * @param[in] uavs (const sulphur::foundation::Vector<sulphur::graphics::D3D12Resource*>&) The list of UAV resources for this material.
       */
-      D3D12Material(D3D12Device& device, const engine::MaterialPass& material);
+      D3D12Material(const foundation::Vector<D3D12Resource*>& srvs, const foundation::Vector<D3D12Resource*>& uavs);
+
+      /**
+      * @brief Copy constructor.
+      * @param[in] other (const sulphur::graphics::D3D12Material&) The material to copy into this one.
+      */
+      D3D12Material(const D3D12Material& other);
 
       /**
       * @brief Resets the state of this object. Material state should be reset at the beginning of each frame.
@@ -53,14 +61,19 @@ namespace sulphur
       void CopyConstantBufferData(D3D12ConstantBufferHeap& constant_buffer_heap);
 
       /**
-      * @return (D3D12_GPU_DESCRIPTOR_HANDLE) A GPU handle to the beginning of the SRV descriptor table in the frame descriptor heap.
+      * @return (const foundation::Vector<uint32_t>&) The persistent SRV handles for resources bound to this material.
       */
-      D3D12_GPU_DESCRIPTOR_HANDLE srv_descriptor_table_handle() const { return srv_descriptor_table_handle_; }
+      const foundation::Vector<uint32_t>& persistent_srv_handles() const { return persistent_srv_handles_; }
 
       /**
-      * @return (D3D12_GPU_DESCRIPTOR_HANDLE) A GPU handle to the beginning of the UAV descriptor table in the frame descriptor heap.
+      * @return (const foundation::Vector<uint32_t>&) The persistent UAV handles for resources bound to this material.
       */
-      D3D12_GPU_DESCRIPTOR_HANDLE uav_descriptor_table_handle() const { return uav_descriptor_table_handle_; }
+      const foundation::Vector<uint32_t>& persistent_uav_handles() const { return persistent_uav_handles_; }
+
+      /**
+      * @return (D3D12_GPU_DESCRIPTOR_HANDLE) A GPU handle to the beginning of the SRV descriptor table in the frame descriptor heap.
+      */
+      D3D12_GPU_DESCRIPTOR_HANDLE descriptor_table_handle() const { return descriptor_table_handle_; }
 
       /**
       * @return (D3D12_GPU_VIRTUAL_ADDRESS) A GPU handle to the constant buffer.
@@ -77,8 +90,7 @@ namespace sulphur
       foundation::Vector<uint32_t> persistent_srv_handles_; //!< Collection of persistent SRV handles for this material.
       foundation::Vector<uint32_t> persistent_uav_handles_; //!< Collection of persistent UAV handles for this material.
 
-      D3D12_GPU_DESCRIPTOR_HANDLE srv_descriptor_table_handle_; //!< A GPU handle to the beginning of the SRV descriptor table in the frame descriptor heap.
-      D3D12_GPU_DESCRIPTOR_HANDLE uav_descriptor_table_handle_; //!< A GPU handle to the beginning of the UAV descriptor table in the frame descriptor heap.
+      D3D12_GPU_DESCRIPTOR_HANDLE descriptor_table_handle_; //!< A GPU handle to the beginning of the descriptor table for this material.
       D3D12_GPU_VIRTUAL_ADDRESS constant_buffer_handle_; //!< A GPU handle to the constant buffer.
     };
 
@@ -109,8 +121,9 @@ namespace sulphur
 
       /**
       * @brief Sets the currently used material.
+      * @param[in] material (const sulphur::graphics::D3D12Material&) The material to set.
       */
-      void SetMaterial(const engine::MaterialPass& material);
+      void SetMaterial(const D3D12Material& material);
 
       /**
       * @return (D3D12Material*) The currently set material.

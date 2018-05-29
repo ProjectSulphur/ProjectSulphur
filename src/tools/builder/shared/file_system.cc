@@ -5,58 +5,35 @@
 
 namespace std_filesystem = std::experimental::filesystem::v1;
 
-namespace sulphur 
+namespace sulphur
 {
-  namespace builder 
+  namespace builder
   {
     //-----------------------------------------------------------------------------------------------
     Directory::Directory() :
-      path_("./")
-    {
-    }
+      path_("")
+    {}
 
     //-----------------------------------------------------------------------------------------------
     Directory::Directory(const char* path) :
       path_(path)
-    {
-      eastl::replace_if(path_.begin(), path_.end(), IsForwardSlash, '/');
-
-      if (path_.empty() == true)
-      {
-        path_ += "./";
-      }
-      else if (path_.back() != '/')
-      {
-        path_ += "/";
-      }
-    }
+    {}
 
     //-----------------------------------------------------------------------------------------------
     Directory::Directory(const foundation::String& path) :
       path_(path)
-    {
-      eastl::replace_if(path_.begin(), path_.end(), IsForwardSlash, '/');
-
-      if (path_.empty() == true)
-      {
-        path_ += "./";
-      }
-      else if (path_.back() != '/')
-      {
-        path_ += "/";
-      }
-    }
+    {}
 
     //-----------------------------------------------------------------------------------------------
     bool Directory::operator==(const foundation::String& path)
     {
-      return path == path_;
+      return path_ == path;
     }
 
     //-----------------------------------------------------------------------------------------------
     bool Directory::operator==(const char* path)
     {
-      return path == path_;
+      return path_ == path;
     }
 
     //-----------------------------------------------------------------------------------------------
@@ -69,12 +46,12 @@ namespace sulphur
     foundation::Vector<Directory> Directory::GetSubDirs() const
     {
       foundation::Vector<Directory> result;
-      std_filesystem::directory_iterator dir_iter = 
-        std_filesystem::directory_iterator(path_.c_str());
+      std_filesystem::directory_iterator dir_iter =
+        std_filesystem::directory_iterator(path_.GetString().c_str());
 
-      while(dir_iter != std_filesystem::end(dir_iter))
+      while (dir_iter != std_filesystem::end(dir_iter))
       {
-        if(std_filesystem::is_directory(dir_iter->path()) == true)
+        if (std_filesystem::is_directory(dir_iter->path()) == true)
         {
           Directory directory = Directory(dir_iter->path().string().c_str());
           result.push_back(directory);
@@ -87,7 +64,7 @@ namespace sulphur
     //-----------------------------------------------------------------------------------------------
     Directory Directory::GetParentDir() const
     {
-      foundation::String path = foundation::String(path_);
+      foundation::String path = path_.GetString();
       size_t last_div = path.find_last_of("\\");
       Directory parent_dir = Directory(path.substr(0, last_div));
       return parent_dir;
@@ -97,8 +74,8 @@ namespace sulphur
     foundation::Vector<Directory> Directory::GetSubDirsRecursive() const
     {
       foundation::Vector<Directory> result;
-      std_filesystem::recursive_directory_iterator dir_iter = 
-        std_filesystem::recursive_directory_iterator(path_.c_str());
+      std_filesystem::recursive_directory_iterator dir_iter =
+        std_filesystem::recursive_directory_iterator(path_.GetString().c_str());
 
       while (dir_iter != std_filesystem::end(dir_iter))
       {
@@ -115,17 +92,22 @@ namespace sulphur
     }
 
     //-----------------------------------------------------------------------------------------------
-    foundation::Vector<foundation::String> Directory::GetFiles() const
+    foundation::Vector<foundation::Path> Directory::GetFiles() const
     {
-      foundation::Vector<foundation::String> result;
-      std_filesystem::directory_iterator dir_iter = 
-        std_filesystem::directory_iterator(path_.c_str());
+      foundation::String temp_path = path_.GetString();
+      if(temp_path.empty() == true)
+      {
+        temp_path = "./";
+      }
+      foundation::Vector<foundation::Path> result = {};
+      std_filesystem::directory_iterator dir_iter =
+        std_filesystem::directory_iterator(temp_path.c_str());
 
       while (dir_iter != std_filesystem::end(dir_iter))
       {
         if (std_filesystem::is_regular_file(dir_iter->path()) == true)
         {
-          foundation::String path = foundation::String(dir_iter->path().string().c_str());
+          foundation::Path path = dir_iter->path().string().c_str();
           result.push_back(path);
         }
         ++dir_iter;
@@ -134,17 +116,22 @@ namespace sulphur
     }
 
     //-----------------------------------------------------------------------------------------------
-    foundation::Vector<foundation::String> Directory::GetFilesRecursive() const
+    foundation::Vector<foundation::Path> Directory::GetFilesRecursive() const
     {
-      foundation::Vector<foundation::String> result;;
-      std_filesystem::recursive_directory_iterator dir_iter = 
-        std_filesystem::recursive_directory_iterator(path_.c_str());
+      foundation::String temp_path = path_.GetString();
+      if (temp_path.empty() == true)
+      {
+        temp_path = "./";
+      }
+      foundation::Vector<foundation::Path> result;;
+      std_filesystem::recursive_directory_iterator dir_iter =
+        std_filesystem::recursive_directory_iterator(temp_path.c_str());
 
       while (dir_iter != std_filesystem::end(dir_iter))
       {
         if (std_filesystem::is_regular_file(dir_iter->path()) == true)
         {
-          foundation::String path = foundation::String(dir_iter->path().string().c_str());
+          foundation::Path path = dir_iter->path().string().c_str();
           result.push_back(path);
         }
         ++dir_iter;
@@ -153,31 +140,40 @@ namespace sulphur
     }
 
     //-----------------------------------------------------------------------------------------------
-    foundation::String Directory::path() const
+    foundation::Path Directory::path() const
     {
       return path_;
     }
 
     //-----------------------------------------------------------------------------------------------
-    foundation::String Directory::GetAbsolutePath() const
+    foundation::Path Directory::GetAbsolutePath() const
     {
-      foundation::String result = path_;
-      result = std_filesystem::system_complete(result.c_str()).string().c_str();
+      foundation::Path result = path_;
+      result = std_filesystem::system_complete(result.GetString().c_str()).string().c_str();
       return result;
     }
 
     //-----------------------------------------------------------------------------------------------
     bool Directory::Exists() const
     {
-      return std_filesystem::exists(path_.c_str());
+      if(path_.IsEmpty() == true)
+      {
+        return true;
+      }
+      return std_filesystem::exists(path_.GetString().c_str());
     }
 
     //-----------------------------------------------------------------------------------------------
     void Directory::Create() const
     {
+      if(path_.IsEmpty())
+      {
+        return;
+      }
+
       if (Exists() == false)
       {
-        std_filesystem::create_directory(path_.c_str());
+        std_filesystem::create_directory(path_.GetString().c_str());
       }
     }
 
@@ -189,6 +185,20 @@ namespace sulphur
         return true;
       }
       return false;
+    }
+
+    //-----------------------------------------------------------------------------------------------
+    bool Path::IsRelative(const foundation::String& path)
+    {
+      std_filesystem::path p = path.c_str();
+      return p.is_relative();
+    }
+
+    //-----------------------------------------------------------------------------------------------
+    bool Path::IsAbsolute(const foundation::String& path)
+    {
+      std_filesystem::path p = path.c_str();
+      return p.is_absolute();
     }
   }
 }

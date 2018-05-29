@@ -43,6 +43,8 @@ namespace sulphur
     {
       if (heap_ != nullptr)
       {
+        heap_->Unmap(0, nullptr);
+
         heap_->Release();
       }
 

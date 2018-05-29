@@ -3,16 +3,21 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:sulphur.editor"
         xmlns:controls="clr-namespace:sulphur.editor.controls"
         mc:Ignorable="d"
-        Title="sulphur-editor" Width="1280" 
+        Title="Sulphur editor" Width="1280" 
                                Height="720"
         Icon="./sulphur-generator-icon.ico">
-
     <DockPanel LastChildFill="True">
-        <controls:AssetBrowserControl x:Name="asset_browser" DockPanel.Dock="Bottom" Height="200"/>
-        <controls:EngineHostControl x:Name="engine" DockPanel.Dock="Top"/>
+        <controls:MenuBar x:Name="menu_bar" DockPanel.Dock="Top"></controls:MenuBar>
+        <controls:ToolbarControl x:Name="toolbar" DockPanel.Dock="Top" Height="32"/>
+
+        <controls:DynamicDock x:Name="dynamic_dock" DockPanel.Dock="Left">
+            <controls:AssetBrowserControl x:Name="asset_browser" DockPanel.Dock="Bottom" Height="150" controls:DynamicDock.Group="0"/>
+            <controls:HierarchyViewerControl x:Name="hierarchy_viewer" DockPanel.Dock="Left" Width="200"/>
+            <controls:Logger x:Name="logger" controls:DynamicDock.Group="0"/>
+            <controls:EngineHostControl x:Name="engine" DockPanel.Dock="Top"/>
+        </controls:DynamicDock>
     </DockPanel>
-    
+
 </Window>

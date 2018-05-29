@@ -16,9 +16,10 @@ namespace sulphur
     */
     struct NetworkPlayerData
     {
-      NetworkPlayerData() : id(0) {};
+      NetworkPlayerData() : id(0), ping(0) {};
       char name[kNameLength]; //!<The name
       uint8_t id; //!<The id
+      unsigned int ping; //!<The ping of the player
     };
 
     /**
@@ -70,6 +71,11 @@ namespace sulphur
       */
       void set_last_heartbeat_sent(float heartbeat);
       /**
+      * @brief Set the round trip time
+      * @param[in] rtt (unsigned int) The round trip time
+      */
+      void set_round_trip_time(unsigned int rtt);
+      /**
       * @brief Retrieve the peer
       * @return (ENetPeer*) the peer
       */
@@ -99,6 +105,11 @@ namespace sulphur
       * @return (float) the heartbeat
       */
       float last_heartbeat_sent() const;
+      /**
+      * @brief Retrieve the round trip time
+      * @return (unsigned int) the round trip time
+      */
+      unsigned int round_trip_time() const;
     private:
       ENetPeer * peer_; //!<The peer
       char name_[kNameLength]; //!<The name
@@ -106,6 +117,7 @@ namespace sulphur
       uint8_t id_; //!<The id
       float last_heartbeat_; //!<The last time we recieved a heartbeat
       float last_heartbeat_sent_; //!<The last time we sent a heartbeat
+      unsigned int round_trip_time_; //!<The round trip time
     };
   }
 }

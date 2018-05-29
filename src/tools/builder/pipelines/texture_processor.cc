@@ -1,6 +1,5 @@
 #include "tools/builder/pipelines/texture_processor.h"
-
-#include <foundation/logging/logger.h>
+#include "tools/builder/base/logger.h"
 
 #include <nvtt/nvtt.h>
 
@@ -44,7 +43,7 @@ namespace sulphur
     // ------------------------------------------------------------------------
     void TextureProcessor::error(nvtt::Error error)
     {
-      PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+      PS_LOG_BUILDER(Error,
         nvtt::errorString(error));
     }
   }

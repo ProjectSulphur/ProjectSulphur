@@ -22,7 +22,7 @@ namespace sulphur
       *            The Lua state to create an instance of ScriptableUserData in
       * @param[in] value (void*) pointer to the UserData to expose to Lua
       */
-      ScriptableUserData(ScriptSystem* script_system, void* value);
+      ScriptableUserData(ScriptState* script_state, void* value);
     };
 
   }

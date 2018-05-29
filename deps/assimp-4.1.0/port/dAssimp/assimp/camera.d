@@ -1,4 +1,4 @@
-﻿/*
+/*
 ---------------------------------------------------------------------------
 Open Asset Import Library (ASSIMP)
 ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ extern ( C ) {
     * }
     * ---
     *
-    * Note: Some file formats (such as 3DS, ASE) export a "target point" â€“ the
+    * Note: Some file formats (such as 3DS, ASE) export a "target point" – the
     *    point the camera is looking at (it can even be animated). Assimp
     *    writes the target point as a subnode of the camera's main node, called
     *    "<camName>.Target". However, this is just additional information; the

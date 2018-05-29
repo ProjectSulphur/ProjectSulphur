@@ -13,6 +13,7 @@ namespace sulphur
     class Application
     {
     public:
+      Application();
       /**
        * @brief Sets the output directory of the pipeline caches.
        * @param[in] path (sulphur::foundation::String) The new output directory.
@@ -29,24 +30,25 @@ namespace sulphur
        * @brief Getter for the cache output directory.
        * @return (sulpher::builder::Directory) The cache output direcoty.
        */
-      static Directory out_dir();
+      static Directory& out_dir();
 
       /**
        * @brief Getter for the package output directory.
        * @return (sulpher::builder::Directory) The package output directory.
        */
-      static Directory package_dir();
+      static Directory& package_dir();
 
       /**
        * @brief Getter for the package output directory relative the the cache output directory.
        * @return (sulphur::builder::Directory) The relative package output directory.
        */
-      static foundation::String package_relative_path();
+      static foundation::String& package_relative_path();
+      void ShutDown();
 
     private:
-      static Directory out_dir_; //!< working directory of the application. this directory serves as the root for finding unconverted assets
-      static Directory package_dir_; //!< the output directory of the packages.
-      static foundation::String package_relative_path_; //!< the output directory of the packages relative to the output directory.
+      static Directory* out_dir_; //!< working directory of the application. this directory serves as the root for finding unconverted assets
+      static Directory* package_dir_; //!< the output directory of the packages.
+      static foundation::String* package_relative_path_; //!< the output directory of the packages relative to the output directory.
     };
   }
 }

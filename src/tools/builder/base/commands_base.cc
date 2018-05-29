@@ -40,6 +40,25 @@ namespace sulphur
       return "No description available \n";
     }
 
+    void ICommand::SetPipelines(ModelPipeline* model_pipeline,
+      MeshPipeline* mesh_pipeline, MaterialPipeline* material_pipeline,
+      TexturePipeline* texture_pipeline, ShaderPipeline* shader_pipeline,
+      SkeletonPipeline* skeleton_pipeline, AnimationPipeline* animation_pipeline,
+      ScriptPipeline* script_pipeline, AudioPipeline* audio_pipeline, 
+      SceneLoader* scene_loader)
+    {
+      model_pipeline_ = model_pipeline;
+      mesh_pipeline_ = mesh_pipeline;
+      material_pipeline_ = material_pipeline;
+      texture_pipeline_ = texture_pipeline;
+      shader_pipeline_ = shader_pipeline;
+      skeleton_pipeline_ = skeleton_pipeline;
+      animation_pipeline_ = animation_pipeline;
+      script_pipeline_ = script_pipeline;
+      audio_pipeline_ = audio_pipeline;
+      scene_loader_ = scene_loader;
+    }
+
     //-----------------------------------------------------------------------------------------------
     Syntax ICommand::syntax()
     {

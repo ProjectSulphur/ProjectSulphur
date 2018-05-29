@@ -1,4 +1,4 @@
-﻿/*
+/*
 ---------------------------------------------------------------------------
 Open Asset Import Library (ASSIMP)
 ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ extern ( C ) {
 
    /**
     * Configures the <code>FindDegenerates</code> step to remove degenerated
-    * primitives from the import â€“ immediately.
+    * primitives from the import – immediately.
     *
     * The default behaviour converts degenerated triangles to lines and
     * degenerated lines to points. See the documentation to the
@@ -438,7 +438,7 @@ extern ( C ) {
     *
     * The step checks for animation tracks where all frame values are
     * absolutely equal and removes them. This tweakable controls the epsilon
-    * for floating-point comparisons â€“ two keys are considered equal if the
+    * for floating-point comparisons – two keys are considered equal if the
     * invariant abs(n0-n1) > epsilon holds true for all vector respectively
     * quaternion components.
     *
@@ -629,8 +629,8 @@ extern ( C ) {
     * Configures the LWO loader to load just one layer from the model.
     *
     * LWO files consist of layers and in some cases it could be useful to load
-    * only one of them. This property can be either a string â€“ which specifies
-    * the name of the layer â€“ or an integer â€“ the index of the layer. If the
+    * only one of them. This property can be either a string – which specifies
+    * the name of the layer – or an integer – the index of the layer. If the
     * property is not set the whole LWO model is loaded. Loading fails if the
     * requested layer is not available. The layer index is zero-based and the
     * layer name may not be empty.
@@ -673,7 +673,7 @@ extern ( C ) {
     *
     * Property type: integer.
     *
-    * See: <code>AI_CONFIG_IMPORT_LWS_ANIM_END</code> â€“ end of the imported
+    * See: <code>AI_CONFIG_IMPORT_LWS_ANIM_END</code> – end of the imported
     *    time range
     */
    const char* AI_CONFIG_IMPORT_LWS_ANIM_START = "IMPORT_LWS_ANIM_START";

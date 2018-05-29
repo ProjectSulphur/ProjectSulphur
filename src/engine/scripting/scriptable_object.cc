@@ -5,16 +5,18 @@ namespace sulphur
 {
   namespace engine
   {
-    void ScriptableObject::SetMetaTable(foundation::SharedPointer<ScriptableValue> value, const char * libname)
+    //------------------------------------------------------------------------------
+    void ScriptableObject::SetMetaTable(
+      foundation::SharedPointer<ScriptableValue> value, 
+      const char * libname)
     {
       char metaname[128];
       sprintf_s(metaname, "sulphur.%s", libname);
 
       value->Push();
 
-      luaL_getmetatable(value->script_system()->lua_state(), metaname);
-      lua_setmetatable(value->script_system()->lua_state(), -2);
-
+      luaL_getmetatable(value->script_state()->lua_state(), metaname);
+      lua_setmetatable(value->script_state()->lua_state(), -2);
     }
   }
 }

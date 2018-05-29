@@ -49,6 +49,7 @@ namespace sulphur
       glm::mat4 projection; //!< Projection matrix
       float time; //!< Total time passed
       float padding[15]; //!< Padding to align size to 256 bytes
+      glm::mat4 bone_matrices[256];
     } g_scene_buffer; //!< The per scene constant buffer 
 
     static_assert(
@@ -102,7 +103,6 @@ namespace sulphur
       pso_manager_(device_),
       material_manager_(device_)
     {
-      // TODO: Initialize variables and device if possible
       // Enable debug layer
 #if defined (_DEBUG)
       {
@@ -126,7 +126,7 @@ namespace sulphur
 
     //------------------------------------------------------------------------------------------------------
     void D3D12Renderer::OnInitialize(
-      foundation::NativeWindowHandle hWnd,
+      void* window_handle,
       const glm::ivec2& screen_size,
       bool vsync)
     {
@@ -134,7 +134,7 @@ namespace sulphur
       constant_buffer_heap_.Create(device_);
 
       // Create frame descriptor heap
-      frame_descriptor_heap_.Initialize(BACK_BUFFER_COUNT, 1024, 512, 512, 512);
+      frame_descriptor_heap_.Initialize(BACK_BUFFER_COUNT, 2048, 512, 512);
 
 
       
@@ -157,24 +157,23 @@ namespace sulphur
 
         DXGI_SWAP_CHAIN_DESC1 swap_chain_desc = {};
         swap_chain_desc.BufferCount = BACK_BUFFER_COUNT;
+        swap_chain_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         swap_chain_desc.Width = screen_size.x;
         swap_chain_desc.Height = screen_size.y;
         swap_chain_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         swap_chain_desc.SampleDesc.Count = 1;
+        swap_chain_desc.SampleDesc.Quality = 0;
         swap_chain_desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-        swap_chain_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-
-        if (hWnd.type != foundation::NativeWindowHandle::Type::kWin32)
-        {
-          PS_LOG(Error, "Wrong native handle passed to DirectX 12 renderer.\n");
-          return;
-        }
+        swap_chain_desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
+        swap_chain_desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+        swap_chain_desc.Scaling = DXGI_SCALING_STRETCH;
+        swap_chain_desc.Stereo = FALSE;
 
         HRESULT hresult;
 
         hresult = factory->CreateSwapChainForHwnd(
           direct_command_queue_,
-          (HWND)hWnd.win32_window,
+          (HWND)window_handle,
           &swap_chain_desc,
           nullptr,
           nullptr,
@@ -183,8 +182,7 @@ namespace sulphur
 
         if (FAILED(hresult))
         {
-          // TODO(Yana): Replace with foundation::Logger
-          printf("Failed to create a swap chain.\n");
+          PS_LOG(Error, "Failed to create a swap chain.\n");
           return;
         }
 
@@ -192,24 +190,34 @@ namespace sulphur
       }
       // Create render targets and command allocators
       {
+        ID3D12Resource* rt_res = nullptr;
+
         D3D12_RENDER_TARGET_VIEW_DESC rtv_desc = {};
         rtv_desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
         rtv_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 
         for (uint8_t i = 0; i < BACK_BUFFER_COUNT; ++i)
         {
-          if (FAILED(swap_chain_->GetBuffer(i, IID_PPV_ARGS(&OM_render_targets_[i]))))
+          if (FAILED(swap_chain_->GetBuffer(i, IID_PPV_ARGS(&rt_res))))
           {
             PS_LOG(Error, "Failed to get back buffers from the swap chain.\n");
             return;
           }
 
+          OM_render_targets_[i] = foundation::Memory::Construct<D3D12Texture2D>(
+            foundation::Memory::Construct<D3D12Resource>()
+          );
+          OM_render_targets_[i]->buffer()->resource_ = rt_res;
+          OM_render_targets_[i]->buffer()->current_state_ = D3D12_RESOURCE_STATE_PRESENT;
+          OM_render_targets_[i]->format_ = DXGI_FORMAT_R8G8B8A8_UNORM;
+
           device_.CreateRenderTargetView(
-            OM_render_targets_[i],
+            OM_render_targets_[i]->buffer()->resource_,
             rtv_desc,
-            persistent_render_target_handles_[i]
+            OM_render_targets_[i]->rtv_persistent_index()
           );
 
+          // Create direct command allocators
           if (device_.CreateCommandAllocator(direct_command_allocators_[i]) == false)
           {
             PS_LOG(Error, "Failed to create command allocator.\n");
@@ -327,7 +335,7 @@ namespace sulphur
         CD3DX12_SHADER_BYTECODE(default_ps, sizeof(default_ps))
       );
 
-      // Create command list
+      // Create direct command list
       if (device_.CreateGraphicsCommandList(
         direct_command_list_,
         direct_command_allocators_[0],
@@ -337,7 +345,6 @@ namespace sulphur
         PS_LOG(Error, "Failed to create d3d12 command list.\n");
         return;
       }
-
       // Close command list
       direct_command_list_->Close();
 
@@ -360,7 +367,7 @@ namespace sulphur
 
       ImguiCustomConfig();
 
-      if (ImGui_ImplDX12_Init(hWnd.win32_window, device_, direct_command_list_) == false)
+      if (ImGui_ImplDX12_Init(window_handle, device_, direct_command_list_) == false)
       {
         PS_LOG(Error, "Failed to initialize imgui.\n");
         return;
@@ -393,7 +400,7 @@ namespace sulphur
       for (uint8_t i = 0; i < BACK_BUFFER_COUNT; ++i)
       {
         SafeRelease(depth_buffer_[i]);
-        SafeRelease(OM_render_targets_[i]);
+        foundation::Memory::Destruct(OM_render_targets_[i]);
       }
 
       SafeRelease(swap_chain_);
@@ -414,6 +421,8 @@ namespace sulphur
       device_.OnDestroy();
 
       // Libs can be removed if `dxgi_debug` is disabled
+      // Uncomment if there are live D3D12 producers at shutdown
+      // Used to see the types of the live producers
       /*#pragma comment(lib, "dxguid.lib")
       #pragma comment(lib, "dxgi.lib")
 
@@ -438,17 +447,12 @@ namespace sulphur
     {
       // TODO: Resize stuff
     }
-
+    
     //------------------------------------------------------------------------------------------------------
     void D3D12Renderer::StartFrame()
     {
-      // TODO: Prepare renderer for a new frame
-      // Reset pipeline state to default
-      // Reset vertex counter
-      // etc..
       // IMPORTANT: DO NOT CLEAR THE RENDER TARGETS, THIS IS DONE BY THE CAMERA'S
 
-      //current_frame_index_ = swap_chain_->GetCurrentBackBufferIndex();
       frame_descriptor_heap_.StartFrame(current_frame_index_);
       material_manager_.StartFrame();
 
@@ -456,12 +460,6 @@ namespace sulphur
       direct_command_allocators_[current_frame_index_]->Reset();
       direct_command_list_->Reset(direct_command_allocators_[current_frame_index_], nullptr);
 
-      D3D12_RESOURCE_BARRIER render_target_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        OM_render_targets_[current_frame_index_],
-        D3D12_RESOURCE_STATE_PRESENT,
-        D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-      direct_command_list_->ResourceBarrier(1, &render_target_barrier);
       direct_command_list_->SetPipelineState(pso_manager_.pipeline_state_object());
       direct_command_list_->SetGraphicsRootSignature(root_signature_);
 
@@ -470,7 +468,7 @@ namespace sulphur
 
       D3D12_CPU_DESCRIPTOR_HANDLE rtv_handle;
       device_.persistent_descriptor_heap().GetCPUHandleForRTVDescriptor(
-        persistent_render_target_handles_[current_frame_index_],
+        OM_render_targets_[current_frame_index_]->rtv_persistent_index(),
         rtv_handle
       );
 
@@ -500,26 +498,39 @@ namespace sulphur
         frame_descriptor_heap_.srv_uav_heap(current_frame_index_)
       };
       direct_command_list_->SetDescriptorHeaps(_countof(pp_desc_heaps), pp_desc_heaps);
-
+      direct_command_list_->SetDescriptorHeaps(_countof(pp_desc_heaps), pp_desc_heaps);
     }
 
     //------------------------------------------------------------------------------------------------------
     void D3D12Renderer::EndFrame(bool present)
     {
+      D3D12_CPU_DESCRIPTOR_HANDLE rtv_handle;
+      device_.persistent_descriptor_heap().GetCPUHandleForRTVDescriptor(
+        OM_render_targets_[current_frame_index_]->rtv_persistent_index(),
+        rtv_handle);
+
+      direct_command_list_->OMSetRenderTargets(1, &rtv_handle, false, nullptr);
       ImGui::Render();
 
-      D3D12_RESOURCE_BARRIER present_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        OM_render_targets_[current_frame_index_],
-        D3D12_RESOURCE_STATE_RENDER_TARGET,
-        D3D12_RESOURCE_STATE_PRESENT);
-
-      direct_command_list_->ResourceBarrier(1, &present_barrier);
+      // Execute compute
+      
+      // Transition backbuffer to "PRESENT" state
+      D3D12_RESOURCE_BARRIER present_barrier;
+      if (OM_render_targets_[current_frame_index_]->buffer()->Transition(
+        D3D12_RESOURCE_STATE_PRESENT,
+        present_barrier))
+      {
+        direct_command_list_->ResourceBarrier(1, &present_barrier);
+      }
 
       direct_command_list_->Close();
+      ID3D12CommandList* pp_direct_command_lists[] = { direct_command_list_ };
+      // TODO: Sync somehow?? Misses implementation.
 
-      ID3D12CommandList* pp_command_lists[] = { direct_command_list_ };
-
-      direct_command_queue_->ExecuteCommandLists(_countof(pp_command_lists), pp_command_lists);
+      direct_command_queue_->ExecuteCommandLists(
+        _countof(pp_direct_command_lists),
+        pp_direct_command_lists
+      );
 
       if (present == false)
         return;
@@ -568,14 +579,94 @@ namespace sulphur
       LoadShader(material.shader());
       const foundation::Vector<engine::TextureHandle>& textures = material.textures();
 
+      foundation::Vector<D3D12Resource*> srvs;
+      foundation::Vector<D3D12Resource*> uavs;
+
       for (size_t i = 0; i < textures.size(); ++i)
       {
         SetTexture(static_cast<int>(i), textures[i]);
+        srvs.push_back(device_.texture_asset_manager().GetTexture(textures[i].GetGPUHandle())->buffer());
       }
 
-      material_manager_.SetMaterial(material);
+      D3D12Material mat(eastl::move(srvs), eastl::move(uavs));
+
+      material_manager_.SetMaterial(mat);
       current_draw_call_.use_default_pipeline_state = true;
       current_draw_call_.current_material = material;
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void D3D12Renderer::SetComputePass(const engine::ComputePass& pass)
+    {
+      foundation::Vector<D3D12Resource*> mat_srvs;
+      foundation::Vector<D3D12Resource*> mat_uavs;
+
+      // Set SRVs
+      const foundation::Vector<engine::TextureHandle>& textures = pass.textures();
+
+      for (size_t i = 0; i < textures.size(); ++i)
+      {
+        SetTexture(static_cast<int>(i), textures[i], true);
+        mat_srvs.push_back(device_.texture_asset_manager().GetTexture(textures[i].GetGPUHandle())->buffer());
+      }
+
+      // Set UAVs
+      const foundation::Vector<engine::TextureHandle>& uavs = pass.uavs();
+
+      bool match_found = false;
+      for (size_t i = 0; i < uavs.size(); ++i)
+      {
+        match_found = false;
+        for (size_t j = 0; j < textures.size(); ++j)
+        {
+          if (uavs[i] == textures[j])
+          {
+            match_found = true;
+          }
+        }
+
+        SetUAV(static_cast<int>(i), uavs[i], match_found);
+        mat_uavs.push_back(device_.texture_asset_manager().GetTexture(uavs[i].GetGPUHandle())->buffer());
+      }
+
+      engine::GPUAssetHandle handle = pass.compute_shader().GetGPUHandle();
+      if (!handle)
+      {
+        device_.shader_asset_manager().Create(pass.compute_shader());
+      }
+
+      // Set PP material on material manager
+      D3D12Material mat(eastl::move(mat_srvs), eastl::move(mat_uavs));
+      material_manager_.SetMaterial(mat);
+      material_manager_.current_material()->CopyDescriptorsToFrameDescriptorHeap(
+        frame_descriptor_heap_
+      );
+
+      // Set pipeline state
+      pso_manager_.SetPipelineState(pass.compute_shader());
+      direct_command_list_->SetPipelineState(pso_manager_.pipeline_state_object());
+
+      // Set root signature
+      D3D12RootSignature* root_sig = device_.shader_asset_manager().GetRootSignatureForShader(
+        pass.compute_shader().GetGPUHandle()
+      );
+      direct_command_list_->SetComputeRootSignature(root_sig->root_signature());
+
+      direct_command_list_->SetComputeRootDescriptorTable(
+        1,
+        material_manager_.current_material()->descriptor_table_handle()
+      );
+
+      // Bind constant buffer
+      g_scene_buffer.time = total_time_;
+
+
+      size_t offset;
+      constant_buffer_heap_.Write(&g_scene_buffer, sizeof(g_scene_buffer), offset);
+      direct_command_list_->SetComputeRootConstantBufferView(
+        0,
+        constant_buffer_heap_.GetGPUVirtualAddress() + offset
+      );
     }
 
     //------------------------------------------------------------------------------------------------------
@@ -607,28 +698,19 @@ namespace sulphur
         depth_buffer.buffer().GetGPUHandle()
       );
       device_.persistent_descriptor_heap().GetCPUHandleForDSVDescriptor(
-        ds_tex->dsv_persistent_index_,
+        ds_tex->dsv_persistent_index(),
         dsv_handle);
 
-      // Set render target, get a cpu handle. Use the back buffer
-      // from the swap chain, if the render target type is kBackBuffer (main camera)
-      if (render_target.render_target_type() == sulphur::engine::RenderTargetType::kBackBuffer)
-      {
-        device_.persistent_descriptor_heap().GetCPUHandleForRTVDescriptor(
-          persistent_render_target_handles_[current_frame_index_],
-          rtv_handle);
-      }
-      else
-      {
-        SetRenderTarget(0, render_target, foundation::Color::kWhite); // Is this really necessary in this function?
+            // Set render target, get a cpu handle.
+      SetRenderTarget(0, render_target, foundation::Color::kWhite); // Is this really necessary in this function?
 
-        D3D12Texture2D* rt_tex = device_.texture_asset_manager().GetTexture(
-          render_target.GetTarget().GetGPUHandle()
-        );
-        device_.persistent_descriptor_heap().GetCPUHandleForRTVDescriptor(
-          rt_tex->rtv_persistent_index_,
-          rtv_handle);
-      }
+      D3D12Texture2D* rt_tex = device_.texture_asset_manager().GetTexture(
+        render_target.GetTextureResource().GetGPUHandle()
+      );
+
+      device_.persistent_descriptor_heap().GetCPUHandleForRTVDescriptor(
+        rt_tex->rtv_persistent_index(),
+        rtv_handle);
 
       direct_command_list_->OMSetRenderTargets(1, &rtv_handle, false, &dsv_handle);
     }
@@ -666,28 +748,20 @@ namespace sulphur
       const foundation::Color& clear_color)
     {
       D3D12_CPU_DESCRIPTOR_HANDLE rtv_handle;
-      if (render_target.render_target_type() == engine::RenderTargetType::kBackBuffer)
-      {
-        device_.persistent_descriptor_heap().GetCPUHandleForRTVDescriptor(
-          persistent_render_target_handles_[current_frame_index_],
-          rtv_handle
-        );
-        direct_command_list_->ClearRenderTargetView(rtv_handle, clear_color.rgba, 0, nullptr);
-      }
-      else
-      {
-        SetRenderTarget(0, render_target, clear_color);
-        D3D12Texture2D* rt_tex = device_.texture_asset_manager().GetTexture(
-          render_target.GetTarget().GetGPUHandle()
-        );
-        device_.persistent_descriptor_heap().GetCPUHandleForRTVDescriptor(
-          rt_tex->rtv_persistent_index_,
-          rtv_handle
-        );
-      }
+
+      SetRenderTarget(0, render_target, clear_color);
+
+      D3D12Texture2D* rt_tex = device_.texture_asset_manager().GetTexture(
+        render_target.GetTextureResource().GetGPUHandle()
+      );
+
+      device_.persistent_descriptor_heap().GetCPUHandleForRTVDescriptor(
+        rt_tex->rtv_persistent_index(),
+        rtv_handle
+      );
 
       direct_command_list_->ClearRenderTargetView(rtv_handle, clear_color.rgba, 0, nullptr);
-    }
+     }
 
     //------------------------------------------------------------------------------------------------------
     void D3D12Renderer::ClearDepthBuffer(const engine::DepthBuffer& depth_buffer)
@@ -698,7 +772,7 @@ namespace sulphur
       );
       D3D12_CPU_DESCRIPTOR_HANDLE depth_handle;
       device_.persistent_descriptor_heap().GetCPUHandleForDSVDescriptor(
-        depth_tex->dsv_persistent_index_,
+        depth_tex->dsv_persistent_index(),
         depth_handle
       );
 
@@ -720,14 +794,20 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    void D3D12Renderer::Draw()
+    void D3D12Renderer::Draw(uint index_count, uint index_offset)
     {
       // Probably could do some kind of verification in debug mode
 
       // TODO: NEEDS WORK (JELLE check this out)
-      if (!current_draw_call_.current_material.shader())
+      if (!current_draw_call_.current_material.shader() ||
+        current_draw_call_.current_mesh->GetIndexCount() == 0)
       {
         return;
+      }
+
+      if (index_count == 0)
+      {
+        index_count = current_draw_call_.current_mesh->GetIndexCount();
       }
 
       engine::Shader* raw_shader =
@@ -804,7 +884,7 @@ namespace sulphur
 
       direct_command_list_->SetGraphicsRootDescriptorTable(
         1,
-        material_manager_.current_material()->srv_descriptor_table_handle()
+        material_manager_.current_material()->descriptor_table_handle()
       );
 
 
@@ -818,9 +898,9 @@ namespace sulphur
 
       // Execute draw command
       direct_command_list_->DrawIndexedInstanced(
-        static_cast<UINT>(mesh_data->index_count_),
+        index_count,
         1,
-        0,
+        index_offset,
         0,
         0
       );
@@ -828,16 +908,55 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    void D3D12Renderer::Dispatch(ComputeQueueType, uint, uint, uint)
+    void D3D12Renderer::CopyToScreen(const engine::RenderTarget& render_target)
     {
-      // TODO: Process compute shader dispatch call
+      engine::GPUAssetHandle& gpu_handle = render_target.GetTextureResource().GetGPUHandle();
+
+      if (!gpu_handle)
+      {
+        LoadTexture(render_target.GetTextureResource());
+        gpu_handle = render_target.GetTextureResource().GetGPUHandle();
+      }
+
+      // Copy backbuffer data	to the swap-chain resource
+      D3D12Texture2D* rt_tex = device_.texture_asset_manager().GetTexture(
+        render_target.GetTextureResource().GetGPUHandle()
+      );
+      D3D12_RESOURCE_BARRIER bb_barrier;
+      if (rt_tex->buffer()->Transition(D3D12_RESOURCE_STATE_COPY_SOURCE, bb_barrier))
+      {
+        direct_command_list_->ResourceBarrier(1, &bb_barrier);
+      }
+      D3D12_RESOURCE_BARRIER rt_barrier;
+
+      if (OM_render_targets_[current_frame_index_]->buffer()->Transition(
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        rt_barrier))
+      {
+        direct_command_list_->ResourceBarrier(1, &rt_barrier);
+      }
+
+      direct_command_list_->CopyResource(
+        OM_render_targets_[current_frame_index_]->buffer()->resource_,
+        rt_tex->buffer()->resource_);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void D3D12Renderer::Dispatch(ComputeQueueType, uint x, uint y, uint z)
+    {
+      direct_command_list_->Dispatch(x, y, z);
     }
 
     //------------------------------------------------------------------------------------------------------
     void D3D12Renderer::SetVsync(bool value)
     {
-      // TODO: Update renderer to use vsync value
       vsync_ = value;
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void D3D12Renderer::SetStencilRef(uint value)
+    {
+      direct_command_list_->OMSetStencilRef(value);
     }
 
     //------------------------------------------------------------------------------------------------------
@@ -860,6 +979,19 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
+    void D3D12Renderer::SetBoneMatrices(const foundation::Vector<glm::mat4>& bone_matrices)
+    {
+      memcpy(g_scene_buffer.bone_matrices, &bone_matrices[0], bone_matrices.size() * sizeof(glm::mat4));
+
+      size_t offset;
+      constant_buffer_heap_.Write(&g_scene_buffer, sizeof(g_scene_buffer), offset);
+      direct_command_list_->SetGraphicsRootConstantBufferView(
+        0,
+        constant_buffer_heap_.GetGPUVirtualAddress() + offset
+      );
+    }
+
+    //------------------------------------------------------------------------------------------------------
     void D3D12Renderer::SetPipelineState(const PipelineState& pipeline_state)
     {
       current_draw_call_.current_pipeline_state = pipeline_state;
@@ -867,12 +999,16 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    void D3D12Renderer::SetTexture(int /*register_id*/, const engine::TextureHandle& texture)
+    void D3D12Renderer::SetTexture(
+      int /*register_id*/, 
+      const engine::TextureHandle& texture, 
+      bool is_compute_resource, 
+      bool /*use_ping_pong*/)
     {
       engine::GPUAssetHandle handle = texture.GetGPUHandle();
       if (!handle)
       {
-        LoadTexture(texture, D3D12TextureType::kTexture);
+        LoadTexture(texture);
         handle = texture.GetGPUHandle();
       }
 
@@ -886,11 +1022,45 @@ namespace sulphur
       }
 
       D3D12_RESOURCE_BARRIER psr_barrier;
-      if (texture_data->Transition(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, psr_barrier))
+      if (texture_data->buffer()->Transition(
+        (is_compute_resource ?
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE : 
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE),
+        psr_barrier))
       {
         direct_command_list_->ResourceBarrier(1, &psr_barrier);
       }
+    }
 
+    //------------------------------------------------------------------------------------------------------
+    void D3D12Renderer::SetUAV(int /*register_id*/, const engine::TextureHandle& uav_texture, bool use_ping_pong)
+    {
+      engine::GPUAssetHandle handle = uav_texture.GetGPUHandle();
+      if (!handle)
+      {
+        LoadTexture(uav_texture);
+        handle = uav_texture.GetGPUHandle();
+      }
+
+      // Find texture using 'handle'
+      // Use this texture at register 'registerId'
+      D3D12Texture2D* texture_data = device_.texture_asset_manager().GetTexture(handle);
+
+      if (texture_data->has_uav_ == false)
+      {
+        device_.CreateUnorderedAccessView(texture_data);
+      }
+
+      if (use_ping_pong == true)
+      {
+        texture_data->SwapBuffers();
+      }
+
+      D3D12_RESOURCE_BARRIER ua_barrier;
+      if (texture_data->buffer()->Transition(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, ua_barrier))
+      {
+        direct_command_list_->ResourceBarrier(1, &ua_barrier);
+      }
     }
 
     //------------------------------------------------------------------------------------------------------
@@ -900,12 +1070,12 @@ namespace sulphur
       const foundation::Color& clear_color)
     {
       // TODO: Validate render target
-      engine::TextureHandle tex_handle = render_target.GetTarget();
+      engine::TextureHandle tex_handle = render_target.GetTextureResource();
       engine::GPUAssetHandle gpu_handle = tex_handle.GetGPUHandle();
 
       if (!gpu_handle)
       {
-        LoadTexture(tex_handle, D3D12TextureType::kRenderTarget, clear_color);
+        LoadTexture(tex_handle, clear_color);
         gpu_handle = tex_handle.GetGPUHandle();
       }
 
@@ -917,7 +1087,9 @@ namespace sulphur
       }
 
       D3D12_RESOURCE_BARRIER render_target_barrier;
-      if (texture_data->Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, render_target_barrier))
+      if (texture_data->buffer()->Transition(
+        D3D12_RESOURCE_STATE_RENDER_TARGET,
+        render_target_barrier))
       {
         direct_command_list_->ResourceBarrier(1, &render_target_barrier);
       }
@@ -928,11 +1100,11 @@ namespace sulphur
     //------------------------------------------------------------------------------------------------------
     void D3D12Renderer::SetDepthBuffer(const engine::DepthBuffer& depth_buffer)
     {
-      engine::GPUAssetHandle gpu_handle = depth_buffer.buffer().GetGPUHandle();
+      engine::GPUAssetHandle& gpu_handle = depth_buffer.buffer().GetGPUHandle();
 
       if (!gpu_handle)
       {
-        LoadTexture(depth_buffer.buffer(), D3D12TextureType::kDepthStencil);
+        LoadTexture(depth_buffer.buffer());
         gpu_handle = depth_buffer.buffer().GetGPUHandle();
       }
 
@@ -944,7 +1116,7 @@ namespace sulphur
       }
 
       D3D12_RESOURCE_BARRIER depth_barrier;
-      if (texture_data->Transition(D3D12_RESOURCE_STATE_DEPTH_WRITE, depth_barrier))
+      if (texture_data->buffer()->Transition(D3D12_RESOURCE_STATE_DEPTH_WRITE, depth_barrier))
       {
         direct_command_list_->ResourceBarrier(1, &depth_barrier);
       }
@@ -953,13 +1125,12 @@ namespace sulphur
     //------------------------------------------------------------------------------------------------------
     void D3D12Renderer::LoadTexture(
       const engine::TextureHandle& texture,
-      const D3D12TextureType type,
       foundation::Color clear_color)
     {
       engine::GPUAssetHandle& handle = texture.GetGPUHandle();
       if (!handle)
       {
-        device_.texture_asset_manager().Create(texture, type, clear_color);
+        device_.texture_asset_manager().Create(texture, clear_color);
       }
     }
 
@@ -984,9 +1155,11 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    void D3D12Renderer::UpdateDynamicMesh(const engine::MeshHandle&)
+    void D3D12Renderer::UpdateDynamicMesh(const engine::MeshHandle& mesh)
     {
-
+      device_.mesh_asset_manager().Release(mesh.GetGPUHandle());
+      device_.mesh_asset_manager().Create(mesh);
+      mesh->set_has_changed(false);
     }
   }
 }

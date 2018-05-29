@@ -132,43 +132,54 @@ namespace sulphur
       /**
       * @brief Create a committed resource
       * @param[out] out_resource (ID3D12Resource*&) The created committed resource
-      * @param[in] heap_properties (D3D12_HEAP_PROPERTIES) Heap properties 
+      * @param[in] heap_properties (const D3D12_HEAP_PROPERTIES&) Heap properties 
       * @param[in] flags (D3D12_HEAP_FLAGS) The resource flags
-      * @param[in] resource_desc (D3D12_RESOURCE_DESC) Resource description struct
+      * @param[in] resource_desc (const D3D12_RESOURCE_DESC&) Resource description struct
       * @param[in] initial_state (D3D12_RESOURCE_STATES) The initial resource state of the resource
       * @param[in] clear_value (D3D12_CLEAR_VALUE*) The optimized clear value for the resource
       * @return (bool) Has the committed resource been created successfully?
       */
       bool CreateCommittedResource(
         ID3D12Resource*& out_resource,
-        D3D12_HEAP_PROPERTIES heap_properties,
+        const D3D12_HEAP_PROPERTIES& heap_properties,
         D3D12_HEAP_FLAGS flags,
-        D3D12_RESOURCE_DESC resource_desc,
+        const D3D12_RESOURCE_DESC& resource_desc,
         D3D12_RESOURCE_STATES initial_state,
         D3D12_CLEAR_VALUE* clear_value
       );
 
       /**
-      * @brief Create a graphics pipeline state object
-      * @param[out] out_pso (ID3D12PipelineState*&) The created graphics pipeline state object
-      * @param[in] desc (D3D12_GRAPHICS_PIPELINE_STATE_DESC&) Description of the graphics pipeline state
+      * @brief Create a graphics pipeline state object.
+      * @param[out] out_pso (ID3D12PipelineState*&) The created graphics pipeline state object.
+      * @param[in] desc (const D3D12_GRAPHICS_PIPELINE_STATE_DESC&) Description of the graphics pipeline state.
       * @return (bool) Has the pipeline state object been created successfully?
       */
       bool CreateGraphicsPipelineState(
         ID3D12PipelineState*& out_pso,
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC &desc
+        const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc
+      );
+
+      /**
+      * @brief Create a compute pipeline state object.
+      * @param[out] out_pso (ID3D12PipelineState*&) The created compute pipeline state object.
+      * @param[in] desc (const D3D12_COMPUTE_PIPELINE_STATE_DESC&) Description of the compute pipeline state.
+      * @return (bool) Has the compute pipeline state object been created successfully?
+      */
+      bool CreateComputePipelineState(
+        ID3D12PipelineState*& out_pso,
+        const D3D12_COMPUTE_PIPELINE_STATE_DESC& desc
       );
 
       /**
       * @brief Create a versioned root signature
       * @param[out] out_root_signature (ID3D12RootSignature*&) The created root signature
-      * @param[in] desc (D3D12_VERSIONED_ROOT_SIGNATURE_DESC&) The root signature description
+      * @param[in] desc (const D3D12_VERSIONED_ROOT_SIGNATURE_DESC&) The root signature description
       * @param[in] max_version (D3D_ROOT_SIGNATURE_VERSION) The maximum supported root signature version
       * @return (bool) Has the root signature been created successfully?
       */
       bool CreateVersionedRootSignature(
         ID3D12RootSignature*& out_root_signature,
-        const D3D12_VERSIONED_ROOT_SIGNATURE_DESC desc,
+        const D3D12_VERSIONED_ROOT_SIGNATURE_DESC& desc,
         D3D_ROOT_SIGNATURE_VERSION max_version = D3D_ROOT_SIGNATURE_VERSION_1_1
       );
 
@@ -181,12 +192,12 @@ namespace sulphur
       /**
       * @brief Create a render target view
       * @param[in] resource (ID3D12Resource*) The resource to create a render target view for
-      * @param[in] desc (D3D12_RENDER_TARGET_VIEW_DESC) The render target view description
+      * @param[in] desc (const D3D12_RENDER_TARGET_VIEW_DESC&) The render target view description
       * @param[in] out_heap_handle (uint32_t&) A handle for this descriptor in the persistent descriptor heap
       */
       void CreateRenderTargetView(
         ID3D12Resource* resource,
-        D3D12_RENDER_TARGET_VIEW_DESC desc,
+        const D3D12_RENDER_TARGET_VIEW_DESC& desc,
         uint32_t& out_heap_handle
       );
 
@@ -234,14 +245,34 @@ namespace sulphur
       /**
       * @brief Create a shader resource view
       * @param[in] resource (ID3D12Resource*) The resource to create a shader resource view for
-      * @param[in] srv_desc (D3D12_SHADER_RESOURCE_VIEW_DESC) The shader resource view description
+      * @param[in] srv_desc (const D3D12_SHADER_RESOURCE_VIEW_DESC&) The shader resource view description
       * @param[in] out_srv_persistent_index (uint32_t&) A handle for this SRV in the persistent descriptor heap
       */
       void CreateShaderResourceView(
         ID3D12Resource* resource,
-        D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc,
+        const D3D12_SHADER_RESOURCE_VIEW_DESC& srv_desc,
         uint32_t& out_srv_persistent_index
       );
+
+      /**
+      * @brief Create an unordered access view.
+      * @remarks Currently doesn't allow to have a counter resource (always created with nullptr)
+      * @param[in] resource (ID3D12Resource*) The resource to create an unordered access view for
+      * @param[in] srv_desc (const D3D12_UNORDERED_ACCESS_VIEW_DESC&) The unordered access view description
+      * @param[in] out_uav_persistent_index (uint32_t&) A handle for this UAV in the persistent descriptor heap
+      */
+      void CreateUnorderedAccessView(
+        ID3D12Resource* resource,
+        const D3D12_UNORDERED_ACCESS_VIEW_DESC& uav_desc,
+        uint32_t& out_uav_persistent_index
+      );
+
+      /**
+      * @brief Create an unordered access view for a texture.
+      * @remarks Currently doesn't allow to have a counter resource (always created with nullptr)
+      * @param[in] texture (sulphur::graphics::D3D12Texture2D*) The texture to create an unordered access view for
+      */
+      void CreateUnorderedAccessView(D3D12Texture2D* texture);
 
       /**
       * @brief Copy descriptors from one descriptor heap to another
@@ -283,24 +314,22 @@ namespace sulphur
       /**
       * @brief Create a texture 2D from data
       * @param[in] bytes (const uint8_t) The texture data to create the resource with
-      * @param[in] desc (D3D12_RESOURCE_DESC) Structure, which describes the resource to create
+      * @param[in] desc (D3D12_RESOURCE_DESC&) Structure, which describes the resource to create
       * @param[in] initial_state (D3D12_RESOURCE_STATES) The initial resource state to use for this resource
       * @param[in] sub_res_data (D3D12_SUBRESOURCE_DATA*) Pointer to an array of pointers of subresource descriptions
       * @param[in] mip_count (uint32_t) The amount of mipmaps for this resource
       * @param[out] out_texture (sulphur::graphics::D3D12Texture2D*) The created texture object
-      * @param[in] texture_type (sulphur::graphics::D3D12TextureType) The type of the texture to create
-      * @param[in] clear_color (sulphur::foundation::Color) The optimized clear color to create the texture with
+      * @param[in] clear_value (D3D12_CLEAR_VALUE*) The clear value for the texture resource
       * @return (bool) Was the texture created successfully?
       */
       bool CreateTexture2D(
         const uint8_t* bytes,
-        D3D12_RESOURCE_DESC desc,
+        D3D12_RESOURCE_DESC& desc,
         D3D12_RESOURCE_STATES initial_state,
         D3D12_SUBRESOURCE_DATA* sub_res_data,
         uint32_t mip_count,
         D3D12Texture2D* out_texture,
-        D3D12TextureType texture_type = D3D12TextureType::kTexture,
-        foundation::Color clear_color = foundation::Color::kBlackTransparent
+        D3D12_CLEAR_VALUE* clear_value
       );
 
       // TODO: Temporary. I find better fix. <3

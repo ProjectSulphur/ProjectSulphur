@@ -3,6 +3,7 @@
 #include "engine/core/handle_base.h"
 #include "engine/core/entity_system.h"
 #include "engine/systems/component_system.h"
+#include "engine/scripting/scriptable_object.h"
 
 #include <foundation/memory/memory.h>
 #include <foundation/containers/vector.h>
@@ -16,6 +17,7 @@ namespace sulphur
   {
     class RigidBodySystem;
     class PhysicsSystem;
+    class RewindStorage;
 
     /**
     * @brief An enumerator that is an index of the element. 
@@ -54,9 +56,13 @@ namespace sulphur
     * @brief A component which adds dynamic physical properties to the entity.
     * @author Angelo van der Mark
     */
-    class RigidBodyComponent : public ComponentHandleBase
+    SCRIPT_CLASS() class RigidBodyComponent : public ComponentHandleBase
     {
     public:
+
+      SCRIPT_NAME(RigidBodyComponent);
+      SCRIPT_COMPONENT();
+
       using System = RigidBodySystem; //!< The associated component system.
       
       /**
@@ -75,200 +81,212 @@ namespace sulphur
       * @remarks The mass cannot be set to less than 0.0001f.
       * @param[in] mass (float) Mass in Kg.
       */
-      void SetMass(float mass);
+      SCRIPT_FUNC() void SetMass(float mass);
 
       /**
       * @brief Returns the mass of this rigid body.
       * @return (float) Mass in Kg.
       */
-      float GetMass() const;
+      SCRIPT_FUNC() float GetMass() const;
 
       /**
       * @brief Returns the inverse mass of this rigid body.
       * @return (float) Inverse mass in Kg.
       */
-      float GetInverseMass() const;
+      SCRIPT_FUNC() float GetInverseMass() const;
 
       /**
       * @brief Sets the inertia tensor of this rigid body.
       * @param[in] inertia (const glm::vec3&) The inertia tensor.
       */
-      void SetInertiaTensor(const glm::vec3& inertia);
+      SCRIPT_FUNC() void SetInertiaTensor(const glm::vec3& inertia);
       /**
       * @brief Returns the inertia tensor of this rigid body.
       * @return (glm::vec3) The inertia tensor.
       */
-      glm::vec3 GetInertiaTensor() const;
+      SCRIPT_FUNC() glm::vec3 GetInertiaTensor() const;
       /**
       * @brief Returns the inverse inertia tensor of this rigid body.
       * @return (glm::vec3) The inverse inertia tensor.
       */
-      glm::vec3 GetInverseInertiaTensor() const;
+      SCRIPT_FUNC() glm::vec3 GetInverseInertiaTensor() const;
 
       /**
       * @brief Sets the linear velocity of this rigid body.
       * @param[in] velocity (const glm::vec3&) Velocity to set it to.
       */
-      void SetLinearVelocity(const glm::vec3& velocity);
+      SCRIPT_FUNC() void SetLinearVelocity(const glm::vec3& velocity);
       /**
       * @brief Adds a linear velocity to this rigid body.
       * @param[in] velocity (const glm::vec3&) Velocity to add.
       */
-      void AddLinearVelocity(const glm::vec3& velocity);
+      SCRIPT_FUNC() void AddLinearVelocity(const glm::vec3& velocity);
       /**
       * @brief Returns the linear velocity of this rigid body.
       * @return (glm::vec3) The current linear velocity.
       */
-      glm::vec3 GetLinearVelocity() const;
+      SCRIPT_FUNC() glm::vec3 GetLinearVelocity() const;
 
       /**
       * @brief Set the angular velocity of this rigid body.
       * @param[in] velocity (const glm::vec3&) Angular velocity to set it to.
       */
-      void SetAngularVelocity(const glm::vec3& velocity);
+      SCRIPT_FUNC() void SetAngularVelocity(const glm::vec3& velocity);
       /**
       * @brief Adds an angular velocity to this rigid body.
       * @param[in] velocity (const glm::vec3&) Angular velocity to add.
       */
-      void AddAngularVelocity(const glm::vec3& velocity);
+      SCRIPT_FUNC() void AddAngularVelocity(const glm::vec3& velocity);
       /**
       * @brief Returns the angular velocity of this rigid body.
       * @return (glm::vec3) The current angular velocity.
       */
-      glm::vec3 GetAngularVelocity() const;
+      SCRIPT_FUNC() glm::vec3 GetAngularVelocity() const;
 
       /**
       * @brief Sets the linear damping coefficient for this rigid body.
       * @param[in] damping (float) The damping coefficient.
       */
-      void SetLinearDamping(float damping);
+      SCRIPT_FUNC() void SetLinearDamping(float damping);
       /**
       * @brief Returns the linear damping coefficient of this rigid body.
       * @return (float) The damping coefficient.
       */
-      float GetLinearDamping() const;
+      SCRIPT_FUNC() float GetLinearDamping() const;
       /**
       * @brief Sets the angular damping coefficient for this rigid body.
       * @param[in] damping (float) The damping coefficient.
       */
-      void SetAngularDamping(float damping);
+      SCRIPT_FUNC() void SetAngularDamping(float damping);
       /**
       * @brief Returns the linear damping coefficient of this rigid body.
       * @return (float) The damping coefficient.
       */
-      float GetAngularDamping() const;
+      SCRIPT_FUNC() float GetAngularDamping() const;
 
       /**
       * @brief Applies a linear force on the center of mass.
       * @param[in] force (const glm::vec3&) The force to apply.
       */
-      void ApplyForce(const glm::vec3& force);
+      SCRIPT_FUNC() void ApplyForce(const glm::vec3& force);
       /**
       * @brief Applies a torque on the rigid body. This will not apply any linear force.
       * @param[in] torque (const glm::vec3&) The torque to apply.
       */
-      void ApplyTorque(const glm::vec3& torque);
+      SCRIPT_FUNC() void ApplyTorque(const glm::vec3& torque);
       /**
       * @brief Applies a force on the rigid body from a position in world space.
       * @param[in] force (const glm::vec3&) The force to apply.
       * @param[in] position (const glm::vec3&) Position in world space where the force is applied.
       */
-      void ApplyForceAtPosition(const glm::vec3& force, const glm::vec3& position);
+      SCRIPT_FUNC() void ApplyForceAtPosition(const glm::vec3& force, const glm::vec3& position);
 
       /**
       * @brief Applies a linear impulse on the center of mass.
       * @param[in] impulse (const glm::vec3&) The linear impulse to apply.
       */
-      void ApplyImpulse(const glm::vec3& impulse);
+      SCRIPT_FUNC() void ApplyImpulse(const glm::vec3& impulse);
       /**
       * @brief Applies an angular impulse on the rigid body. This will not apply any linear impulse.
       * @param[in] impulse (const glm::vec3&) The angular impulse to apply.
       */
-      void ApplyAngularImpulse(const glm::vec3& impulse);
+      SCRIPT_FUNC() void ApplyAngularImpulse(const glm::vec3& impulse);
       /**
       * @brief Applies an impulse on the rigid body from a position in world space.
       * @param[in] impulse (const glm::vec3&) Impulse to apply.
       * @param[in] position (const glm::vec3&) Position in world space where the impulse is applied.
       */
-      void ApplyImpulseAtPosition(const glm::vec3& impulse, const glm::vec3& position);
+      SCRIPT_FUNC() void ApplyImpulseAtPosition(const glm::vec3& impulse, const glm::vec3& position);
 
       /**
       * @brief Returns whether the rigid body is active in the simulation.
       * @return (bool) True is the rigid body is sleeping.
       */
-      bool IsSleeping() const;
+      SCRIPT_FUNC() bool IsSleeping() const;
       /**
       * @brief Wakes the rigid body if it is sleeping.
       */
-      void ForceWake();
+      SCRIPT_FUNC() void ForceWake();
       /**
       * @brief Makes the rigid body sleep if it is active.
       */
-      void ForceSleep();
+      SCRIPT_FUNC() void ForceSleep();
+
+      /**
+      * @brief Sets the rigid body state to kinematic or dynamic.
+      * @param[in] kinematic (bool) True to set this body to kinematic, false to set this body to dynamic.
+      */
+      SCRIPT_FUNC() void SetKinematic(bool kinematic);
+
+      /**
+      * @brief Returns whether this body is dynamic or kinematic.
+      * @return (bool) True if kinematic.
+      */
+      SCRIPT_FUNC() bool IsKinematic() const;
 
       /**
       * @brief Allows a total restriction of movement on the given axes.
       * @note This only applies to physics-based movement. Directly moving the body is unaffected.
       * @param[in] lock_axes (const glm::bvec3&) The axes to lock. True means the axis is locked.
       */
-      void LockTranslation(const glm::bvec3& lock_axes);
+      SCRIPT_FUNC() void LockTranslation(const glm::vec3& lock_axes);
 
       /**
       * @brief Sets or unsets a total restriction of movement on the X axis.
       * @note This only applies to physics-based movement. Directly moving the body is unaffected.
       * @param[in] lock_axis (bool) Whether to lock or unlock movement on this axis.
       */
-      void LockTranslationX(bool lock_axis);
+      SCRIPT_FUNC() void LockTranslationX(bool lock_axis);
       /**
       * @brief Sets or unsets a total restriction of movement on the Y axis.
       * @note This only applies to physics-based movement. Directly moving the body is unaffected.
       * @param[in] lock_axis (bool) Whether to lock or unlock movement on this axis.
       */
-      void LockTranslationY(bool lock_axis);
+      SCRIPT_FUNC() void LockTranslationY(bool lock_axis);
       /**
       * @brief Sets or unsets a total restriction of movement on the Z axis.
       * @note This only applies to physics-based movement. Directly moving the body is unaffected.
       * @param[in] lock_axis (bool) Whether to lock or unlock movement on this axis.
       */
-      void LockTranslationZ(bool lock_axis);
+      SCRIPT_FUNC() void LockTranslationZ(bool lock_axis);
 
       /**
       * @brief Returns what axes this body is locked to, restricting movement.
       * @return (glm::bvec3) Three booleans corresponding to each axis. True means translation is locked.
       */
-      glm::bvec3 GetTranslationLock() const;
+      SCRIPT_FUNC() glm::vec3 GetTranslationLock() const;
 
       /**
       * @brief Allows a total restriction of rotation on the given axes.
       * @note This only applies to physics-based movement. Directly rotating the body is unaffected.
       * @param[in] lock_axes (const glm::bvec3&) The axes to lock. True means the axis is locked.
       */
-      void LockRotation(const glm::bvec3& lock_axes);
+      SCRIPT_FUNC() void LockRotation(const glm::vec3& lock_axes);
 
       /**
       * @brief Sets or unsets a total restriction of rotation on the X axis.
       * @note This only applies to physics-based movement. Directly rotation the body is unaffected.
       * @param[in] lock_axis (bool) Whether to lock or unlock rotation on this axis.
       */
-      void LockRotationX(bool lock_axis);
+      SCRIPT_FUNC() void LockRotationX(bool lock_axis);
       /**
       * @brief Sets or unsets a total restriction of rotation on the Y axis.
       * @note This only applies to physics-based movement. Directly rotation the body is unaffected.
       * @param[in] lock_axis (bool) Whether to lock or unlock rotation on this axis.
       */
-      void LockRotationY(bool lock_axis);
+      SCRIPT_FUNC() void LockRotationY(bool lock_axis);
       /**
       * @brief Sets or unsets a total restriction of rotation on the Z axis.
       * @note This only applies to physics-based movement. Directly rotation the body is unaffected.
       * @param[in] lock_axis (bool) Whether to lock or unlock rotation on this axis.
       */
-      void LockRotationZ(bool lock_axis);
+      SCRIPT_FUNC() void LockRotationZ(bool lock_axis);
 
       /**
       * @brief Returns what axes this body is locked to, restricting rotation.
       * @return (glm::bvec3) Three booleans corresponding to each axis. True means rotation is locked.
       */
-      glm::bvec3 GetRotationLock() const;
+      SCRIPT_FUNC() glm::vec3 GetRotationLock() const;
 
     private:
       RigidBodySystem* system_;
@@ -281,7 +299,7 @@ namespace sulphur
     * @brief Manages the lifecycle and all instances of sulphur::engine::RigidBodyComponent.
     * @author Angelo van der Mark
     */
-    class RigidBodySystem : public IComponentSystem<RigidBodyComponent, RigidBodyData>
+    class RigidBodySystem : public IComponentSystem
     {
     public:
       /**
@@ -299,13 +317,20 @@ namespace sulphur
       void OnTerminate() override;
 
       /**
-      * @see sulphur::engine::IComponentSystem< sulphur::engine::RigidBodyComponent >::Create
+      * @see sulphur::engine::IComponentSystem::Create
       */
-      RigidBodyComponent Create(Entity entity) override;
+      template<typename ComponentT>
+      ComponentT Create(Entity& entity) { return Create(entity); };
+
       /**
-      * @see sulphur::engine::IComponentSystem <sulphur::engine::RigidBodyComponent>::Destroy
+      * @see sulphur::engine::IComponentSystem::Destroy
       */
-      void Destroy(RigidBodyComponent handle) override;
+      void Destroy(ComponentHandleBase handle) override;
+
+      /**
+      * @see sulphur::engine::IComponentSystem::Create
+      */
+      RigidBodyComponent Create(Entity& entity);
 
       /**
       * @see sulphur::engine::RigidBodyComponent::SetMass
@@ -466,10 +491,24 @@ namespace sulphur
       void ForceSleep(RigidBodyComponent handle);
 
       /**
+      * @see sulphur::engine::RigidBodyComponent::SetKinematic
+      * @param[in] handle (sulphur::engine::RigidBodyComponent) The component to call the function on.
+      * @param[in] kinematic (bool) True to set this body to kinematic, false to set this body to dynamic.
+      */
+      void SetKinematic(RigidBodyComponent handle, bool kinematic);
+
+      /**
+      * @see sulphur::engine::RigidBodyComponent::IsKinematic
+      * @param[in] handle (sulphur::engine::RigidBodyComponent) The component to call the function on.
+      * @return (bool) True if kinematic.
+      */
+      bool IsKinematic(RigidBodyComponent handle) const;
+
+      /**
       * @see sulphur::engine::RigidBodyComponent::LockTranslation
       * @param[in] handle (sulphur::engine::RigidBodyComponent) The component to call the function on.
       */
-      void LockTranslation(RigidBodyComponent handle, const glm::bvec3& lock_axes);
+      void LockTranslation(RigidBodyComponent handle, const glm::vec3& lock_axes);
 
       /**
       * @see sulphur::engine::RigidBodyComponent::LockTranslationX
@@ -523,14 +562,16 @@ namespace sulphur
 
       /**
       * @brief Returns the Entity from a given component.
-      * @param[in] handle (sulphur::engine::RigidBodyComponent) The component the Entity is requested from.
+      * @param[in] handle (sulphur::engine::ComponentHandleBase) The component the Entity is requested from.
       * @return (sulphur::engine::Entity&) The owning Entity.
       */
-      Entity& GetEntity(RigidBodyComponent handle) const;
+      Entity& GetEntity(ComponentHandleBase handle) const;
 
     private:
       PhysicsSystem* physics_service_; //!< The physics service system this system is using.
+      RewindStorage* rewind_storage_;//!< Rewind storage for the physics system
 
+      RigidBodyData component_data_; //!< An instance of the container that stores per-component data
     };
   }
 }

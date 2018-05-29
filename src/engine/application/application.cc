@@ -1,15 +1,16 @@
 #include "application.h"
 
-#include "engine/application/window.h"
 #include "engine/application/frame_scheduler.h"
-#include "engine/networking/messaging_system.h"
-
 #include "engine/assets/asset_system.h"
-#include "engine/scripting/script_system.h"
 #include "engine/physics/physics_system.h"
-#ifdef PS_EDITOR
-#include "engine/networking/messages.h"
-#endif
+#include "engine/scripting/script_system.h"
+#include "engine/networking/network_system.h"
+#include "engine/rewinder/rewind_system.h"
+#include "engine/audio/audio_system.h"
+#include "engine/application/hooks.h"
+
+#include "engine/networking/messaging_system.h"
+#include <physics/platform_physics.h>
 
 #include <graphics/platform/renderer_loader.h>
 
@@ -17,8 +18,7 @@
 #include <foundation/job/job_graph.h>
 #include <foundation/job/data_policy.h>
 #include <foundation/utils/timer.h>
-#include <foundation/memory/memory.h>
-#include <foundation/logging/logger.h>
+#include <functional>
 
 namespace sulphur
 {
@@ -28,17 +28,24 @@ namespace sulphur
     Application::Application() :
       BaseResource("Application"),
       platform_(nullptr),
-      renderer_("Renderer", nullptr),
-      physics_("Physics", nullptr)
+      renderer_("renderer", nullptr),
+      physics_("platform_physics", nullptr)
     {
       foundation::Memory::Initialize(2ul * 1024ul * 1024ul * 1024ul);
+      editor_hook_ = foundation::Memory::Construct<EditorHook>();
 
-      foundation::Vector<graphics::RendererType> supported_renderers_ =
-        graphics::RendererLoader::GetSupportedRenderers();
-
-      assert(!supported_renderers_.empty() && "This device is not supported or renderers could not be build.");
+      platform_ = editor_hook_->ConstructPlatform(renderer_);
+      if (platform_ == nullptr)
+      {
+        platform_ = foundation::Memory::ConstructUnique<Platform>(*renderer_, nullptr);
+      }
 
       // Create external systems
+      foundation::Vector<graphics::RendererType> supported_renderers_ =
+        graphics::RendererLoader::GetSupportedRenderers();
+      PS_LOG_IF(supported_renderers_.empty(), Fatal,
+        "This device is not supported or renderers could not be build.");
+
       renderer_ = foundation::SharedPointerResource<IRenderer>(
         "Renderer",
         graphics::RendererLoader::CreateRenderer(supported_renderers_[0])
@@ -50,44 +57,30 @@ namespace sulphur
 
       // Create internal systems
       services_.Create<MessagingSystem>();
+      services_.Create<AssetSystem>();
       services_.Create<PhysicsSystem>();
-      services_.Create<ScriptSystem>();
+      services_.Create<NetworkSystem>();
+      services_.Create<AudioSystem>();
       // @note (Maarten) This service should probably always be the last that is initialized so 
       //                 accidental references to other services from within the world are valid
       services_.Create<WorldProviderSystem>();
+      // @note (Raymi) This one depends on the systems in the world to work. So it needs to be after the world
+      services_.Create<RewindSystem>();
+      // @note (Daniel) Makes sure all systems before it are initialized, so that scripting has everything accessible
+      services_.Create<ScriptSystem>();
+
+      editor_hook_->AddEditorServices(services_);
     }
 
+    //------------------------------------------------------------------------------------------------------
     void Application::OnInitialize(foundation::JobGraph&)
     {
       OnInitialize();
     }
 
     //--------------------------------------------------------------------------
-    void Application::Run()
+    void Application::Run(int argc, char** argv)
     {
-      // Initialize platform layer
-      while (platform_ == nullptr)
-      {
-#if PS_EDITOR
-        // Retrieve window handle from server (editor)
-        MessageID id;
-        MessagePayload payload;
-        if (services_.Get<MessagingSystem>().connection_.RetrieveNextMessage(&id, &payload) == true)
-        {
-          if (id == MessageID::kWindowHandle)
-          {
-            const WindowHandlePayload& actual_payload = payload.AsFormat<WindowHandlePayload>();
-
-            PS_LOG(Debug, "Window handle (%x) received from peer", actual_payload.handle);
-
-            platform_ = foundation::Memory::ConstructUnique<Platform>(reinterpret_cast<void*>(actual_payload.handle));
-          }
-        }
-#else
-        platform_ = foundation::Memory::ConstructUnique<Platform>(nullptr);
-#endif
-      }
-
       // Initialize job-system
       foundation::ThreadPool thread_pool;
       foundation::JobGraphExt job_graph;
@@ -101,77 +94,138 @@ namespace sulphur
       );
 
       // Create jobs to group the different phases
-      job_graph.Add(foundation::make_job("fixed_update", "", []() {}));
-      job_graph.Add(foundation::make_job("update", "", []() {}));
-      job_graph.Add(foundation::make_job("render", "", []() {}));
+      foundation::Job fixed_update_job = foundation::make_job("fixed_update", "", []() {});
+      job_graph.Add(std::move(fixed_update_job));
 
-      // Create a set of tasks to perform the old updates
-      const auto legacy_fixed_update = [](SystemSet<IServiceSystemBase>& services)
+      foundation::Job update_job = foundation::make_job("update", "", []() {});
+      update_job.set_blocker("fixed_update");
+      job_graph.Add(std::move(update_job));
+
+      foundation::Job restore_rewind_job = foundation::make_job("restore_rewind", "", []() {});
+      job_graph.Add(std::move(restore_rewind_job));
+
+      foundation::Resource<RewindSystem*> rewinder = foundation::Resource<RewindSystem*>(
+        "Rewinder",
+        (&services_.Get<RewindSystem>())
+        );
+
+      foundation::Job render_job = foundation::make_job("render", "", []() {});
+      render_job.set_blocker("update");
+      job_graph.Add(std::move(render_job));
+
+      const auto render_update = [](foundation::SharedPointer<IRenderer> renderer)
       {
-        services.Execute(&ISystemBase::OnFixedUpdate);
+        renderer->OnUpdate();
+      };
+      const auto renderer_startframe = [](foundation::SharedPointer<IRenderer>& renderer)
+      {
+        renderer->StartFrame();
+      };
+      const auto renderer_endframe = [](foundation::SharedPointer<IRenderer>& renderer)
+      {
+        renderer->EndFrame();
       };
 
-      job_graph.Add(make_job(
-        "legacy_fixed_update",
-        "fixed_update",
-        legacy_fixed_update,
-        bind_write(services_)
-      ));
-
-      const auto render_update  = [](foundation::SharedPointer<IRenderer> renderer) { renderer->OnUpdate(); };
-      const auto service_update = [](SystemSet<IServiceSystemBase>& services) { services.Execute(&ISystemBase::OnUpdate, foundation::Frame::delta_time());};
-
-      auto render_update_job = make_job("render_update", "update", render_update, bind_write(renderer_));
+      foundation::Job render_update_job = make_job("render_update", "update",
+        render_update, bind_write(renderer_));
       job_graph.Add(std::move(render_update_job));
 
-      auto service_update_job = make_job("service_update", "update", service_update, bind_write(services_));
-      service_update_job.set_blocker("render_update");
-      job_graph.Add(std::move(service_update_job));
-
-      const auto services_onprerender  = [](SystemSet<IServiceSystemBase>& services) { services.Execute(&ISystemBase::OnPreRender);};
-      const auto renderer_startframe   = [](foundation::SharedPointer<IRenderer>& renderer) {renderer->StartFrame();};
-      const auto services_onrender     = [](SystemSet<IServiceSystemBase>& services) {services.Execute(&ISystemBase::OnRender);};
-      const auto renderer_endframe     = [](foundation::SharedPointer<IRenderer>& renderer) {renderer->EndFrame();};
-      const auto services_onpostrender = [](SystemSet<IServiceSystemBase>& services) {services.Execute(&ISystemBase::OnPostRender);};
-
-      auto services_onprerender_job = make_job("services_onprerender", "render", services_onprerender, bind_write(services_));
-      job_graph.Add(std::move(services_onprerender_job));
-
-      auto renderer_startframe_job = make_job("renderer_startframe", "render", renderer_startframe, bind_write(renderer_));
-      renderer_startframe_job.set_blocker("services_onprerender");
+      foundation::Job renderer_startframe_job = make_job("renderer_startframe", "render",
+        renderer_startframe, bind_write(renderer_));
       job_graph.Add(std::move(renderer_startframe_job));
 
-      auto services_onrender_job = make_job("services_onrender", "render", services_onrender, bind_write(services_));
-      services_onrender_job.set_blocker("renderer_startframe");
-      job_graph.Add(std::move(services_onrender_job));
-
-      auto renderer_endframe_job = make_job("renderer_endframe", "render", renderer_endframe, bind_write(renderer_));
-      renderer_endframe_job.set_blocker("services_onrender");
+      foundation::Job renderer_endframe_job = make_job("renderer_endframe", "render",
+        renderer_endframe, bind_write(renderer_));
+      renderer_endframe_job.set_blocker("camerasystem_copy_to_screen");
       job_graph.Add(std::move(renderer_endframe_job));
 
-      auto services_onpostrender_job = make_job("services_onpostrender", "render", services_onpostrender, bind_write(services_));
-      services_onpostrender_job.set_blocker("renderer_endframe");
-      job_graph.Add(std::move(services_onpostrender_job));
-            
       // Initialization
+      // 0. Save the project directory
+
+      if (argc > 1 && argv != nullptr)
+      {
+        project_directory_ = argv[1];
+      }
+      else
+      {
+        project_directory_ = "";
+      }
+
       // 1. Initialize the renderer
       const Window& window = platform_->window();
-      (*renderer_)->OnInitialize(window.GetWindowHandle(), window.size());
+      (*renderer_.Get())->OnInitialize(window.GetNativeWindowHandle(), window.GetSize());
       PS_LOG(Debug, "Renderer intiliazation successful!");
 
       // 2. Initialize physics
-      physics_->get()->Initialize();
+      (*physics_.Get())->Initialize();
       PS_LOG(Debug, "Physics intiliazation successful!");
 
       // 3. Initialize internal systems
-      services_.Execute(&ISystemBase::OnInitialize, *this, job_graph);
+      services_.Execute(&IServiceSystemBase::OnInitialize, *this, job_graph);
       PS_LOG(Debug, "Services initialized successfully!");
+
 
       // 4. Initialize the application
       OnInitialize(job_graph);
 
+      // 5. Intialize the editor hook
+      editor_hook_->Intialize(*this, job_graph);
+
+      // @note (Daniel) Makes sure every single thing is initialized before starting the scripting environment
+      // @note (Stan) When the editor is hooked in the application state is initialized in edit mode. 
+      //              Thus scripting is not required to be started yet as it will not run in this state.
+      if (editor_hook_->Connected() == false)
+      {
+        services_.Get<ScriptSystem>().Start(project_directory_.path());
+      }
+
       // Validate the job graph
       PS_LOG_IF(!job_graph.Validate(), Error, "Data contention detected");
+
+      // Setup the correct engine logic update. If editor is hooked in the update uses a state machine to swap between edit, simulate and rewind update
+      // If the editor is not hooked in the regular update logic is used to run the engine. 
+      std::function<void(foundation::ThreadPool& thread_pool,
+        foundation::JobGraphExt& job_graph,
+        foundation::Resource<FrameScheduler>& frame_scheduler)> update;
+
+      if (editor_hook_->Connected() == true)
+      {
+        update = [this](foundation::ThreadPool& thread_pool,
+          foundation::JobGraphExt& job_graph,
+          foundation::Resource < FrameScheduler>& frame_scheduler)
+        {
+          editor_hook_->Update(thread_pool, job_graph, frame_scheduler);
+        };
+      }
+      else
+      {
+        update = [rewinder](foundation::ThreadPool& thread_pool,
+          foundation::JobGraphExt& job_graph,
+          foundation::Resource<FrameScheduler>& frame_scheduler)
+        {
+          if ((*rewinder)->IsRewinding() == false)
+          {
+            while (frame_scheduler->TryStartFixed() == true)
+            {
+              job_graph.SubmitSubTreeToPool("fixed_update", thread_pool);
+              thread_pool.RunAllTasks();
+            }
+
+            job_graph.SubmitSubTreeToPool("update", thread_pool);
+            thread_pool.RunAllTasks();
+            if ((*rewinder)->active() == true)
+            {
+              job_graph.SubmitSubTreeToPool("store_rewind", thread_pool);
+              thread_pool.RunAllTasks();
+            }
+          }
+          else if ((*rewinder)->IsRewinding())
+          {
+            job_graph.SubmitSubTreeToPool("restore_rewind", thread_pool);
+            thread_pool.RunAllTasks();
+          }
+        };
+      }
 
       while (platform_->ShouldExit() == false)
       {
@@ -180,47 +234,106 @@ namespace sulphur
         {
           continue;
         }
-
-        while (update_scheduler->TryStartFixed() == true)
-        {
-          job_graph.SubmitSubTreeToPool("fixed_update", thread_pool);
-          thread_pool.RunAllTasks();
-        }
-
         services_.Get<MessagingSystem>().ReceiveMessages();
+        editor_hook_->RecieveMessages();
 
-        job_graph.SubmitSubTreeToPool("update", thread_pool);
-        thread_pool.RunAllTasks();
+        update(thread_pool, job_graph, update_scheduler);
 
         job_graph.SubmitSubTreeToPool("render", thread_pool);
         thread_pool.RunAllTasks();
 
         platform_->ProcessEvents();
-
-        services_.Get<MessagingSystem>().DispatchMessages();
+        editor_hook_->SendMessages();
       }
 
       // Termination
       // 1. Shutdown application
       OnTerminate();
 
-      // 2. Shutdown local services
-      services_.Execute(&ISystemBase::OnTerminate);
+      // 2. release all editor listeners
+      editor_hook_->Release();
 
-      // 3. Shutdown physics
-      (*physics_)->Destroy();
+      // 3. Notify local services
+      services_.Execute(&IServiceSystemBase::OnTerminate);
 
-      // 4. Shutdown asset system and release GPU resources
-      AssetSystem::ReleaseGPUHandles();
-      
+      // 4. Shutdown physics
+      (*physics_.Get())->Destroy();
+
       // 5. Shutdown renderer
-      (*renderer_)->OnDestroy();
+      (*renderer_.Get())->OnDestroy();
 
-      // 6. Shutdown AssetSystem
-      AssetSystem::Shutdown();
+      // 6. Shutdown local services
+      services_.Execute(&IServiceSystemBase::OnShutdown);
 
       // 7. Shutdown platform-layer
       platform_ = nullptr;
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    IRenderer& Application::platform_renderer()
+    {
+      return *(*renderer_.Get()).get();
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    const IRenderer& Application::platform_renderer() const
+    {
+      return *(*renderer_.Get()).get();
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    physics::PlatformPhysics& Application::platform_physics()
+    {
+      return *(*physics_.Get()).get();
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    const physics::PlatformPhysics& Application::platform_physics() const
+    {
+      return *(*physics_.Get()).get();
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    Platform& Application::platform()
+    {
+      return *(platform_);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    const Platform& Application::platform() const
+    {
+      return *(platform_);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    const foundation::Path& Application::project_directory() const
+    {
+      return project_directory_;
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    IEditorHook* Application::editor_hook()
+    {
+      return editor_hook_;
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void Application::SetProjectDirectory(foundation::Path& directory_path)
+    {
+      // Todo: unload all world resources
+      // Todo: load the initial world.
+
+
+      ScriptSystem& script_system = GetService<ScriptSystem>();
+      script_system.OnTerminate();
+      script_system.InitializeScriptState(*this);
+      script_system.RegisterClasses(*this);
+      script_system.LoadMain(*this);
+
+      if (editor_hook_->Connected() == false)
+      {
+        script_system.Start(project_directory_.path());
+      }
     }
   }
 }

@@ -1,8 +1,12 @@
 #pragma once
-#include "../containers/string.h"
-#include "../containers/vector.h"
-#include "../containers/map.h"
-#include "binary_serializable.h"
+#include "foundation/containers/string.h"
+#include "foundation/containers/vector.h"
+#include "foundation/containers/map.h"
+#include "foundation/io/binary_serializable.h"
+#include "foundation/io/filesystem.h"
+#include "foundation/utils/compression.h"
+
+#define PS_COMPRESSION_PREFIX "PSCOMP"
 
 namespace sulphur 
 {
@@ -18,9 +22,9 @@ namespace sulphur
     public:
       /**
       * @brief Create a binary writer and sets the file to save the written data to.
-      * @param[in] file (const sulphur::foundation::String&) The file to write to.
+      * @param[in] file (const sulphur::foundation::Path&) The file to write to.
       */
-      BinaryWriter(const String& file);
+      BinaryWriter(const Path& file);
       BinaryWriter() = default;
       ~BinaryWriter() = default;
 
@@ -36,6 +40,21 @@ namespace sulphur
       * @return (bool) If the data was written successfully.
       */
       bool Save(const String& file);
+
+      /**
+      * @brief Compresses the data and then writes the data to a file.
+      * @param[in|opt] type (sulphur::foundation::CompressionType) The type of compression to apply. 
+      * @return (bool) If the data was written successfully.
+      */
+      bool SaveCompressed(CompressionType type = CompressionType::kHighCompression);
+
+      /**
+      * @brief Compresses the data and then writes the data to a file.
+      * @param[in] file (const sulphur::foundation::String&) The file to output to.
+      * @param[in|opt] type (sulphur::foundation::CompressionType) The type of compression to apply. 
+      * @return (bool) If the data was written successfully.
+      */
+      bool SaveCompressed(const String& file, CompressionType type = CompressionType::kHighCompression);
 
       /**
        * @brief Write a boolean to the buffer.
@@ -79,9 +98,14 @@ namespace sulphur
       void Write(double val);
       /**
       * @brief Write a string to the buffer.
-      * @param val (sulphur::foundation::String) The string value to write.
+      * @param val (const sulphur::foundation::String&) The string value to write.
       */
       void Write(const String& val);
+      /**
+      * @brief Write a string to the buffer.
+      * @param val (const sulphur::foundation::Path&) The path value to write.
+      */
+      void Write(const Path& val);
       /**
       * @brief Write an array to the buffer.
       * @param arrayptr (const char*) Pointer to an array of data.
@@ -145,7 +169,7 @@ namespace sulphur
        */
       void WriteWriteable(const void* serializable);
 
-      String file_;                 //!< The file to output the buffer to when calling save.
+      Path file_;                   //!< The file to output the buffer to when calling save.
       Vector<unsigned char> data_;  //!< The buffer of written data.
     };
 

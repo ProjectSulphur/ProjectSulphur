@@ -1,4 +1,4 @@
-﻿%module assimp
+%module assimp
 
 // SWIG helpers for std::string and std::vector wrapping.
 %include <std_string.i>
@@ -8,7 +8,7 @@
 %dstripprefix;
 
 
-// PACK_STRUCT is a no-op for SWIG â€“ it does not matter for the generated
+// PACK_STRUCT is a no-op for SWIG – it does not matter for the generated
 // bindings how the underlying C++ code manages its memory.
 #define PACK_STRUCT
 

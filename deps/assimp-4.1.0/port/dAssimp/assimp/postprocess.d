@@ -1,4 +1,4 @@
-﻿/*
+/*
 ---------------------------------------------------------------------------
 Open Asset Import Library (ASSIMP)
 ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ extern ( C ) {
        * This post processing step splits up all higher faces to triangles.
        * Line and point primitives are <em>not</em> modified!.
        *
-       * If you want Â»triangles onlyÂ« with no other kinds of primitives,
+       * If you want »triangles only« with no other kinds of primitives,
        * specify both <code>Triangulate</code> and <code>SortByPType</code> and
        * ignore all point and line meshes when you process Assimp's output.
        */
@@ -160,8 +160,8 @@ extern ( C ) {
        * There is a configuration option,
        * <code>AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE</code> which allows you to
        * specify an angle maximum for the normal smoothing algorithm. Normals
-       * exceeding this limit are not smoothed, resulting in a Â»hardÂ« seam
-       * between two faces. Using a decent angle here (e.g. 80Â°) results in
+       * exceeding this limit are not smoothed, resulting in a »hard« seam
+       * between two faces. Using a decent angle here (e.g. 80°) results in
        * very good visual appearance.
        */
       GenSmoothNormals = 0x40,
@@ -288,7 +288,7 @@ extern ( C ) {
        * Several material settings not contributing to the final appearance of
        * a surface are ignored in all comparisons; the material name is one of
        * them. So, if you are passing additional information through the
-       * content pipeline (probably using Â»magicÂ« material names), don't
+       * content pipeline (probably using »magic« material names), don't
        * specify this flag. Alternatively take a look at the
        * <code>AI_CONFIG_PP_RRM_EXCLUDE_LIST</code> setting.
        */
@@ -328,7 +328,7 @@ extern ( C ) {
        * This step searches all meshes for degenerated primitives and converts
        * them to proper lines or points.
        *
-       * A face is Â»degeneratedÂ« if one or more of its points are identical.
+       * A face is »degenerated« if one or more of its points are identical.
        * To have the degenerated stuff not only detected and collapsed but also
        * removed, try one of the following procedures:
        *
@@ -398,7 +398,7 @@ extern ( C ) {
        * This step applies per-texture UV transformations and bakes them to
        * stand-alone vtexture coordinate channelss.
        *
-       * UV transformations are specified per-texture â€“ see the
+       * UV transformations are specified per-texture – see the
        * <code>AI_MATKEY_UVTRANSFORM</code> material key for more information.
        * This step processes all textures with transformed input UV coordinates
        * and generates new (pretransformed) UV channel which replace the old
@@ -458,7 +458,7 @@ extern ( C ) {
        * This flag is designed to be used with <code>OptimizeMeshes</code> for
        * best results.
        *
-       * Note: Â»CrappyÂ« scenes with thousands of extremely small meshes packed
+       * Note: »Crappy« scenes with thousands of extremely small meshes packed
        *    in deeply nested nodes exist for almost all file formats.
        *    <code>OptimizeMeshes</code> in combination with
        *    <code>OptimizeGraph</code> usually fixes them all and makes them

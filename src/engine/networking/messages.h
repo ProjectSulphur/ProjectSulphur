@@ -1,140 +1,198 @@
 #pragma once
-#include "engine/networking/message_out.h"
+#include <tools/networking/export.h>
 
-#include <glm/glm.hpp>
-
-#include <cinttypes>
-
-namespace sulphur 
+namespace sulphur
 {
-  namespace engine 
+  namespace engine
   {
     /**
-    * Adding a custom message requires the following steps to be completed:
-    * 1. Add an enumerator for the new message to sulphur::engine::MessageID
-    * 2. Declare a struct that inherits from sulphur::engine::Payload in this file that
-    *    implement the data component of the message you are adding.
-    * 3. Declare an alias that specifies sulphur::engine::Message <sulphur::engine::MessageID, TPayload>
-    *    passing it the identifier and the payload class
+    * @brief An enumerator containing the identifiers of all the messages that can be sent/received
     */
+    enum struct MessageID : uint32_t
+    {
+      kPOD = 0, //!< Unformatted plain-old-data
+      kString, //!< A text string
+      kNumMessages, //!< The amount of unique messages that can be received
+    };
 
     /**
-    * @struct sulphur::engine::PODPayload : sulphur::engine::Payload
-    * @see sulphur::engine::MessageID::kPOD
+    * @struct sulphur::engine::Payload
+    * @brief Base class for custom payload objects.
+    * @details Used for compile-time type verification and defines special member function behaviour.
     * @author Maarten ten Velden
     */
-    struct PODPayload : Payload
+    struct Payload
     {
-      byte data[networking::editor::kMaxPayloadSize];
+      Payload& operator=(const Payload&) = delete;
     };
-    using PODMessage = Message<MessageID::kPOD, PODPayload>;
-    
-    /**
-    * @struct sulphur::engine::StringPayload : sulphur::engine::Payload
-    * @see sulphur::engine::MessageID::kString
-    * @author Maarten ten Velden
-    */
-    struct StringPayload : Payload
-    {
-      char string[64];
-    };
-    using StringMessage = Message<MessageID::kString, StringPayload>;
 
     /**
-    * @struct sulphur::engine::WindowHandlePayload : sulphur::engine::Payload
-    * @see sulphur::engine::MessageID::kWindowHandle
+    * @class sulphur::engine::MessagePayload
+    * @brief A class representing the data component of a message.
+    * @see sulphur::engine::editor::Message::SendLocal
+    * @see sulphur::engine::editor::Message::SendToEditor
     * @author Maarten ten Velden
     */
-    struct WindowHandlePayload : Payload
+    class MessagePayload
     {
-      int64_t handle;
+    public:
+      /**
+      * @brief Default constructor
+      * @remarks Sets the amount of bytes used to the max payload capacity (networking::editor::kMaxPayloadSize)
+      */
+      MessagePayload();
+      /**
+      * @brief Custom copy constructor. Only copies over the bytes that are actually used
+      * @param[in] payload (const sulphur::engine::editor::MessagePayload&) The object from which to copy the data over
+      * @see sulphur::engine::editor::MessagePayload
+      */
+      MessagePayload(const MessagePayload& payload);
+      /**
+      * @brief Custom constructor. Copies over all bytes from a message.
+      * @param[in] payload (const TPayload&) The object from which to copy the payload data
+      * @tparam TPayload (typename) The class that identifies how to interpret the payload data
+      */
+      template<typename TPayload, typename = typename std::enable_if<eastl::is_base_of<Payload, TPayload>::value>::type>
+      MessagePayload(const TPayload& payload);
+
+      /**
+      * @brief Getter for the unformatted data component of the message.
+      * @return (uint8_t*) A pointer to the first byte of this array.
+      */
+      uint8_t* data();
+      /**
+      * @brief Constant getter for the unformatted data component of the message.
+      * @return (const uint8_t*) A const-pointer to the first byte of this array.
+      */
+      const uint8_t* data() const;
+      /**
+      * @brief Getter for the number of bytes in the payload that contain actual information.
+      * @return (uint32_t) The number that is the amount of bytes used.
+      */
+      uint32_t used_bytes() const;
+
+      /**
+      * @brief Conversion function for interpretting the internal data as defined by a class.
+      * @tparam TPayload (typename) The class that identifies how to interpret the payload data
+      * @return (const TPayload&) A read-only reference to the internal data as the requested type.
+      */
+      template<typename TPayload, typename = typename std::enable_if<eastl::is_base_of<Payload, TPayload>::value>::type>
+      const TPayload& AsFormat() const;
+
+      /**
+      * @internal
+      * @brief Check if a custom payload type is of acceptable size (at compile-time).
+      * @tparam TPayload (typename) The class that identifies how to interpret the payload data
+      */
+      template<typename TPayload, typename = typename std::enable_if<eastl::is_base_of<Payload, TPayload>::value>::type>
+      static constexpr void ValidateSize()
+      {
+        static_assert(sizeof(TPayload) < networking::editor::kMaxPayloadSize, "TPayload carries a payload bigger than the maximum allowed size");
+      }
+
+    private:
+      uint8_t data_[networking::editor::kMaxPayloadSize]; //!< The unformatted data component of the message
+      uint32_t used_bytes_; //!< The number of bytes in the payload that contain actual information
+
     };
-    using WindowHandleMessage = Message<MessageID::kWindowHandle, WindowHandlePayload>;
-    
-    /**
-    * @struct sulphur::engine::EntityCreatedPayload : sulphur::engine::Payload
-    * @see sulphur::engine::MessageID::kEntityCreated
-    * @author Maarten ten Velden
-    */
-    struct EntityCreatedPayload : Payload
-    {
-      size_t entity_id; //!< The ID of the new entity
-    };
-    using EntityCreatedMessage = Message<MessageID::kEntityCreated, EntityCreatedPayload>;
 
     /**
-    * @struct sulphur::engine::EntityDestroyedPayload : sulphur::engine::Payload
-    * @see sulphur::engine::MessageID::kEntityDestroyed
+    * @struct sulphur::engine::MessageBuffer
+    * @brief A small structure that can be used to represent a message whose type is unknown at compile time
     * @author Maarten ten Velden
     */
-    struct EntityDestroyedPayload : Payload
+    struct MessageBuffer
     {
-      size_t entity_id; //!< The ID of the entity to be destroyed
+      MessageID id; //!< The unique identifier that specifies the message's type
+      MessagePayload payload; //!< The data component of the message
     };
-    using EntityDestroyedMessage = Message<MessageID::kEntityDestroyed, EntityDestroyedPayload>;
 
     /**
-    * @struct sulphur::engine::ComponentAddedPayload : sulphur::engine::Payload
-    * @see sulphur::engine::MessageID::kComponentAdded
+    * @class sulphur::engine::editor::Message <sulphur::engine::MessageType, TPayload>
+    * @brief A structure that makes sending messages easier by providing an interface that wraps the individual message components.
+    * @tparam actual_id (MessageID) The unique identifier that specifies the message type
+    * @tparam TPayload (typename) The class that implements the data component of the message
+    * @remarks For an example of how this might be used see sulphur::engine::editor::PODMessage
     * @author Maarten ten Velden
     */
-    struct ComponentAddedPayload : Payload
+    template<MessageID actual_id, typename TPayload>
+    class Message
     {
-      size_t entity_id; //!< The ID of the entity to which the component was attached
-      size_t component_type_id; //!< The ID of component system to target
-    };
-    using ComponentAddedMessage = Message<MessageID::kComponentAdded, ComponentAddedPayload>;
+      static_assert(eastl::is_base_of<Payload, TPayload>::value, "TPayload must be derived from sulphur::engine::Payload");
+      static_assert(sizeof(TPayload) < networking::editor::kMaxPayloadSize, "TPayload carries a payload bigger than the maximum allowed size");
 
-    /**
-    * @struct sulphur::engine::ComponentRemovedPayload : sulphur::engine::Payload
-    * @see sulphur::engine::MessageID::kComponentRemoved
-    * @author Maarten ten Velden
-    */
-    struct ComponentRemovedPayload : Payload
+    public:
+
+      /**
+      * @brief Accessor to edit the internal payload data
+      */
+      TPayload& payload();
+      /**
+      * @brief Constant getter to read the internal payload data
+      */
+      const TPayload& payload() const;
+      /**
+      * @brief Compile-time constant getter to get the message identifier.
+      */
+      constexpr MessageID id() const;
+
+    private:
+      TPayload payload_;
+    };
+
+    //-------------------------------------------------------------------------
+    template<MessageID actual_id, typename TPayload>
+    inline const TPayload& Message<actual_id, TPayload>::payload() const
     {
-      size_t entity_id; //!< The ID of the entity from which the component was removed
-      size_t component_type_id; //!< The ID of component system to target
-      size_t component_id; //!< The ID of the component to be removed
-    };
-    using ComponentRemovedMessage = Message<MessageID::kComponentRemoved, ComponentRemovedPayload>;
+      return payload_;
+    }
 
-    /**
-    * @struct sulphur::engine::ClickRaycastPayload : sulphur::engine::Payload
-    * @see sulphur::engine::MessageID::kClickRaycast
-    * @author Maarten ten Velden
-    */
-    struct ClickRaycastPayload : Payload
+    //-------------------------------------------------------------------------
+    template<MessageID actual_id, typename TPayload>
+    inline TPayload& Message<actual_id, TPayload>::payload()
     {
-      size_t camera_component_id; //!< The ID of the camera component to target
-      glm::vec2 screen_position; //!< The normalized position (from 0 to 1) inside the camera's viewport
-    };
-    using ClickRaycastMessage = Message<MessageID::kClickRaycast, ClickRaycastPayload>;
+      return payload_;
+    }
 
-    /**
-    * @struct sulphur::engine::RaycastPayload : sulphur::engine::Payload
-    * @see sulphur::engine::MessageID::kRaycast
-    * @author Maarten ten Velden
-    */
-    struct RaycastPayload : Payload
+    //-------------------------------------------------------------------------
+    template<MessageID actual_id, typename TPayload>
+    inline constexpr MessageID Message<actual_id, TPayload>::id() const
     {
-      glm::vec3 origin; //!< The origin of the ray in world-space.
-      glm::vec3 direction; //!< The direction of the ray in world-space.
-    };
-    using RaycastMessage = Message<MessageID::kRaycast, RaycastPayload>;
+      return actual_id;
+    }
 
-    /**
-    * @struct sulphur::engine::RaycastResultPayload : sulphur::engine::Payload
-    * @see sulphur::engine::MessageID::kRaycastResult
-    * @author Maarten ten Velden
-    */
-    struct RaycastResultPayload : Payload
+    //-------------------------------------------------------------------------
+    template<typename TPayload, typename>
+    inline MessagePayload::MessagePayload(const TPayload& payload) :
+      used_bytes_(sizeof(TPayload))
     {
-      glm::vec3 origin; //!< The origin of the ray in world-space.
-      glm::vec3 direction; //!< The direction of the ray in world-space.
-      float t; //!< The point along the ray at which something was hit equal to -1 if nothing was hit
-      size_t entity_id; //!< The ID of the entity that was hit
-    };
-    using RaycastResultMessage = Message<MessageID::kRaycastResult, RaycastResultPayload>;
+      ValidateSize<TPayload>();
+      memcpy_s(data_, sizeof data_, &payload, used_bytes_);
+    }
 
+    //-------------------------------------------------------------------------
+    template<typename TPayload, typename>
+    inline const TPayload& MessagePayload::AsFormat() const
+    {
+      ValidateSize<TPayload>();
+      return reinterpret_cast<const TPayload&>(data_);
+    }
+
+    //-------------------------------------------------------------------------
+    inline uint8_t* MessagePayload::data()
+    {
+      return data_;
+    }
+    //-------------------------------------------------------------------------
+    inline const uint8_t* MessagePayload::data() const
+    {
+      return data_;
+    }
+
+    //-------------------------------------------------------------------------
+    inline uint32_t MessagePayload::used_bytes() const
+    {
+      return used_bytes_;
+    }
   }
 }

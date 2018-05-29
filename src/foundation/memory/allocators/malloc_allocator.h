@@ -28,6 +28,10 @@ namespace sulphur
       */
       MallocAllocator(void* buffer, size_t size);
 
+      /**
+       * @brief Move assignment operator.
+       */
+      MallocAllocator& operator=(MallocAllocator&& other);
     private:
 
       /**

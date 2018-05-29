@@ -10,7 +10,8 @@ namespace sulphur
       peer_(peer),
       id_(id),
       last_heartbeat_(last_heartbeat),
-      last_heartbeat_sent_(last_heartbeat)
+      last_heartbeat_sent_(last_heartbeat),
+      round_trip_time_(0)
     {
       memset(name_, '\0', kNameLength);
       memset(ip_, '\0', kIpLength);
@@ -42,11 +43,17 @@ namespace sulphur
     {
       last_heartbeat_ = heartbeat;
     }
-    //-------------------------------------------------------------------------
 
+    //-------------------------------------------------------------------------
     void NetworkPlayer::set_last_heartbeat_sent(float heartbeat)
     {
       last_heartbeat_sent_ = heartbeat;
+    }
+
+    //-------------------------------------------------------------------------
+    void NetworkPlayer::set_round_trip_time(unsigned int rtt)
+    {
+      round_trip_time_ = rtt;
     }
 
     //-------------------------------------------------------------------------
@@ -83,6 +90,10 @@ namespace sulphur
     float NetworkPlayer::last_heartbeat_sent() const
     {
       return last_heartbeat_sent_;
+    }
+    unsigned int NetworkPlayer::round_trip_time() const
+    {
+      return round_trip_time_;
     }
   }
 }

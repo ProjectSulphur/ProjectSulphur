@@ -11,6 +11,10 @@ namespace sulphur //! sulphur namespace, everything related to project sulphur
 	
 	namespace engine //! sulphur::engine namespace, everything related to the engine side of project sulphur
 	{
+    namespace editor //! sulphur::engine::editor namespace, everything related to the editor that is inside the engine can be found here
+    {
+
+    }
 	}
 	
 	namespace graphics //! sulphur::graphics namespace, everything related to the graphics side of project sulphur

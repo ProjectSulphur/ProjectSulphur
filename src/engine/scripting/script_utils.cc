@@ -1,71 +1,48 @@
-#include "script_utils.h"
+#include "engine/scripting/script_utils.h"
+#include "engine/systems/component_system.h"
 
+#include "engine/scripting/scriptable_values/scriptable_table.h"
 namespace sulphur 
 {
   namespace engine 
   {
-    foundation::SharedPointer<ScriptableValue> ScriptUtils::CreateFunction(ScriptSystem* state, ScriptFunction function, bool is_lib)
+    foundation::SharedPointer<ScriptableValue> ScriptUtils::CreateFunction(ScriptState* state, ScriptFunction function, bool is_lib)
     {
       return foundation::Memory::ConstructShared<ScriptableFunction>(state, function, is_lib);
     }
 
     //------------------------------------------------------------------------------
-    foundation::SharedPointer<ScriptableValue> ScriptUtils::CreateTable(ScriptSystem* state)
+    foundation::SharedPointer<ScriptableTable> ScriptUtils::CreateTable(ScriptState* state)
     {
       return foundation::Memory::ConstructShared<ScriptableTable>(
         &foundation::Memory::default_allocator(), 
-        state
-        );
+        state);
     }
 
     //------------------------------------------------------------------------------
-    void ScriptUtils::SetObjectValue(
-      foundation::SharedPointer<ScriptableValue> object, 
-      foundation::SharedPointer<ScriptableValue>  key, 
-      foundation::SharedPointer<ScriptableValue>  value
-    )
+    foundation::SharedPointer<ScriptableTable> ScriptUtils::GetTable(foundation::SharedPointer<ScriptableValue> table)
     {
-      object->Push();
-      key->Push();
-      value->Push();
-
-      lua_settable(object->script_system()->lua_state(), -3);
-
-      lua_pop(object->script_system()->lua_state(), -1);
+      if (table->GetType() != ScriptableValueType::kObject)
+      {
+        PS_LOG(Error, "Tried to get scriptable value as a table but it's not a table");
+        return nullptr;
+      }
+       
+      return eastl::static_pointer_cast<ScriptableTable, ScriptableValue>(table);
     }
 
-    foundation::Map<
-      foundation::SharedPointer<ScriptableValue>, 
-      foundation::SharedPointer<ScriptableValue>
-    > ScriptUtils::GetObject(foundation::SharedPointer<ScriptableValue> value)
+    //------------------------------------------------------------------------------
+    ScriptHandle ScriptUtils::InstantiateType(
+      ScriptState* state, int id, void* handle)
     {
-      value->Push();
+      ScriptState::Metatable mt = state->GetMetatable(id);
+      void* mem = lua_newuserdata(state->lua_state(), mt.size);
+      memcpy(mem, handle, mt.size);
 
-      foundation::Map<
-        foundation::SharedPointer<ScriptableValue>, foundation::SharedPointer<ScriptableValue>
-      > result = foundation::Map<
-        foundation::SharedPointer<ScriptableValue>,
-        foundation::SharedPointer<ScriptableValue>
-      >();
+      foundation::SharedPointer<ScriptableValue> ud = state->GetFromStack(-1);
+      ScriptableObject::SetMetaTable(ud, mt.name.c_str());
 
-      lua_pushnil(value->script_system()->lua_state());
-
-      while (lua_next(value->script_system()->lua_state(), -2))
-      {
-
-        foundation::SharedPointer<ScriptableValue> key =
-          foundation::Memory::ConstructShared<ScriptableValue>(value->script_system(), -2);
-        foundation::SharedPointer<ScriptableValue> mvalue =
-          foundation::Memory::ConstructShared<ScriptableValue>(value->script_system(), -1);
-
-        result.insert({ { key, mvalue } });
-
-        lua_pop(value->script_system()->lua_state(), 1);
-      }
-
-      lua_pop(value->script_system()->lua_state(), -1);
-
-      return result;
+      return ud;
     }
 
     //------------------------------------------------------------------------------
@@ -75,7 +52,7 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------
-    foundation::SharedPointer<ScriptableValue> ScriptUtils::Instantiate(ScriptSystem* state)
+    foundation::SharedPointer<ScriptableValue> ScriptUtils::Instantiate(ScriptState* state)
     {
       return foundation::Memory::ConstructShared<ScriptableValue>(state);
     }

@@ -1,0 +1,26 @@
+﻿<UserControl x:Class="sulphur.editor.controls.ToolbarControl"
+             x:Name="toolbar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:fa="http://schemas.fontawesome.io/icons/"
+             xmlns:controls="clr-namespace:sulphur.editor.controls"
+             mc:Ignorable="d" 
+             d:DesignHeight="32" d:DesignWidth="800">
+
+    <DockPanel x:Name="panel" HorizontalAlignment="Left" LastChildFill="False" Width="530">
+        <DockPanel DockPanel.Dock="Left">
+            <ToggleButton x:Name="translate_gizmo_button" fa:Awesome.Content="Arrows" Height="32" VerticalAlignment="Top" Width="32" Background="{x:Null}" BorderBrush="{x:Null}" TextElement.FontFamily="pack://application:,,,/FontAwesome.WPF;component/#FontAwesome" FontSize="20" Click="TranslateGizmoSelectedButtonClick" DockPanel.Dock="Left" IsChecked="True"/>
+            <ToggleButton x:Name="rotate_gizmo_button" fa:Awesome.Content="Refresh" Height="32" VerticalAlignment="Top" Width="32" Background="{x:Null}" BorderBrush="{x:Null}" TextElement.FontFamily="pack://application:,,,/FontAwesome.WPF;component/#FontAwesome" FontSize="20" Click="RotateGizmoSelectedButtonClick" DockPanel.Dock="Left"/>
+            <ToggleButton x:Name="scale_gizmo_button" fa:Awesome.Content="Expand" Height="32" VerticalAlignment="Top" Width="32" Background="{x:Null}" BorderBrush="{x:Null}" TextElement.FontFamily="pack://application:,,,/FontAwesome.WPF;component/#FontAwesome" FontSize="20" Click="ScaleGizmoSelectedButtonClick" DockPanel.Dock="Left"/>
+        </DockPanel>
+        <DockPanel DockPanel.Dock="Right">
+            <ToggleButton x:Name="FastBackwardButton" fa:Awesome.Content="FastBackward" Height="32" VerticalAlignment="Top" Width="32" Background="{x:Null}" BorderBrush="{x:Null}" TextElement.FontFamily="pack://application:,,,/FontAwesome.WPF;component/#FontAwesome" FontSize="20" Click="FastBackwardButtonClick" DockPanel.Dock="Right"/>
+            <Button x:Name="BackwardButton" fa:Awesome.Content="StepBackward" Height="32" VerticalAlignment="Top" Width="32" Background="{x:Null}" BorderBrush="{x:Null}" TextElement.FontFamily="pack://application:,,,/FontAwesome.WPF;component/#FontAwesome" FontSize="20" Click="BackwardButtonClick" DockPanel.Dock="Right"/>
+            <ToggleButton x:Name="PlayButton" fa:Awesome.Content="Pause" Height="32" VerticalAlignment="Top" Width="32" Background="{x:Null}" BorderBrush="{x:Null}" TextElement.FontFamily="pack://application:,,,/FontAwesome.WPF;component/#FontAwesome" FontSize="20" Click="PlayButtonClick" IsChecked="True" DockPanel.Dock="Right"/>
+            <Button x:Name="ForwardButton" fa:Awesome.Content="StepForward" Height="32" VerticalAlignment="Top" Width="32" Background="{x:Null}" BorderBrush="{x:Null}" TextElement.FontFamily="pack://application:,,,/FontAwesome.WPF;component/#FontAwesome" FontSize="20" Click="ForwardButtonClick" DockPanel.Dock="Right"/>
+            <ToggleButton x:Name="FastForwardButton" fa:Awesome.Content="FastForward" Height="32" VerticalAlignment="Top" Width="32" Background="{x:Null}" BorderBrush="{x:Null}" TextElement.FontFamily="pack://application:,,,/FontAwesome.WPF;component/#FontAwesome" FontSize="20" Click="FastForwardButtonClick" DockPanel.Dock="Right"/>
+        </DockPanel>
+    </DockPanel>
+</UserControl>

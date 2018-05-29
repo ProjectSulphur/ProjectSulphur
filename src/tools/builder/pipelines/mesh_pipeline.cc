@@ -1,7 +1,9 @@
 #include "tools/builder/pipelines/mesh_pipeline.h"
 #include "tools/builder/shared/util.h"
+#include "tools/builder/pipelines/skeleton_pipeline.h"
 #include <foundation/io/binary_writer.h>
 #include <foundation/logging/logger.h>
+#include <foundation/pipeline-assets/skeleton.h>
 #include <glm/gtx/norm.hpp>
 #include <assimp/scene.h>
 
@@ -11,11 +13,13 @@ namespace sulphur
   {
     //--------------------------------------------------------------------------------
     bool MeshPipeline::Create(const aiScene* scene, bool single_mesh,
-                              foundation::Vector<foundation::MeshAsset>& meshes) const
+      const SkeletonPipeline& skeleton_pipeline,
+      foundation::Vector<foundation::MeshAsset>& meshes,
+      foundation::Vector<foundation::SkeletonAsset>& skeletons) const
     {
       if (scene == nullptr)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "scene == nullptr. No meshes created.");
         return false;
       }
@@ -58,10 +62,12 @@ namespace sulphur
 
         mesh.name = name;
 
-        const bool result = LoadSubMeshes(scene, node, mesh.data);
+        const bool result = LoadSubMeshes(scene, node, glm::mat4(1.0f), 
+          mesh.data, skeleton_pipeline, skeletons);
 
         if (result == true && mesh.data.sub_meshes.empty() == false)
         {
+          CalculateBoundingShapes(mesh.data);
           meshes.push_back(mesh);
         }
       }
@@ -70,26 +76,26 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------------
-    bool MeshPipeline::PackageMesh(const foundation::String& asset_origin, foundation::MeshAsset& mesh)
+    bool MeshPipeline::PackageMesh(const foundation::Path& asset_origin, foundation::MeshAsset& mesh)
     {
       if (mesh.name.get_length() == 0)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error, 
+        PS_LOG_BUILDER(Error, 
           "Mesh name not initialized. The mesh will not be packaged.");
         return false;
       }
 
       if (mesh.data.sub_meshes.empty() == true)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "Mesh holds no vertex data. The mesh will not be packaged.");
         return false;
       }
 
-      foundation::String output_file = "";
+      foundation::Path output_file = "";
       if(RegisterAsset(asset_origin, mesh.name, output_file, mesh.id) == false)
       {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+        PS_LOG_BUILDER(Error,
           "Failed to register mesh. The mesh will not be packaged.");
 
         return false;
@@ -97,25 +103,11 @@ namespace sulphur
 
       foundation::BinaryWriter writer(output_file);
 
-      writer.Write(mesh.data.sub_meshes.size());
+      writer.Write(mesh.data);
 
-      for (int i = 0; i < mesh.data.sub_meshes.size(); ++i)
+      if (writer.SaveCompressed(foundation::CompressionType::kHighCompression) == false)
       {
-        const foundation::SubMesh& sub_mesh = mesh.data.sub_meshes[i];
-        writer.Write(sub_mesh.vertex_config);
-        writer.Write(sub_mesh.vertices_base);
-        writer.Write(sub_mesh.vertices_color);
-        writer.Write(sub_mesh.vertices_textured);
-        writer.Write(sub_mesh.vertices_bones);
-        writer.Write(sub_mesh.indices);
-        writer.Write(sub_mesh.primitve_type);
-        writer.Write(sub_mesh.bounding_box);
-        writer.Write(sub_mesh.bounding_sphere);
-      }
-
-      if (writer.Save() == false)
-      {
-        PS_LOG_WITH(foundation::LineAndFileLogger, Error, 
+        PS_LOG_BUILDER(Error, 
           "Failed to package mesh.");
         return false;
       }
@@ -137,8 +129,20 @@ namespace sulphur
 
     //--------------------------------------------------------------------------------
     bool MeshPipeline::LoadSubMeshes(const aiScene* scene, const aiNode* node,
-      foundation::MeshData& mesh)
+      const glm::mat4& parent_transform, foundation::MeshData& mesh,
+      const SkeletonPipeline& skeleton_pipeline,
+      foundation::Vector<foundation::SkeletonAsset>& skeletons)
     {
+      glm::mat4 root_transform = parent_transform * glm::inverse(glm::transpose(
+        *reinterpret_cast<const glm::mat4*>(&node->mTransformation)));
+
+      foundation::SkeletonAsset skeleton = {};
+      const bool skeleton_result = skeleton_pipeline.Create(scene, node, skeleton);
+      if(skeleton_result == true)
+      {
+        skeletons.push_back(skeleton);
+      }
+
       for (unsigned int i = 0u; i < node->mNumMeshes; i++)
       {
         const aiMesh* ai_mesh = scene->mMeshes[node->mMeshes[i]];
@@ -147,13 +151,13 @@ namespace sulphur
         switch (ai_mesh->mPrimitiveTypes)
         {
         case aiPrimitiveType_POINT:
-          sub_mesh.primitve_type = foundation::PrimitiveType::kPoint;
+          sub_mesh.primitive_type = foundation::PrimitiveType::kPoint;
           break;
         case aiPrimitiveType_LINE:
-          sub_mesh.primitve_type = foundation::PrimitiveType::kLine;
+          sub_mesh.primitive_type = foundation::PrimitiveType::kLine;
           break;
         case aiPrimitiveType_TRIANGLE:
-          sub_mesh.primitve_type = foundation::PrimitiveType::kTriangle;
+          sub_mesh.primitive_type = foundation::PrimitiveType::kTriangle;
           // Copy the indices
           sub_mesh.indices.resize(ai_mesh->mNumFaces * 3);
           for (unsigned int f = 0u; f < ai_mesh->mNumFaces; ++f)
@@ -166,7 +170,7 @@ namespace sulphur
           break;
         default:
           {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Assert,
+          PS_LOG_BUILDER(Assert,
             "Unknown primitve type.");
             return false;
           }
@@ -174,7 +178,7 @@ namespace sulphur
 
         if (ai_mesh->HasPositions() == false)
         {
-          PS_LOG_WITH(foundation::LineAndFileLogger, Error,
+          PS_LOG_BUILDER(Error,
             "Mesh has no vertex positions.");
           return false;
         }
@@ -240,7 +244,7 @@ namespace sulphur
           }
         }
 
-        if (ai_mesh->HasBones() == true)
+        if (ai_mesh->HasBones() == true && skeleton_result == true)
         {
           sub_mesh.vertices_bones.resize(ai_mesh->mNumVertices);
           sub_mesh.vertex_config |= foundation::VertexConfig::kVertexBones;
@@ -258,21 +262,26 @@ namespace sulphur
 
               if (offset == 4)
               {
-                PS_LOG_WITH(foundation::LineAndFileLogger, Assert,
+                PS_LOG_BUILDER(Assert,
                   "Vertex has more than 4 bone weights.");
                 return false;
               }
 
-              vertex.bone_indices[offset] = b; // Set the bone index at offset
-              vertex.bone_weights[offset] = ai_weight.mWeight;
-              // Set the bone weight at offset
-
-              ++offset;
+              const foundation::Map<foundation::String, unsigned>::const_iterator it = 
+                skeleton.data.bone_names.find(ai_bone->mName.C_Str());
+              if(it != skeleton.data.bone_names.end())
+              {
+                vertex.bone_indices[offset] = uint16_t(it->second); // Set the bone index at offset
+                vertex.bone_weights[offset] = ai_weight.mWeight; // Set the bone weight at offset
+                ++offset;
+              }
             }
           }
         }
 
         CalculateBoundingShapes(sub_mesh);
+
+        sub_mesh.root_transform = root_transform;
 
         if (sub_mesh.vertex_config != foundation::VertexConfig::kNone)
         {
@@ -283,7 +292,8 @@ namespace sulphur
       // Recursivly add the sub meshes in the child nodes
       for (unsigned int i = 0u; i < node->mNumChildren; ++i)
       {
-        if (LoadSubMeshes(scene, node->mChildren[i], mesh) == false)
+        if (LoadSubMeshes(scene, node->mChildren[i], root_transform, mesh, 
+          skeleton_pipeline, skeletons) == false)
         {
           return false;
         }
@@ -337,6 +347,23 @@ namespace sulphur
 
       bs_center = (b + c) * 0.5f;
       bs_radius = glm::distance(b, c) * 0.5f;
+    }
+
+    void MeshPipeline::CalculateBoundingShapes(foundation::MeshData& mesh)
+    {
+      if(mesh.sub_meshes.empty() == true)
+      {
+        return;
+      }
+
+      mesh.bounding_box = mesh.sub_meshes[0].bounding_box;
+      mesh.bounding_sphere = mesh.sub_meshes[0].bounding_sphere;
+
+      for(int i = 1; i < mesh.sub_meshes.size(); ++i)
+      {
+        mesh.bounding_box += mesh.sub_meshes[i].bounding_box;
+        mesh.bounding_sphere += mesh.sub_meshes[i].bounding_sphere;
+      }
     }
   }
 }

@@ -14,6 +14,7 @@ namespace sulphur
     {
       shape_ = foundation::Memory::Construct<btCapsuleShape>(PhysicsShape::kDefaultExtents,
                                                              PhysicsShape::kDefaultExtents*3);
+      shape_->setUserPointer(this);
     }
 
     //-------------------------------------------------------------------------
@@ -25,18 +26,11 @@ namespace sulphur
     //-------------------------------------------------------------------------
     void BulletCapsuleShape::SetRadius(float radius)
     {
-      // Bullet doesn't allow modifying capsules at run-time, 
-      // but we're doing it anyway by recreating the shape.
+      btVector3 half_extents = btVector3(radius, GetHeight()*0.5f, radius);
 
-      float height = GetHeight();
-      PhysicsBody* body = attached_body_;
+      reinterpret_cast<btCapsuleShape*>(shape_)->setImplicitShapeDimensions(half_extents);
 
-      AttachToBody(nullptr);
-
-      foundation::Memory::Destruct<btCollisionShape>(shape_);
-      shape_ = foundation::Memory::Construct<btCapsuleShape>(radius, height);
-
-      AttachToBody(body);
+      UpdateColliders();
     }
 
     //-------------------------------------------------------------------------
@@ -48,18 +42,11 @@ namespace sulphur
     //-------------------------------------------------------------------------
     void BulletCapsuleShape::SetHeight(float height)
     {
-      // Bullet doesn't allow modifying capsules at run-time, 
-      // but we're doing it anyway by recreating the shape.
+      btVector3 half_extents = btVector3(GetRadius(), height*0.5f, GetRadius());
 
-      float radius = GetRadius();
-      PhysicsBody* body = attached_body_;
+      reinterpret_cast<btCapsuleShape*>(shape_)->setImplicitShapeDimensions(half_extents);
 
-      AttachToBody(nullptr);
-
-      foundation::Memory::Destruct<btCollisionShape>(shape_);
-      shape_ = foundation::Memory::Construct<btCapsuleShape>(radius, height);
-
-      AttachToBody(body);
+      UpdateColliders();
     }
 
     //-------------------------------------------------------------------------

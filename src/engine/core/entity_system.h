@@ -1,12 +1,10 @@
 #pragma once
 
 #include "engine/application/application.h"
-#include "engine/systems/component_system.h"
 #include "engine/core/entity_component.h"
 #include "engine/core/handle_base.h"
 #include "engine/core/world.h"
 
-#include <foundation/utils/generation_handle.h>
 #include <foundation/utils/type_definitions.h>
 #include <foundation/containers/vector.h>
 #include <foundation/containers/deque.h>
@@ -16,9 +14,10 @@ namespace sulphur
   namespace engine
   {
     class EntitySystem;
+    class EntityRewindStorage;
 
     /**
-    * @class sulphur::engine::Entity : public sulphur::engine::ComponentHandleBase
+    * @class sulphur::engine::Entity : sulphur::engine::ComponentHandleBase
     * @brief The entity that is used by the component systems. You can attach or remove components from this entity and it will automatically communicate with the entity manager and component system
     * @todo Hide functions that should not be called by the user
     * @todo Decide on 64 bit or 32 bit
@@ -27,10 +26,20 @@ namespace sulphur
     * @todo Check over the functions as many could be const
     * @author Raymi Klingers
     */
-    class Entity : public ComponentHandleBase
+    SCRIPT_CLASS() class Entity : public ComponentHandleBase
     {
     public:
+
       using System = EntitySystem;
+
+      SCRIPT_NAME(Entity);
+
+      /**
+      * @brief Adds a component by type ID as in the script state
+      * @param[in] id (int) The ID of the component to add
+      * @return (sulphur::engine::ScriptHandle) The created component as a script value
+      */
+      SCRIPT_FUNC() ScriptHandle AddComponent(int id);
 
       /**
       * @brief Adds a component to the entity
@@ -38,6 +47,13 @@ namespace sulphur
       */
       template<typename Component>
       Component Add();
+
+      /**
+      * @brief Removes a component by type ID as in the script state
+      * @param[in] id (int) The ID of the component to remove
+      */
+      SCRIPT_FUNC() void RemoveComponent(int id);
+
       /**
       * @brief Removes a component from the entity
       * @param[in] handle (sulphur::engine::Component) The component to remove
@@ -45,6 +61,14 @@ namespace sulphur
       */
       template<typename Component>
       void Remove(Component handle);
+
+      /**
+      * @brief Gets a component by type ID as in the script state
+      * @param[in] id (int) The ID of the component to get
+      * @return (sulphur::engine::ScriptHandle) The component as a script value
+      */
+      SCRIPT_FUNC() ScriptHandle GetComponent(int id);
+
       /**
       * @brief Gets a component from the entity
       * @return (sulphur::engine::Component) The component if the entity has it else an invalid handle
@@ -73,7 +97,8 @@ namespace sulphur
     };
 
     /**
-    * @class sulphur::engine::EntitySystem : public sulphur::engine::IOwnerSystem <sulphur::engine::EntitySystem>
+    * @class sulphur::engine::EntitySystem :
+    *        sulphur::engine::IOwnerSystem <sulphur::engine::Entity>
     * @brief Handles the entity lifetime and the linking of the components with entities.
     * @todo Hide functions that should not be called on the entity system but just on the entity.
     * @todo Move this into the component folder? Or its own folder
@@ -83,6 +108,7 @@ namespace sulphur
     {
       static constexpr uint kMinimumFreeIndices_ = 1024u; //!< Number of free indices before we start to reuse entity slots
 
+      friend EntityRewindStorage;
     public:
       /**
        * @brief Default constructor
@@ -95,15 +121,20 @@ namespace sulphur
       void OnInitialize(Application& app, foundation::JobGraph& job_graph) override;
 
       /**
+      * @see sulphur::engine::IOwnerSystem::OnTerminate
+      */
+      void OnTerminate() override;
+
+      /**
       * @brief Creates a new entity with proper generation and entity-component link storage.
       * @return (sulphur::engine::Entity) A new entity.
       */
-      Entity Create() override;
+      Entity Create();
       /**
       * @brief Destroys the entity, increments the generation and removes the linking and destroys the components.
       * @param[in] entity (sulphur::engine::Entity) The entity to destroy.
       */
-      void Destroy(Entity entity) override;
+      void Destroy(Entity entity);
 
       /**
       * @brief Checks if the entity is alive.
@@ -137,12 +168,21 @@ namespace sulphur
       ComponentHandleBase GetHandle(Entity entity, size_t type) const;
 
     private:
+      /**
+      * @brief Creates a new entity that is owned by the editor
+      * @param[in] with_editor (bool) Setting this to true indicates the editor instantiated this
+      *                               entity, rather than the local application
+      * @return (sulphur::engine::Entity) A new entity.
+      */
+      Entity Create(bool with_editor);
+
       World* world_; //!< A pointer to the world that this system is a part of
+      EntityRewindStorage* storage_;//<! A class to glue the data systems of the rewinder together
 
-      foundation::Vector<byte> generation;//!< Stores the current generation of the entity which is used in the Alive function @see sulphur::engine::EntitySystem::Alive.
-      foundation::Deque<uint> free_indices;//!< Stores free entity slots for reuse.
-      foundation::Vector<EntityComponentData> entity_components;//!< Stores the linking information of the components.
 
+      foundation::Vector<byte> generation_;//!< Stores the current generation of the entity which is used in the Alive function @see sulphur::engine::EntitySystem::Alive.
+      foundation::Deque<uint> free_indices_;//!< Stores free entity slots for reuse.
+      foundation::Vector<EntityComponentData> entity_components_;//!< Stores the linking information of the components.
     };
 
     //-------------------------------------------------------------------------
@@ -150,29 +190,32 @@ namespace sulphur
     inline Component Entity::Add()
     {
       World& world = application_->GetService<WorldProviderSystem>().GetWorld();
-      EntitySystem& system = world.GetSystem<EntitySystem>();
+      EntitySystem& system = world.GetOwner<EntitySystem>();
 
       Component component = (static_cast<typename Component::System&>(
-        world.GetSystem(Component::System::type_id())
-        )).Create(*this);
+        world.GetComponent(foundation::type_id<typename Component::System>())
+        )).template
+        Create<Component>(*this);
 
       system.Link(
         *this,
         *static_cast<ComponentHandleBase*>(&component),
-        Component::System::type_id());
+        foundation::type_id<typename Component::System>());
 
       return component;
     }
+    
+    //-------------------------------------------------------------------------
     template<typename Component>
     inline void Entity::Remove(Component handle)
     {
       World& world = application_->GetService<WorldProviderSystem>().GetWorld();
-      EntitySystem& system = world.GetSystem<EntitySystem>();
+      EntitySystem& system = world.GetOwner<EntitySystem>();
 
       system.UnLink(
         *this,
         *static_cast<ComponentHandleBase*>(&handle),
-        Component::System::type_id());
+        foundation::type_id<typename Component::System>());
     }
 
     //-------------------------------------------------------------------------
@@ -180,18 +223,20 @@ namespace sulphur
     inline Component Entity::Get() const
     {
       World& world = application_->GetService<WorldProviderSystem>().GetWorld();
-      EntitySystem& system = world.GetSystem<EntitySystem>();
+      EntitySystem& system = world.GetOwner<EntitySystem>();
 
-      ComponentHandleBase avoid_error = system.GetHandle(*this, Component::System::type_id());
-      return Component(world.GetSystem<typename Component::System>(), avoid_error.Handle());
+      ComponentHandleBase avoid_error = system.GetHandle(*this, foundation::type_id<typename Component::System>());
+      return Component(world.GetComponent<typename Component::System>(), avoid_error.Handle());
     }
+    
+    //-------------------------------------------------------------------------
     template<typename Component>
     inline bool Entity::Has() const
     {
       World& world = application_->GetService<WorldProviderSystem>().GetWorld();
-      EntitySystem& system = world.GetSystem<EntitySystem>();
+      EntitySystem& system = world.GetOwner<EntitySystem>();
 
-      ComponentHandleBase avoid_error = system.GetHandle(*this, Component::System::type_id());
+      ComponentHandleBase avoid_error = system.GetHandle(*this, foundation::type_id<typename Component::System>());
       return avoid_error != Component::InvalidHandle();
     }
   }

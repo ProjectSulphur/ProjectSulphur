@@ -6,8 +6,8 @@ namespace sulphur
 {
   namespace foundation
   {
-    template<typename T>
-    using Set = eastl::set<T, eastl::less<T>, EASTLAllocator>;
+    template<typename T, typename Compare = eastl::less<T>>
+    using Set = eastl::set<T, Compare, EASTLAllocator>;
     template<typename T>
     using MultiSet = eastl::multiset<T>;
   }

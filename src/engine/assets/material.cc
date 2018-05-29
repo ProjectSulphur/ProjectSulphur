@@ -11,7 +11,8 @@ namespace sulphur
     MaterialPass::MaterialPass(const ShaderHandle& shader) :
       shader_(shader),
       uniform_buffers_(),
-      textures_(shader->GetTextureInfo().size())
+      textures_(shader->GetTextureInfo().size()),
+      uavs_(shader->GetUAVInfo().size())
     {
       for (size_t i = 0; i < 5; ++i)
       {
@@ -25,6 +26,12 @@ namespace sulphur
 
       // Fill with white textures
       for (TextureHandle& texture : textures_)
+      {
+        texture = AssetSystem::Instance().GetHandle<Texture>("__pixel_white");
+      }
+
+      // Fill with white textures
+      for (TextureHandle& texture : uavs_)
       {
         texture = AssetSystem::Instance().GetHandle<Texture>("__pixel_white");
       }
@@ -47,12 +54,15 @@ namespace sulphur
 
       textures_.clear();
       textures_.resize(shader->GetTextureInfo().size());
+
+      uavs_.clear();
+      uavs_.resize(shader->GetUAVInfo().size());
     }
 
     //--------------------------------------------------------------------------------
     const TextureHandle& MaterialPass::GetTexture(size_t index) const
     {
-      assert(textures_.size() >= index);
+      assert(textures_.size() >= index); // Index is bigger than the amount of textures the shader expects
       return textures_.at(index);
     }
 
@@ -75,7 +85,7 @@ namespace sulphur
     void MaterialPass::SetTexture(size_t index, const TextureHandle& texture)
     {
       assert(textures_.size() >= index); // Index is bigger than the amount of textures the shader expects
-      textures_.at(index) = texture;
+      textures_.at(index) = texture ? texture : AssetSystem::Instance().GetHandle<Texture>("__pixel_magenta");
     }
 
     //--------------------------------------------------------------------------------
@@ -86,7 +96,7 @@ namespace sulphur
       {
         if (texture_info[i].name == name)
         {
-          textures_.at(i) = texture;
+          SetTexture(i, texture);
           return;
         }
       }
@@ -100,6 +110,56 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------------
+    const TextureHandle& MaterialPass::GetUAV(size_t index) const
+    {
+      assert(uavs_.size() >= index);
+      return uavs_.at(index);
+    }
+
+    //--------------------------------------------------------------------------------
+    const TextureHandle& MaterialPass::GetUAV(const foundation::String& name) const
+    {
+      const foundation::Vector<TextureInfo> uav_info = shader_->GetUAVInfo();
+      for (int i = 0; i < uav_info.size(); ++i)
+      {
+        if (uav_info[i].name == name)
+        {
+          return uavs_.at(i);
+        }
+      }
+      assert(false && "This name does not match any of the shader variables");
+      return uavs_[0];
+    }
+
+    //--------------------------------------------------------------------------------
+    void MaterialPass::SetUAV(size_t index, const TextureHandle& uav)
+    {
+      assert(uavs_.size() >= index); // Index is bigger than the amount of uavs the shader expects
+      uavs_.at(index) = uav;
+    }
+
+    //--------------------------------------------------------------------------------
+    void MaterialPass::SetUAV(const foundation::String& name, const TextureHandle& uav)
+    {
+      const foundation::Vector<TextureInfo> uav_info = shader_->GetUAVInfo();
+      for (int i = 0; i < uav_info.size(); ++i)
+      {
+        if (uav_info[i].name == name)
+        {
+          uavs_.at(i) = uav;
+          return;
+        }
+      }
+      assert(false && "This name does not match any of the shader variables");
+    }
+
+    //--------------------------------------------------------------------------------
+    size_t MaterialPass::NumUAVs() const
+    {
+      return uavs_.size();
+    }
+
+    //--------------------------------------------------------------------------------
     UniformBuffer& MaterialPass::GetUniformBuffer(ShaderType shader_type)
     {
       return uniform_buffers_[static_cast<size_t>(shader_type)];
@@ -109,6 +169,12 @@ namespace sulphur
     const UniformBuffer& MaterialPass::GetUniformBuffer(ShaderType shader_type) const
     {
       return uniform_buffers_[static_cast<size_t>(shader_type)];
+    }
+
+    //--------------------------------------------------------------------------------
+    Material::Material(const ShaderHandle& shader)
+    {
+      AddMaterialPass(MaterialPass(shader));
     }
 
     //--------------------------------------------------------------------------------
@@ -175,23 +241,61 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------------
-    const TextureHandle & Material::GetTexture(const foundation::String& name, size_t pass_index) const
+    const TextureHandle& Material::GetTexture(const foundation::String& name, 
+      size_t pass_index) const
     {
       return GetMaterialPass(pass_index).GetTexture(name);
     }
 
     //--------------------------------------------------------------------------------
-    void Material::SetTexture(size_t texture_index, const TextureHandle& texture, size_t pass_index)
+    void Material::SetTexture(size_t texture_index, 
+      const TextureHandle& texture, size_t pass_index)
     {
       assert(material_passes_.size() >= pass_index);
       GetMaterialPass(pass_index).SetTexture(texture_index, texture);
     }
     
     //--------------------------------------------------------------------------------
-    void Material::SetTexture(const foundation::String& name, const TextureHandle& texture, size_t pass_index)
+    void Material::SetTexture(const foundation::String& name, 
+      const TextureHandle& texture, size_t pass_index)
     {
       assert(material_passes_.size() >= pass_index);
       GetMaterialPass(pass_index).SetTexture(name, texture);
+    }
+
+    //--------------------------------------------------------------------------------
+    const foundation::Vector<TextureHandle>& Material::GetUAVs(size_t pass_index) const
+    {
+      assert(material_passes_.size() >= pass_index);
+      return GetMaterialPass(pass_index).uavs();
+    }
+
+    //--------------------------------------------------------------------------------
+    const TextureHandle& Material::GetUAV(size_t texture_index, size_t pass_index) const
+    {
+      assert(material_passes_.size() >= pass_index);
+      return GetMaterialPass(pass_index).GetUAV(texture_index);
+    }
+
+    //--------------------------------------------------------------------------------
+    const TextureHandle & Material::GetUAV(const foundation::String& name, size_t pass_index) const
+    {
+      return GetMaterialPass(pass_index).GetUAV(name);
+    }
+
+    //--------------------------------------------------------------------------------
+    void Material::SetUAV(size_t texture_index, const TextureHandle& texture, size_t pass_index)
+    {
+      assert(material_passes_.size() >= pass_index);
+      GetMaterialPass(pass_index).SetUAV(texture_index, texture);
+    }
+
+    //--------------------------------------------------------------------------------
+    void Material::SetUAV(const foundation::String& name, 
+      const TextureHandle& texture, size_t pass_index)
+    {
+      assert(material_passes_.size() >= pass_index);
+      GetMaterialPass(pass_index).SetUAV(name, texture);
     }
   }
 }

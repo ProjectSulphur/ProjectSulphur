@@ -3,6 +3,9 @@
 #include "engine/application/application.h"
 #include "engine/core/world.h"
 
+#include "engine/rewinder/rewind_system.h"
+#include "engine/rewinder/systems/transform_storage.h"
+
 #include <foundation/job/job_graph.h>
 #include <foundation/job/data_policy.h>
 
@@ -12,6 +15,8 @@
 
 #include <functional>
 #include <algorithm>
+
+#include <lua-classes/transform_system.lua.cc>
 
 #define PS_FAST_QUATERNION_INVERSE
 
@@ -80,49 +85,53 @@ namespace sulphur
       return quaternion;
     }
     
+    //-------------------------------------------------------------------------
     // Source glm::decompose();
-    void Decompose(glm::mat4 const& model_matrix, glm::vec3& scale, glm::quat& orientation, glm::vec3& translation)
+    // Make a linear combination of two vectors and return the result.
+    glm::vec3 Combine(
+      glm::vec3 const& a,
+      glm::vec3 const& b,
+      float ascl, float bscl)
     {
-      glm::mat4 local_matrix(model_matrix);
-            
-      // Next take care of translation (easy).
-      translation = glm::vec3(local_matrix[3]);
-      local_matrix[3] = glm::vec4(0.0f, 0.0f, 0.0f, local_matrix[3][3]);
+      return (a * ascl) + (b * bscl);
+    }
 
-      glm::vec3 row[3];
+    void Decompose(const glm::mat4& model_matrix, glm::vec3& scale, glm::quat& orientation, glm::vec3& translation)
+    {
+      // Take care of translation (easy).
+      translation = glm::vec3(model_matrix[3]);
 
-      // Now get scale and shear.
-      for (glm::length_t i = 0; i < 3; ++i)
-      {
-        for (glm::length_t j = 0; j < 3; ++j)
-        {
-          row[i][j] = local_matrix[i][j];
-        }
-      }
-
+      glm::mat3x3 row(model_matrix);
+      
       // Compute X scale factor and normalize first row.
       scale.x = glm::length(row[0]);
       row[0] /= scale.x;
 
+      // Compute XY shear factor and make 2nd row orthogonal to 1st.
+      row[1] += (row[0] * -glm::dot(row[0], row[1]));
+
       // Now, compute Y scale and normalize 2nd row.
       scale.y = glm::length(row[1]);
       row[1] /= scale.y;
-      
+
+      // Compute XZ and YZ shears, orthogonalize 3rd row.
+      row[2] += (row[0] * -glm::dot(row[0], row[2]));
+      row[2] += (row[1] * -glm::dot(row[1], row[2]));
+
       // Next, get Z scale and normalize 3rd row.
       scale.z = glm::length(row[2]);
       row[2] /= scale.z;
-      
+
       // At this point, the matrix (in rows[]) is orthonormal.
       // Check for a coordinate system flip.  If the determinant
       // is -1, then negate the matrix and the scaling factors.
-      glm::vec3 p_dum3 = glm::cross(row[1], row[2]);
-      if (glm::dot(row[0], p_dum3) < 0)
+      glm::vec3 pdum3 = glm::cross(row[1], row[2]);
+      if (glm::dot(row[0], pdum3) < 0)
       {
+        scale *= -1.0f;
+
         for (glm::length_t i = 0; i < 3; i++)
-        {
-          scale[i] *= -1.0f;
           row[i] *= -1.0f;
-        }
       }
 
       float root, trace = row[0].x + row[1].y + row[2].z;
@@ -165,13 +174,12 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    TransformComponent TransformSystem::root_;
-
-    //-------------------------------------------------------------------------
     TransformComponent::TransformComponent() :
       system_(nullptr)
     {
     }
+
+    //-------------------------------------------------------------------------
     TransformComponent::TransformComponent(System& system, size_t handle) :
       ComponentHandleBase(handle),
       system_(&system)
@@ -183,10 +191,14 @@ namespace sulphur
     {
       return system_->GetLocal(*this);
     }
+
+    //-------------------------------------------------------------------------
     glm::mat4 TransformComponent::GetLocalToWorld()
     {
       return system_->GetLocalToWorld(*this);
     }
+
+    //-------------------------------------------------------------------------
     glm::mat4 TransformComponent::GetWorldToLocal()
     {
       return system_->GetWorldToLocal(*this);
@@ -197,14 +209,20 @@ namespace sulphur
     {
       system_->SetParent(*this, parent);
     }
+    
+    //-------------------------------------------------------------------------
     void TransformComponent::UnsetParent()
     {
       system_->UnsetParent(*this);
     }
+    
+    //-------------------------------------------------------------------------
     void TransformComponent::AttachChild(TransformComponent child)
     {
       system_->AttachChild(*this, child);
     }
+    
+    //-------------------------------------------------------------------------
     void TransformComponent::DetachChild(TransformComponent child)
     {
       system_->UnsetParent(child);
@@ -227,26 +245,44 @@ namespace sulphur
     {
       return system_->GetRoot(*this);
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::GetParent() const
     {
       return system_->GetParent(*this);
     }
+
+    //-------------------------------------------------------------------------
+    size_t TransformComponent::GetHierarchyIndex() const
+    {
+      return system_->GetHierarchyIndex(*this);
+    }
+
+    //-------------------------------------------------------------------------
     foundation::Vector<TransformComponent> TransformComponent::GetSiblings()
     {
       return system_->GetSiblings(*this);
     }
+    
+    //-------------------------------------------------------------------------
     size_t TransformComponent::GetSiblingIndex()
     {
       return system_->GetSiblingIndex(*this);
     }
+    
+    //-------------------------------------------------------------------------
     void TransformComponent::SetSiblingIndex(size_t index)
     {
       system_->SetSiblingIndex(*this, index);
     }
+    
+    //-------------------------------------------------------------------------
     foundation::Vector<TransformComponent> TransformComponent::GetChildren(bool recursive) const
     {
       return system_->GetChildren(*this, recursive);
     }
+    
+    //-------------------------------------------------------------------------
     size_t TransformComponent::GetChildCount(bool recursive) const
     {
       return system_->GetChildCount(*this, recursive);
@@ -264,6 +300,8 @@ namespace sulphur
       const glm::vec3 local_position = world_to_local * glm::vec4(position, 1.0f);
       return SetLocalPosition(local_position);
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::SetWorldRotation(const glm::quat& rotation)
     {
       if (HasParent() == false)
@@ -279,6 +317,8 @@ namespace sulphur
       return SetLocalRotation(local_rotation);
 
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::SetWorldScale(const glm::vec3& scale)
     {
       if (HasParent() == false)
@@ -290,16 +330,22 @@ namespace sulphur
       const glm::vec3 local_scale = scale / parent_scale;
       return SetLocalScale(local_scale);
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::SetLocalPosition(const glm::vec3& position)
     {
       system_->SetLocalPosition(*this, position);
       return *this;
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::SetLocalRotation(const glm::quat& rotation)
     {
       system_->SetLocalRotation(*this, rotation);
       return *this;
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::SetLocalScale(const glm::vec3& scale)
     {
       system_->SetLocalScale(*this, scale);
@@ -311,23 +357,33 @@ namespace sulphur
     {
       return system_->GetWorldPosition(*this);
     }
+    
+    //-------------------------------------------------------------------------
     glm::quat TransformComponent::GetWorldRotation()
     {
       return system_->GetWorldRotation(*this);
     }
+   
+    //-------------------------------------------------------------------------
     glm::vec3 TransformComponent::GetWorldScale()
     {
       return system_->GetWorldScale(*this);
     }
-    glm::vec3 TransformComponent::GetLocalPosition() const
+    
+    //-------------------------------------------------------------------------
+    glm::vec3 TransformComponent::GetLocalPosition()
     {
       return system_->GetLocalPosition(*this);
     }
-    glm::quat TransformComponent::GetLocalRotation() const
+    
+    //-------------------------------------------------------------------------
+    glm::quat TransformComponent::GetLocalRotation()
     {
       return system_->GetLocalRotation(*this);
     }
-    glm::vec3 TransformComponent::GetLocalScale() const
+    
+    //-------------------------------------------------------------------------
+    glm::vec3 TransformComponent::GetLocalScale()
     {
       return system_->GetLocalScale(*this);
     }
@@ -338,25 +394,35 @@ namespace sulphur
       const glm::quat forward_to_up(.7f, .7f, 0, 0);
       return SetWorldRotation(LookRotation(up, right) * forward_to_up);
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::SetWorldRight(const glm::vec3& right, glm::vec3 forward)
     {
       const glm::quat forward_to_right(-.7f, 0, .7f, 0);
       return SetWorldRotation(LookRotation(right, forward) * forward_to_right);
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::SetWorldForward(const glm::vec3& forward, glm::vec3 up)
     {
       return SetWorldRotation(LookRotation(forward, up));
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::SetLocalUp(const glm::vec3& up, glm::vec3 right)
     {
       const glm::quat forward_to_up(.7f, .7f, 0, 0);
       return SetLocalRotation(LookRotation(up, right) * forward_to_up);
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::SetLocalRight(const glm::vec3& right, glm::vec3 forward)
     {
       const glm::quat forward_to_right(-.7f, 0, .7f, 0);
       return SetLocalRotation(LookRotation(right, forward) * forward_to_right);
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::SetLocalForward(const glm::vec3& forward, glm::vec3 up)
     {
       return SetLocalRotation(LookRotation(forward, up));
@@ -365,27 +431,37 @@ namespace sulphur
     //-------------------------------------------------------------------------
     glm::vec3 TransformComponent::GetWorldUp()
     {
-      return TransformVector(glm::vec3(0.0f, 1.0f, 0.0f));
+      return TransformDirection(glm::vec3(0.0f, 1.0f, 0.0f));
     }
+    
+    //-------------------------------------------------------------------------
     glm::vec3 TransformComponent::GetWorldRight()
     {
-      return TransformVector(glm::vec3(1.0f, 0.0f, 0.0f));
+      return TransformDirection(glm::vec3(1.0f, 0.0f, 0.0f));
     }
+    
+    //-------------------------------------------------------------------------
     glm::vec3 TransformComponent::GetWorldForward()
     {
-      return TransformVector(glm::vec3(0.0f, 0.0f, -1.0f));
+      return TransformDirection(glm::vec3(0.0f, 0.0f, 1.0f));
     }
-    glm::vec3 TransformComponent::GetLocalUp() const
+    
+    //-------------------------------------------------------------------------
+    glm::vec3 TransformComponent::GetLocalUp()
     {
-      return TransformLocalVector(glm::vec3(0.0f, 1.0f, 0.0f));
+      return TransformLocalDirection(glm::vec3(0.0f, 1.0f, 0.0f));
     }
-    glm::vec3 TransformComponent::GetLocalRight() const
+    
+    //-------------------------------------------------------------------------
+    glm::vec3 TransformComponent::GetLocalRight()
     {
-      return TransformLocalVector(glm::vec3(1.0f, 0.0f, 0.0f));
+      return TransformLocalDirection(glm::vec3(1.0f, 0.0f, 0.0f));
     }
-    glm::vec3 TransformComponent::GetLocalForward() const
+    
+    //-------------------------------------------------------------------------
+    glm::vec3 TransformComponent::GetLocalForward()
     {
-      return TransformLocalVector(glm::vec3(0.0f, 0.0f, -1.0f));
+      return TransformLocalDirection(glm::vec3(0.0f, 0.0f, 1.0f));
     }
 
     //-------------------------------------------------------------------------
@@ -393,30 +469,44 @@ namespace sulphur
     {
       return SetWorldPosition(GetWorldPosition() + offset);
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::RotateWorld(const glm::quat& rotation)
     {
       return SetWorldRotation(GetWorldRotation() * rotation);
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::ScaleWorld(const glm::vec3& scale)
     {
       return SetWorldScale(GetWorldScale() * scale);
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::RotateWorldEuler(const glm::vec3& angles)
     {
       return RotateWorld(glm::quat(angles));
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::TranslateLocal(const glm::vec3& offset)
     {
       return SetLocalPosition(GetLocalPosition() + offset);
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::RotateLocal(const glm::quat& rotation)
     {
       return SetLocalRotation(GetLocalRotation() * rotation);
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::ScaleLocal(const glm::vec3& scale)
     {
       return SetLocalScale(GetLocalScale() * scale);
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::RotateLocalEuler(const glm::vec3& angles)
     {
       return RotateLocal(glm::quat(angles));
@@ -425,21 +515,45 @@ namespace sulphur
     //-------------------------------------------------------------------------
     TransformComponent TransformComponent::RotateWorldX(float angle)
     {
-      return SetWorldRotation(GetWorldRotation() * glm::quat(glm::vec3(angle, 0.0f, 0.0f)));
+      return SetWorldRotation(glm::quat(glm::vec3(angle, 0.0f, 0.0f)) * GetWorldRotation());
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::RotateWorldY(float angle)
     {
-      return SetWorldRotation(GetWorldRotation() * glm::quat(glm::vec3(0.0f, angle, 0.0f)));
+      return SetWorldRotation(glm::quat(glm::vec3(0.0f, angle, 0.0f)) * GetWorldRotation());
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::RotateWorldZ(float angle)
     {
-      return SetWorldRotation(GetWorldRotation() * glm::quat(glm::vec3(0.0f, 0.0f, -angle)));
+      return SetWorldRotation(glm::quat(glm::vec3(0.0f, 0.0f, -angle)) * GetWorldRotation());
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::RotateAroundWorld(const glm::vec3& center, const glm::vec3& axis, float angle)
     {
-      return RotateAroundWorld(center, glm::angleAxis(angle, axis));
+      return RotateAroundWorldQuat(center, glm::angleAxis(angle, axis));
     }
-    TransformComponent TransformComponent::RotateAroundWorld(const glm::vec3& center, const glm::quat& rotation)
+    
+    //-------------------------------------------------------------------------
+
+    SCRIPT_FUNC()TransformComponent TransformComponent::RotateAroundWorldAxis(const glm::vec3& axis, float angle)
+    {
+      glm::quat rotation = glm::angleAxis(angle, axis);
+      glm::quat temp_rot = GetWorldRotation();
+
+      return RotateWorld(glm::inverse(temp_rot) * rotation * temp_rot);
+    }
+    SCRIPT_FUNC()TransformComponent TransformComponent::RotateAroundLocalAxis(const glm::vec3 & axis, float angle)
+    {
+      glm::quat rotation = glm::angleAxis(angle, axis);
+      glm::quat temp_rot = GetLocalRotation();
+      return RotateLocal(glm::inverse(temp_rot) * rotation * temp_rot);
+    }
+
+    //-------------------------------------------------------------------------
+    TransformComponent TransformComponent::RotateAroundWorldQuat(const glm::vec3& center, const glm::quat& rotation)
     {
       const glm::vec3 dir = rotation * (GetWorldPosition() - center);
       SetWorldPosition(center + dir);
@@ -447,23 +561,33 @@ namespace sulphur
       glm::quat temp_rot = GetWorldRotation();
       return RotateWorld(glm::inverse(temp_rot) * rotation * temp_rot);
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::RotateLocalX(float angle)
     {
       return SetLocalRotation(GetLocalRotation() * glm::quat(glm::vec3(angle, 0.0f, 0.0f)));
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::RotateLocalY(float angle)
     {
       return SetLocalRotation(GetLocalRotation() * glm::quat(glm::vec3(0.0f, angle, 0.0f)));
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::RotateLocalZ(float angle)
     {
       return SetLocalRotation(GetLocalRotation() * glm::quat(glm::vec3(0.0f, 0.0f, -angle)));
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::RotateAroundLocal(const glm::vec3& center, const glm::vec3& axis, float angle)
     {
-      return RotateAroundLocal(center, glm::angleAxis(angle, axis));
+      return RotateAroundLocalQuat(center, glm::angleAxis(angle, axis));
     }
-    TransformComponent TransformComponent::RotateAroundLocal(const glm::vec3& center, const glm::quat& rotation)
+    
+    //-------------------------------------------------------------------------
+    TransformComponent TransformComponent::RotateAroundLocalQuat(const glm::vec3& center, const glm::quat& rotation)
     {
       const glm::vec3 dir = rotation * (GetLocalPosition() - center);
       SetLocalPosition(center + dir);
@@ -477,22 +601,44 @@ namespace sulphur
     {
       return GetLocalToWorld() * glm::vec4(point, 1.0f);
     }
+    
+    //-------------------------------------------------------------------------
     glm::vec3 TransformComponent::TransformVector(const glm::vec3& vector)
     {
       return GetLocalToWorld() * glm::vec4(vector, 0.0f);
     }
+    
+    //-------------------------------------------------------------------------
+    glm::vec3 TransformComponent::TransformDirection(const glm::vec3& vector)
+    {
+      return GetWorldRotation() * vector;
+    }
+
+    //-------------------------------------------------------------------------
     glm::vec3 TransformComponent::TransformLocalPoint(const glm::vec3& point) const
     {
       return GetLocal() * glm::vec4(point, 0.0f);
     }
+    
+    //-------------------------------------------------------------------------
     glm::vec3 TransformComponent::TransformLocalVector(const glm::vec3& vector) const
     {
       return GetLocal() * glm::vec4(vector, 0.0f);
     }
+    
+    //-------------------------------------------------------------------------
+    glm::vec3 TransformComponent::TransformLocalDirection(const glm::vec3& vector)
+    {
+      return GetLocalRotation() * vector;
+    }
+
+    //-------------------------------------------------------------------------
     glm::vec3 TransformComponent::InverseTransformPoint(const glm::vec3& point)
     {
       return GetWorldToLocal() * glm::vec4(point, 1.0f);
     }
+    
+    //-------------------------------------------------------------------------
     glm::vec3 TransformComponent::InverseTransformVector(const glm::vec3& vector)
     {
       return GetWorldToLocal() * glm::vec4(vector, 0.0f);
@@ -504,16 +650,22 @@ namespace sulphur
       assert(false && "Not implemented");
       return{};
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::Blend(TransformComponent /*target*/, float /*alpha*/)
     {
       assert(false && "Not implemented");
       return{};
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::LookAt(const glm::vec3& target, glm::vec3 up)
     {
       const glm::vec3 direction = glm::normalize(target - GetWorldPosition());
       return SetLocalRotation(LookRotation(direction, up));
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::LookAtLocal(const glm::vec3& target, glm::vec3 up)
     {
       const glm::vec3 direction = glm::normalize(target - GetLocalPosition());
@@ -525,9 +677,17 @@ namespace sulphur
     {
       return system_->GetSortingLayer(*this);
     }
+    
+    //-------------------------------------------------------------------------
     void TransformComponent::SetSortingLayer(const SortingLayer& sorting_layer)
     {
       system_->SetSortingLayer(*this, sorting_layer);
+    }
+
+    //-------------------------------------------------------------------------
+    Entity TransformComponent::GetEntity()
+    {
+      return system_->GetEntity(*this);
     }
 
     //-------------------------------------------------------------------------
@@ -536,16 +696,22 @@ namespace sulphur
       SetWorldRotation(glm::quat(angles));
       return *this;
     }
+    
+    //-------------------------------------------------------------------------
     TransformComponent TransformComponent::SetLocalRotationEuler(const glm::vec3& angles)
     {
       SetLocalRotation(glm::quat(angles));
       return *this;
     }
+    
+    //-------------------------------------------------------------------------
     glm::vec3 TransformComponent::GetWorldRotationEuler()
     {
       return glm::eulerAngles(GetWorldRotation());
     }
-    glm::vec3 TransformComponent::GetLocalRotationEuler() const
+    
+    //-------------------------------------------------------------------------
+    glm::vec3 TransformComponent::GetLocalRotationEuler()
     {
       return glm::eulerAngles(GetLocalRotation());
     }
@@ -558,36 +724,48 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void TransformSystem::OnInitialize(Application&, foundation::JobGraph&)
+    void TransformSystem::OnInitialize(Application& app, foundation::JobGraph& job_graph)
     {
+      const auto clear_changed_flag = [](TransformSystem& transform_system)
+      {
+        for (TransformData& t : *transform_system.data_)
+        {
+          t.changed = false;
+        }
+      };
+
+      // NOTE: Should be moved to update onces all globals are handled correctly
+      foundation::Job renderer_endframe_job = make_job("transformsystem_clearchangedflag", "render", 
+                                                       clear_changed_flag, bind_write(*this));
+      renderer_endframe_job.set_blocker("physicssystem_gatherchangedtransforms");
+      job_graph.Add(std::move(renderer_endframe_job));
+      rewind_storage_ = foundation::Memory::Construct<TransformRewindStorage>(*this);
+      app.GetService<RewindSystem>().Register(rewind_storage_->storage_);
+    }
+
+    //-------------------------------------------------------------------------
+    void TransformSystem::OnTerminate()
+    {
+      foundation::Memory::Destruct(rewind_storage_);
     }
     
-    ///------------------------------------------------------------------------
-    TransformComponent TransformSystem::GetRoot(const TransformComponent& child_node)
+    //-------------------------------------------------------------------------
+    TransformComponent TransformSystem::GetRoot(TransformComponent child_node)
     {
-      const TransformComponent& parent = child_node.GetParent();
-      if (parent != root_)
-      {
-        return GetRoot(parent);
-      }
-      else
-      {
-        return child_node;
-      }
+      size_t offset = 0;
+      FindRootNode(LookUpData(child_node), offset);
+      size_t index = sparse_array_[child_node.handle].handle - offset;
+      return TransformComponent(*this, dense_to_sparse_array_[index].handle);
     }
 
     //-------------------------------------------------------------------------
-    void TransformSystem::OnUpdate(float)
+    TransformComponent TransformSystem::Create(Entity& entity)
     {
-      for (TransformData& t : *(data_))
+      if(entity.Has<TransformComponent>() == true)
       {
-        t.changed = false;
+        return entity.Get<TransformComponent>();
       }
-    }
 
-    //-------------------------------------------------------------------------
-    TransformComponent TransformSystem::Create(Entity entity)
-    {
       TransformComponent ret(*this, sparse_array_.size());
       
       TransformData new_data;
@@ -600,13 +778,16 @@ namespace sulphur
 
       new_data.name = "Transform " + foundation::to_string(ret.handle);
 
+      ++root_child_count_;
       
       dense_to_sparse_array_.emplace_back(ret.handle);
       sparse_array_.emplace_back(data_->size());
       data_->emplace_back(eastl::move(new_data));
       return ret;
     }
-    void TransformSystem::Destroy(TransformComponent handle)
+    
+    //-------------------------------------------------------------------------
+    void TransformSystem::Destroy(ComponentHandleBase handle)
     {
       if (!handle.IsValid())
       {
@@ -620,6 +801,10 @@ namespace sulphur
         TransformData& old_parent_data = LookUpData(data.parent);
         old_parent_data.child_count--;
       }
+      else
+      {
+        --root_child_count_;
+      }
 
       const size_t removed_idx = sparse_array_[handle.Handle()].handle;
       TransformData* data_begin = data_->begin();
@@ -627,11 +812,10 @@ namespace sulphur
       // Recursively remove all children
       for (int i = 0; i < data.child_count; ++i)
       {
-        TransformComponent h;
-        h.handle = dense_to_sparse_array_[removed_idx + 1 + i].handle;
+        size_t h = dense_to_sparse_array_[removed_idx + 1 + i].handle;
 
-        TransformData& d = *(data_begin + h.handle);
-        d.entity.Remove<TransformComponent>(h);
+        TransformData& d = *(data_begin + h);
+        d.entity.Remove<TransformComponent>(TransformComponent(*this, h));
       }
 
       // Delete myself
@@ -665,7 +849,7 @@ namespace sulphur
       dense_to_sparse_array_.pop_back();
     }
 
-    ///------------------------------------------------------------------------
+    //-------------------------------------------------------------------------
     void TransformSystem::CalculateChildCount(foundation::Vector<TransformData>::iterator& transform_data, size_t& out_child_count)
     {
       out_child_count += transform_data->child_count;
@@ -676,21 +860,22 @@ namespace sulphur
         CalculateChildCount(++transform_data, out_child_count);
       }
     }
-
-    ///------------------------------------------------------------------------
-    TransformSystem::TransformData& TransformSystem::FindRootNode(TransformData& child_node)
+    
+    //-------------------------------------------------------------------------
+    TransformSystem::TransformData& TransformSystem::FindRootNode(TransformData& child_node, size_t& out_offset)
     {
       TransformData* node = &child_node;
 
       while (node->parent != root_)
       {
+        ++out_offset;
         --node;
       }
 
       return *node;
     }
     
-    ///------------------------------------------------------------------------
+    //-------------------------------------------------------------------------
     void TransformSystem::MoveData(size_t first_it, size_t last_it, int offset)
     {
       if (offset == 0)
@@ -834,28 +1019,36 @@ namespace sulphur
       }
 
       TransformData& data = LookUpData(handle);
-      if (data.parent == parent || !parent.IsValid())
+      if (data.parent == parent || parent.IsValid() == false)
       {
         return;
       }
+
       CleanIfDirty(data, CleanFlags::kWorld);
 
+      // Reduce child count on old parent
       if (data.parent != root_)
       {
-        TransformData& old_parent_data = LookUpData(data.parent);
-        old_parent_data.child_count--;
+        LookUpData(data.parent).child_count--;
+      }
+      else
+      {
+        --root_child_count_;
       }
 
+      // Update the matrix to the parent's matrix
       TransformData& parent_data = LookUpData(parent);
       data.local_to_parent = parent_data.cached_world_to_local * data.cached_local_to_world;
 
+      // Invalidate this node so it can update 
       data.flags |= static_cast<int>(DirtyFlags::kParent);
       data.parent = parent;
 
+      // TODO: Might need to invalidate the children too
+
+      // Calculate the amount to move the data
       const size_t parent_idx = sparse_array_[parent.Handle()].handle;
       const size_t child_idx = sparse_array_[handle.Handle()].handle;
-
-
       TransformData* begin = data_->begin() + child_idx;
       size_t child_count = 1;
       CalculateChildCount(begin, child_count);
@@ -864,18 +1057,23 @@ namespace sulphur
       begin = data_->begin() + parent_idx;
       CalculateChildCount(begin, parent_offset);
 
+      // Increase the parents child count after calculating it's old child count
       parent_data.child_count++;
 
       size_t first_it = child_idx;
       size_t last_it = child_idx + child_count;
       int offset = (int)(parent_idx + parent_offset) - (int)child_idx;
 
+      // If the new parent is higher then the current child index, we also need to offset it by child count
       if (parent_idx > child_idx)
+      {
         offset -= (int)child_count;
+      }
 
       MoveData(first_it, last_it, offset);
     }
     
+    //-------------------------------------------------------------------------
     void TransformSystem::UnsetParent(TransformComponent handle)
     {
       TransformData& data = LookUpData(handle);
@@ -891,8 +1089,6 @@ namespace sulphur
       size_t root_child_count = 1;
       CalculateChildCount(root_begin, root_child_count);
 
-      const size_t parent_idx = sparse_array_[data.parent.Handle()].handle;
-
       CleanIfDirty(data, CleanFlags::kWorld);
       data.local_to_parent = data.cached_local_to_world;
 
@@ -902,15 +1098,11 @@ namespace sulphur
       data.parent = root_;
 
       parent_data.child_count--;
-
-      size_t parent_offset = 1;
-      TransformData* begin = data_->begin() + parent_idx;
-      CalculateChildCount(begin, parent_offset);
-
-      // Move data to after the last child in this tree node
+      ++root_child_count_;
       
+      // Move data to after the last child in this tree node
       const size_t child_idx = sparse_array_[handle.Handle()].handle;
-      begin = data_->begin() + child_idx;
+      TransformData* begin = data_->begin() + child_idx;
       size_t child_child_count = 1;
       CalculateChildCount(begin, child_child_count);
 
@@ -925,62 +1117,59 @@ namespace sulphur
     foundation::Vector<TransformComponent> TransformSystem::GetSiblings(TransformComponent handle)
     {
 #ifdef _DEBUG
-      if (!handle.IsValid())
+      if (handle.IsValid() == false)
       {
         return foundation::Vector<TransformComponent>();
       }
 #endif
-      // TODO: Fix if parent == root_
 
       TransformComponent parent = handle.GetParent();
-
-      size_t parent_index = sparse_array_[parent.Handle()].handle;
+      size_t first_child_index = parent == root_ ? 0 : sparse_array_[parent.Handle()].handle + 1;
       size_t child_count = GetChildCount(parent, true);
 
       foundation::Vector<TransformComponent> siblings;
 
       for (size_t i = 0; i < child_count; ++i)
       {
-        if ((*data_)[parent_index + 1 + i].parent != parent)
+        if ((*data_)[first_child_index + i].parent != parent)
         {
           continue;
         }
 
-        TransformComponent h;
-        h.handle = dense_to_sparse_array_[parent_index + 1 + i].handle;
-        siblings.emplace_back(eastl::move(h));
+        size_t h = dense_to_sparse_array_[first_child_index + i].handle;
+        siblings.emplace_back(TransformComponent(*this, h));
       }
 
       return siblings;
     }
+    
+    //-------------------------------------------------------------------------
     size_t TransformSystem::GetSiblingIndex(TransformComponent handle)
     {
 #ifdef _DEBUG
-      if (!handle.IsValid())
+      if (handle.IsValid() == false)
       {
         return PS_SIZE_MAX;
       }
 #endif
-      // TODO: Fix if parent == root_
 
       size_t child_index = sparse_array_[handle.Handle()].handle;
 
       TransformComponent parent = handle.GetParent();
-
-      size_t parent_index = sparse_array_[parent.Handle()].handle;
+      size_t first_child_idx = parent == root_ ? 0 : sparse_array_[parent.Handle()].handle + 1;
       size_t child_count = GetChildCount(parent, true);
       
       size_t sibling_index = 0;
       for (size_t i = 0; i < child_count; ++i)
       {
-        if ((*data_)[parent_index + 1 + i].parent != parent)
-        {
-          continue;
-        }
-
-        if (parent_index + 1 + i == child_index)
+        if (first_child_idx + i == child_index)
         {
           return sibling_index;
+        }
+
+        if ((*data_)[first_child_idx + i].parent != parent)
+        {
+          continue;
         }
 
         sibling_index++;
@@ -988,30 +1177,80 @@ namespace sulphur
 
       return PS_SIZE_MAX;
     }
-    void TransformSystem::SetSiblingIndex(TransformComponent /*handle*/, size_t /*index*/)
+    
+    
+    //-------------------------------------------------------------------------
+    void TransformSystem::SetSiblingIndex(TransformComponent handle, size_t index)
     {
-      //JELLE: FIXME
-      assert(false && "Not implemented");
+#ifdef _DEBUG
+      if (handle.IsValid() == false)
+      {
+        return;
+      }
+#endif
+
+      size_t child_index = sparse_array_[handle.Handle()].handle;
+
+      TransformComponent parent = handle.GetParent();
+      size_t child_count = GetChildCount(handle, true);
+
+      size_t sibling_index = handle.GetSiblingIndex();
+      if (sibling_index == index)
+      {
+        return;
+      }
+
+      int offset = 0;
+      int sibling_offset = static_cast<int>(index) - static_cast<int>(sibling_index);
+      if (sibling_offset > 0)
+      {
+        for (int i = 0; i < sibling_offset; ++offset)
+        {
+          if ((*data_)[child_index + child_count + offset].parent == parent)
+          {
+            ++i;
+          }
+        }
+      }
+      else
+      {
+        for (int i = 0; i > sibling_offset; --offset)
+        {
+          if ((*data_)[child_index + offset].parent == parent)
+          {
+            --i;
+          }
+        }
+      }
+
+      MoveData(child_index, child_index + child_count + 1, offset);
     }
+    
+    //-------------------------------------------------------------------------
     foundation::Vector<TransformComponent> TransformSystem::GetChildren(TransformComponent handle, bool recursive)
     {
 #ifdef _DEBUG
-      if (!handle.IsValid())
+      if (handle.IsValid() == false)
       {
         return foundation::Vector<TransformComponent>();
       }
 #endif
-      size_t parent_index = sparse_array_[handle.Handle()].handle;
+      size_t first_child_idx = sparse_array_[handle.Handle()].handle + 1;
       size_t child_count = GetChildCount(handle, recursive);
       
       foundation::Vector<TransformComponent> children;
       children.reserve(child_count);
 
-      for (size_t i = 0; i < child_count; ++i)
+      for (size_t i = 0, child_index = 0; child_index < child_count; ++i)
       {
-        TransformComponent h;
-        h.handle = dense_to_sparse_array_[parent_index + 1 + i].handle;
-        children.emplace_back(eastl::move(h));
+        if (recursive == false && (*data_)[first_child_idx + i].parent != handle)
+        {
+          continue;
+        }
+
+        ++child_index;
+        size_t h = dense_to_sparse_array_[first_child_idx + i].handle;
+        children.emplace_back(TransformComponent(*this, h));
       }
 
       return children;
@@ -1024,12 +1263,16 @@ namespace sulphur
       CleanIfDirty(data, CleanFlags::kWorld);
       return data.cached_world_position;
     }
+    
+    //-------------------------------------------------------------------------
     glm::quat TransformSystem::GetWorldRotation(TransformComponent handle)
     {
       TransformData& data = LookUpData(handle);
       CleanIfDirty(data, CleanFlags::kWorld);
       return data.cached_world_rotation;
     }
+    
+    //-------------------------------------------------------------------------
     glm::vec3 TransformSystem::GetWorldScale(TransformComponent handle)
     {
       TransformData& data = LookUpData(handle);
@@ -1038,11 +1281,36 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
+    glm::vec3 TransformSystem::GetLocalPosition(TransformComponent handle)
+    {
+      TransformData& data = LookUpData(handle);
+      CleanIfDirty(data, CleanFlags::kLocal);
+      return data.cached_local_position;
+    }
+
+    //-------------------------------------------------------------------------
+    glm::quat TransformSystem::GetLocalRotation(TransformComponent handle)
+    {
+      TransformData& data = LookUpData(handle);
+      CleanIfDirty(data, CleanFlags::kLocal);
+      return data.cached_local_rotation;
+    }
+
+    //-------------------------------------------------------------------------
+    glm::vec3 TransformSystem::GetLocalScale(TransformComponent handle)
+    {
+      TransformData& data = LookUpData(handle);
+      CleanIfDirty(data, CleanFlags::kLocal);
+      return data.cached_local_scale;
+    }
+
+    //-------------------------------------------------------------------------
     SortingLayer TransformSystem::GetSortingLayer(TransformComponent handle) const
     {
       return LookUpData(handle).sorting_layer;
     }
 
+    //-------------------------------------------------------------------------
     void TransformSystem::SetSortingLayer(TransformComponent handle, const SortingLayer& sorting_layer)
     {
       LookUpData(handle).sorting_layer = sorting_layer;
@@ -1079,7 +1347,8 @@ namespace sulphur
       
       if (flag != CleanFlags::kNone)
       {
-        TransformData* begin = &FindRootNode(data);
+        size_t unused = 0;
+        TransformData* begin = &FindRootNode(data, unused);
         TransformData* end = &data; ++end;
 
         TransformData* parent = nullptr;

@@ -1,4 +1,4 @@
-﻿#
+#
 # The MIT License (MIT)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,7 +19,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
-# Copyright (C) 2014 Joakim SÃ¶derberg <joakim.soderberg@gmail.com>
+# Copyright (C) 2014 Joakim Söderberg <joakim.soderberg@gmail.com>
 #
 
 set(_CMAKE_SCRIPT_PATH ${CMAKE_CURRENT_LIST_DIR}) # must be outside coveralls_setup() to get correct path

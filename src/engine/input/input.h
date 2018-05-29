@@ -6,6 +6,9 @@
 #include <foundation/containers/string.h>
 #include <foundation/containers/vector.h>
 #include <foundation/containers/hash_map.h>
+#include <foundation/job/resource.h>
+
+#include "engine/scripting/scriptable_object.h"
 
 #include <glm/glm.hpp>
 
@@ -48,11 +51,16 @@ namespace sulphur
     * @see sulphur::engine::PlatformInput
     * @author Maarten ten Velden
     */
-    class Input
+    class Input : public foundation::BaseResource
     {
     public:
       static constexpr uint kAny = PS_UINT_MAX; //<! A constant used to indicate that all devices should be tested for input
       static constexpr uint kMaxGamepads = 4u; //<! A constant describing the maximum number of gamepads connected at a time
+
+      /**
+      *@brief constructor
+      */
+      Input();
 
       /**
       * @brief Get the current position of the cursor on the screen
@@ -417,8 +425,54 @@ namespace sulphur
       * @see sulphur::engine::PlatformInput::StartFrame
       */
       void AppendInputString(char character);
-
     };
 
+    //-------------------------------------------------------------------------
+    /**
+    * @struct sulphur::engine::ScriptableInput : public sulphur::engine::ScriptableObject
+    * @brief The input system exposed to the scripting environment, statically
+    * @author Daniel Konings
+    */
+    SCRIPT_CLASS() class ScriptableInput : public ScriptableObject
+    {
+
+    public:
+
+      SCRIPT_NAME(Input);
+
+      /**
+      * @brief Initializes the scriptable input with the input system
+      */
+      static void Initialize(Input* input);
+
+      /**
+      * @see sulphur::engine::Input::IsButtonFalling
+      */
+      SCRIPT_FUNC(static) bool IsButtonFalling(Button button);
+
+      /**
+      * @see sulphur::engine::Input::IsButtonRising
+      */
+      SCRIPT_FUNC(static) bool IsButtonRising(Button button);
+
+      /**
+      * @see sulphur::engine::Input::IsButtonUp
+      */
+      SCRIPT_FUNC(static) bool IsButtonUp(Button button);
+
+      /**
+      * @see sulphur::engine::Input::IsButtonDown
+      */
+      SCRIPT_FUNC(static) bool IsButtonDown(Button button);
+
+      /**
+      * @see sulphur::engine::Input::GetAxis
+      */
+      SCRIPT_FUNC(static) float GetAxis(Axis axis);
+
+    private:
+
+      static Input* input_; //!< The actual input system
+    };
   }
 }

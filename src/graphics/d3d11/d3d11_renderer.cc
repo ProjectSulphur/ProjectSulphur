@@ -31,11 +31,11 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------
-    void D3D11Renderer::OnInitialize(foundation::NativeWindowHandle hWnd, const glm::ivec2& screen_size, bool vsync)
+    void D3D11Renderer::OnInitialize(void* window_handle, const glm::ivec2& screen_size, bool vsync)
     {
       vsync_ = vsync;
 
-      device_.CreateSwapChain(hWnd.win32_window, screen_size, vsync_, 60u);
+      device_.CreateSwapChain(window_handle, screen_size, vsync_, 60u);
 
       device_.CreateDepthStencilState();
 
@@ -52,11 +52,7 @@ namespace sulphur
       
       initialized_ = true;
 
-      ImGui_ImplDX11_Init(hWnd.win32_window, device_.GetDevice(), device_.GetDeviceContext());
-
-      // FIXME: TEMPORARY IMGUI INPUT HACK :D
-      SetWindowLongPtr((HWND)hWnd.win32_window, GWLP_WNDPROC, (LONG_PTR)&ImGui_Impl_WndProcHandler);
-      // END ./HACK
+      ImGui_ImplDX11_Init(window_handle, device_.GetDevice(), device_.GetDeviceContext());
 
       // TODO: Put this in a better place
       ImGui_Impl_NewFrame();
@@ -148,6 +144,11 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------
+    void D3D11Renderer::SetBoneMatrices(const foundation::Vector<glm::mat4>&)
+    {
+    }
+
+    //--------------------------------------------------------------------------
     void D3D11Renderer::SetPipelineState(const PipelineState& pipeline_state)
     {
       draw_call_data_.pipeline_state = pipeline_state;
@@ -172,6 +173,10 @@ namespace sulphur
         asset_manager_.CreateTexture(material.GetTexture(i));
       }
     }
+
+    //--------------------------------------------------------------------------
+    void D3D11Renderer::SetComputePass(const engine::ComputePass& /*pass*/)
+    {}
 
     //--------------------------------------------------------------------------
     void D3D11Renderer::SetCamera(const glm::mat4& view, const glm::mat4& projection, const engine::DepthBuffer& depth_buffer, const engine::RenderTarget& render_target)
@@ -199,12 +204,12 @@ namespace sulphur
       }
       else
       {
-        if (!render_target.GetTarget().GetGPUHandle())
+        if (!render_target.GetTextureResource().GetGPUHandle())
         {
-          asset_manager_.CreateRenderTarget(render_target.GetTarget());
+          asset_manager_.CreateRenderTarget(render_target.GetTextureResource());
         }
 
-        D3D11Texture* render_texture = asset_manager_.GetTexture(render_target.GetTarget());
+        D3D11Texture* render_texture = asset_manager_.GetTexture(render_target.GetTextureResource());
 
         bound_asset_data_.render_targets[0] = render_texture->render_target_view.Get();
         bound_asset_data_.bound_render_target_count = 1;
@@ -238,12 +243,12 @@ namespace sulphur
       }
       else
       {
-        if (!render_target.GetTarget().GetGPUHandle())
+        if (!render_target.GetTextureResource().GetGPUHandle())
         {
-          asset_manager_.CreateRenderTarget(render_target.GetTarget());
+          asset_manager_.CreateRenderTarget(render_target.GetTextureResource());
         }
 
-        D3D11Texture* render_texture = asset_manager_.GetTexture(render_target.GetTarget());
+        D3D11Texture* render_texture = asset_manager_.GetTexture(render_target.GetTextureResource());
         device_.ClearRenderTarget(render_texture->render_target_view, clear_color);
       }
     }
@@ -262,12 +267,18 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------
-    void D3D11Renderer::Draw()
+    void D3D11Renderer::Draw(uint index_count, uint index_offset)
     {
-      if (!draw_call_data_.material.shader())
+      if (!draw_call_data_.material.shader() ||
+        draw_call_data_.mesh->GetIndexCount() == 0)
       {
-        PS_LOG(Warning, "Unable to render without a shader, ignoring this draw call!");
+        PS_LOG(Warning, "Unable to render without a shader or index count is zero, ignoring this draw call!");
         return;
+      }
+
+      if (index_count == 0)
+      {
+        index_count = draw_call_data_.mesh->GetIndexCount();
       }
 
       // Bind render target state
@@ -283,7 +294,23 @@ namespace sulphur
       //pso_manager_.SetPipelineState(draw_call_data_.pipeline_state, vert, pix);
 
 
-      device_.Draw();
+      device_.Draw(index_count, index_offset);
+    }
+
+    //--------------------------------------------------------------------------
+    void D3D11Renderer::CopyToScreen(const engine::RenderTarget& render_target)
+    {
+      if (!render_target.GetTextureResource().GetGPUHandle())
+      {
+        return;
+      }
+
+      D3D11Texture* texture = asset_manager_.GetTexture(render_target.GetTextureResource());
+      
+      Microsoft::WRL::ComPtr<ID3D11Resource> backbuffer_texture;
+      device_.GetBackBuffer()->GetResource(backbuffer_texture.GetAddressOf());
+
+      device_.CopyResource(backbuffer_texture, texture->texture);
     }
 
     //--------------------------------------------------------------------------
@@ -299,6 +326,13 @@ namespace sulphur
       vsync_ = value;
     }
 
+    //--------------------------------------------------------------------------
+    void D3D11Renderer::SetStencilRef(uint value)
+    {
+      device_.SetStencilRef(value);
+    }
+
+    //--------------------------------------------------------------------------
     void D3D11Renderer::UpdateMaterial()
     {
       // Update shader
@@ -309,14 +343,12 @@ namespace sulphur
 
       for (int i = 0; i < material.NumTextures(); ++i)
       {
-        if (!material.GetTexture(i)) // TEMP TEST, UNTIL MATERIALS ARE SHADER BASED
-          continue;
-
         D3D11Texture* texture = asset_manager_.GetTexture(material.GetTexture(i));
         device_.SetTexture(i, texture);
       }
     }
 
+    //--------------------------------------------------------------------------
     void D3D11Renderer::UpdateMesh()
     {
       // Update mesh

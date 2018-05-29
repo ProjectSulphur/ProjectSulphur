@@ -471,31 +471,39 @@ namespace sulphur
               row_major float4x4 view; \
               row_major float4x4 projection; \
             };\
+            struct VS_OUTPUT\
+            {\
+              float4 position : SV_POSITION;\
+              float3 position_VS : VIEWPOS;\
+              float3 normal_VS : VIEWNORMAL;\
+              float2 uv  : TEXCOORD0;\
+              float4 color : COLOR;\
+            };\
+            \
             struct VS_INPUT\
             {\
-            float4 pos : POSITION;\
-            float3 normal : NORMAL;\
-            float2 uv  : TEXCOORD;\
-            float4 col : COLOR;\
+              float3 position : POSITION;\
+              float3 normal : NORMAL;\
+              float3 tangent : TANGENT;\
+              float2 uv  : TEXCOORD;\
+              float4 color : COLOR;\
             };\
             \
-            struct PS_INPUT\
+            VS_OUTPUT main(VS_INPUT input)\
             {\
-            float4 pos : SV_POSITION;\
-            float4 col : COLOR;\
-            float2 uv  : TEXCOORD;\
-            };\
-            \
-            PS_INPUT main(VS_INPUT input)\
-            {\
-            PS_INPUT output;\
-            output.pos = mul(input.pos, mul(mul(model, view), projection));\
-            output.col = input.col;\
-            output.uv  = input.uv;\
-            return output;\
+              VS_OUTPUT output;\
+              output.position = float4(input.position.xyz, 1.0f);\
+              float4 pos = mul(output.position, mul(model, view));\
+              output.position_VS = pos.xyz / pos.w;\
+              output.position = mul(pos, projection);\
+              output.normal_VS = mul(float4(input.normal.xyz, 0.0f), mul(model, view)).xyz;\
+              output.uv = input.uv;\
+              output.color = input.color;\
+              \
+              return output;\
             }";
 
-        D3DCompile(vertexShader, strlen(vertexShader), NULL, NULL, NULL, "main", "vs_4_0", 0, 0, &default_vertex_shader_blob_, NULL);
+        D3DCompile(vertexShader, strlen(vertexShader), NULL, NULL, NULL, "main", "vs_5_0", 0, 0, &default_vertex_shader_blob_, NULL);
         if (default_vertex_shader_blob_ == NULL)
         { // NB: Pass ID3D10Blob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
           return;
@@ -524,23 +532,39 @@ namespace sulphur
       // Create the pixel shader
       {
         static const char* pixelShader =
-          "struct PS_INPUT\
+          "cbuffer cbPerObject : register(b0) \
             {\
-            float4 pos : SV_POSITION;\
-            float4 col : COLOR0;\
-            float2 uv  : TEXCOORD0;\
+              row_major float4x4 model; \
+              row_major float4x4 view; \
+              row_major float4x4 projection; \
             };\
             \
-            Texture2D albedoMap;\
-            \
-            SamplerState samplerState;\
-            \
-            float4 main(PS_INPUT input) : SV_Target\
+            struct VS_OUTPUT\
             {\
-            return input.col * albedoMap.Sample(samplerState, input.uv.xy); \
+              float4 position : SV_POSITION;\
+              float3 position_VS : VIEWPOS;\
+              float3 normal_VS : VIEWNORMAL;\
+              float2 uv  : TEXCOORD0;\
+              float4 color : COLOR;\
+            };\
+            \
+            static const float3 u_light = float3(0.0f, 0.0f, -1.0f);\
+            static const float4 u_lightColor = float4(1.0f, 1.0f, 1.0f, 1.0f);\
+            Texture2D ps_texture_albedo : register(t0);\
+            SamplerState g_sampler : register(s0);\
+            \
+            float4 main(VS_OUTPUT input) : SV_Target\
+            {\
+              float3 cameraDir = normalize(-input.position_VS);\
+              float3 lightDirection = mul(float4(u_light.xyz, 0.0f), view).xyz;\
+              float intensity = max(dot(normalize(input.normal_VS), normalize(lightDirection)), 0.0);\
+              float3 halfDir = normalize(cameraDir + normalize(lightDirection));\
+              float specular = pow(max(dot(halfDir, normalize(input.normal_VS)), 0.0), 32);\
+              float4 diffuse = ps_texture_albedo.Sample(g_sampler, input.uv) * input.color;\
+              return saturate(float4(((intensity + specular) * diffuse * u_lightColor).xyz, 1.0f));\
             }";
 
-        D3DCompile(pixelShader, strlen(pixelShader), NULL, NULL, NULL, "main", "ps_4_0", 0, 0, &default_pixel_shader_blob_, NULL);
+        D3DCompile(pixelShader, strlen(pixelShader), NULL, NULL, NULL, "main", "ps_5_0", 0, 0, &default_pixel_shader_blob_, NULL);
         if (default_pixel_shader_blob_ == NULL)
         {  // NB: Pass ID3D10Blob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
           return;
@@ -586,6 +610,12 @@ namespace sulphur
       }
 
       return true;
+    }
+
+    //--------------------------------------------------------------------------------
+    void D3D11Device::CopyResource(const Microsoft::WRL::ComPtr<ID3D11Resource>& destination, const Microsoft::WRL::ComPtr<ID3D11Resource>& source)
+    {
+      device_context_->CopyResource(destination.Get(), source.Get());
     }
 
     //--------------------------------------------------------------------------------
@@ -650,11 +680,9 @@ namespace sulphur
     {
       if (!mesh)
       {
-        render_size_ = 0;
         return;
       }
 
-      render_size_ = mesh->index_count;
       device_context_->IASetIndexBuffer(mesh->index_buffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 
       static uint stride[1] = { sizeof(D3D11Vertex) };
@@ -685,9 +713,15 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------------
-    void D3D11Device::Draw()
+    void D3D11Device::SetStencilRef(uint value)
     {
-      device_context_->DrawIndexed(render_size_, 0, 0);
+      device_context_->OMSetDepthStencilState(default_depth_stencil_state_.Get(), value);
+    }
+
+    //--------------------------------------------------------------------------------
+    void D3D11Device::Draw(uint index_count, uint index_offset)
+    {
+      device_context_->DrawIndexed(index_count, index_offset, 0);
     }
 
     //--------------------------------------------------------------------------------

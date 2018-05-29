@@ -32,6 +32,11 @@ namespace sulphur
       IAllocator(size_t max_allocated);
 
       /**
+      * @brief Move assignment operator.
+      */
+      IAllocator& operator=(IAllocator&& other);
+
+      /**
       * @brief Shutdown this allocator, detects any leaks by asserting
       */
       void Shutdown();
@@ -59,7 +64,6 @@ namespace sulphur
       * and keeps track of the changes in memory
       */
       void Deallocate(void* ptr);
-
     private:
 
       /**

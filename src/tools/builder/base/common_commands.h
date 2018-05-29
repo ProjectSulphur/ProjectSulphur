@@ -10,6 +10,7 @@ namespace sulphur
     class MeshPipeline;
     class ShaderPipeline;
     class TexturePipeline;
+    class AudioPipeline;
     enum struct Error;
 
     /**
@@ -24,15 +25,8 @@ namespace sulphur
       /**
       *@brief constructor
       *@param[in] key (const char*) key to identify this command
-      *@param[in] model_pipeline (sulphur::builder::ModelPipeline*) a model pipeline
-      *@param[in] mesh_pipeline (sulphur::builder::MeshPipeline*) a mesh pipeline
-      *@param[in] material_pipeline (sulphur::builder::MaterialPipeline*) a material pipeline
-      *@param[in] texture_pipeline (sulphur::builder::TexturePipeline*) a texture pipeline
-      *@param[in] shader_pipeline (sulphur::builder::ShaderPipeline*) a shader pipeline
       */
-      SetOutputDir(const char* key, ModelPipeline* model_pipeline,
-        MeshPipeline* mesh_pipeline, MaterialPipeline* material_pipeline,
-        TexturePipeline* texture_pipeline, ShaderPipeline* shader_pipeline);
+      SetOutputDir(const char* key);
 
       /**
       *@see sulphur::builder::Command::GetDescription
@@ -43,13 +37,6 @@ namespace sulphur
       *@see sulphur::builder::Command::Run
       */
       void Run(const CommandInput& input) override;
-
-    private:
-      ModelPipeline* model_pipeline_;       //!< a model pipeline passed by the constructor
-      MeshPipeline* mesh_pipeline_;         //!< a mesh pipeline passed by the constructor
-      MaterialPipeline* material_pipeline_; //!< a material pipeline passed by the constructor
-      TexturePipeline* texture_pipeline_;   //!< a texture pipeline passed by the constructor
-      ShaderPipeline* shader_pipeline_;     //!< a shader pipeline passed by the constructor
     };
 
     /**
@@ -64,15 +51,8 @@ namespace sulphur
       /**
       *@brief constructor
       *@param[in] key (const char*) key to identify this command
-      *@param[in] model_pipeline (sulphur::builder::ModelPipeline*) a model pipeline
-      *@param[in] mesh_pipeline (sulphur::builder::MeshPipeline*) a mesh pipeline
-      *@param[in] material_pipeline (sulphur::builder::MaterialPipeline*) a material pipeline
-      *@param[in] texture_pipeline (sulphur::builder::TexturePipeline*) a texture pipeline
-      *@param[in] shader_pipeline (sulphur::builder::ShaderPipeline*) a shader pipeline
       */
-      SetPackagePath(const char* key, ModelPipeline* model_pipeline,
-        MeshPipeline* mesh_pipeline, MaterialPipeline* material_pipeline,
-        TexturePipeline* texture_pipeline, ShaderPipeline* shader_pipeline);
+      SetPackagePath(const char* key);
 
       /**
       *@see sulphur::builder::Command::GetDescription
@@ -83,13 +63,57 @@ namespace sulphur
       *@see sulphur::builder::Command::Run
       */
       void Run(const CommandInput& input) override;
+    };
 
-    private:
-      ModelPipeline* model_pipeline_;       //!< a model pipeline passed by the constructor
-      MeshPipeline* mesh_pipeline_;         //!< a mesh pipeline passed by the constructor
-      MaterialPipeline* material_pipeline_; //!< a material pipeline passed by the constructor
-      TexturePipeline* texture_pipeline_;   //!< a texture pipeline passed by the constructor
-      ShaderPipeline* shader_pipeline_;     //!< a shader pipeline passed by the constructor
+    /**
+    *@class sulphur::builder::ClearOutputFolders : sulphur::builder::Command 
+    *@brief clears the caches and the output folder.
+    *@remark this reinializes all the pipelines thus all default assets will also be rebuilt.
+    *@author Stan Pepels
+    */
+    class ClearOutputFolders : public ICommand
+    {
+    public:
+      /**
+      *@brief constructor
+      *@param[in] key (const char*) key to identify this command
+      */
+      ClearOutputFolders(const char* key);
+
+      /**
+      *@see sulphur::builder::Command::GetDescription
+      */
+      const char* GetDescription() const override;
+
+      /**
+      *@see sulphur::builder::Command::Run
+      */
+      void Run(const CommandInput& input) override;
+    };
+
+    /**
+    *@class sulphur::builder::RefreshCacheFiles : sulphur::builder::Command
+    *@brief refreshes the cache of all pipelines
+    *@author Stan Pepels
+    */
+    class RefreshCacheFiles : public ICommand
+    {
+    public:
+      /**
+      *@brief constructor
+      *@param[in] key (const char*) key to identify this command
+      */
+      RefreshCacheFiles(const char* key);
+
+      /**
+      *@see sulphur::builder::Command::GetDescription
+      */
+      const char* GetDescription() const override;
+
+      /**
+      *@see sulphur::builder::Command::Run
+      */
+      void Run(const CommandInput& input) override;
     };
   }
 }

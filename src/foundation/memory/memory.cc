@@ -20,7 +20,7 @@ namespace sulphur
       void* addr = Native::InitializeMemoryPool(heap_size);
       initialized_ = true;
 
-      default_allocator_ = GeneralAllocator(addr, heap_size);
+      default_allocator_ = eastl::move(GeneralAllocator(addr, heap_size));
     }
 
     //--------------------------------------------------------------------------
@@ -53,6 +53,33 @@ namespace sulphur
       header->alignment = a;
 
       return ptr;
+    }
+
+    //---------------------------------------------------------------------------------------
+    void* Memory::Reallocate(void* ptr, size_t size, size_t alignment, IAllocator* allocator)
+    {
+      if (allocator == nullptr)
+      {
+        allocator = &default_allocator();
+      }
+
+      MemoryHeader* header = reinterpret_cast<MemoryHeader*>(
+        OffsetBytes(ptr, -static_cast<int>(sizeof(MemoryHeader))));
+
+      void * new_block = Allocate(size, alignment);
+      size_t oldsize = header->size;
+
+      if (size >= oldsize)
+      {
+        memcpy(new_block, ptr, size);
+      }
+      if (size < oldsize)
+      {
+        memcpy(new_block, ptr, oldsize);
+      }
+
+      Deallocate(ptr);
+      return new_block;
     }
 
     //--------------------------------------------------------------------------

@@ -13,6 +13,7 @@ namespace sulphur
     BulletSphereShape::BulletSphereShape()
     {
       shape_ = foundation::Memory::Construct<btSphereShape>(PhysicsShape::kDefaultExtents);
+      shape_->setUserPointer(this);
     }
 
     //-------------------------------------------------------------------------
@@ -25,6 +26,7 @@ namespace sulphur
     void BulletSphereShape::SetRadius(float radius)
     {
       reinterpret_cast<btSphereShape*>(shape_)->setUnscaledRadius(radius);
+      UpdateColliders();
     }
 
     //-------------------------------------------------------------------------

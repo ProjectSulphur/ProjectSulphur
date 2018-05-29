@@ -1,4 +1,4 @@
-﻿//
+//
 //  General.xcconfig
 //
 //  These are General configuration settings for the gtest framework and
@@ -38,4 +38,4 @@ MACOSX_DEPLOYMENT_TARGET = 10.4
 GCC_VERSION = 4.0
 
 // VERSIONING BUILD SETTINGS (used in Info.plist)
-GTEST_VERSIONINFO_ABOUT =  Â© 2008 Google Inc.
+GTEST_VERSIONINFO_ABOUT =  © 2008 Google Inc.

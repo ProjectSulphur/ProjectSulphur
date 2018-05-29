@@ -7,7 +7,9 @@
 #include <graphics/d3d12/d3d12_frame_descriptor_heap.h>
 
 #include <foundation/memory/memory.h>
+
 #include <engine/assets/material.h>
+#include <engine/assets/post_process_material.h>
 #include <engine/assets/texture.h>
 
 namespace sulphur
@@ -15,35 +17,48 @@ namespace sulphur
   namespace graphics
   {
     //------------------------------------------------------------------------------------------------------
-    D3D12Material::D3D12Material(D3D12Device& device, const engine::MaterialPass& material) : 
-      was_used_this_frame_(false)
+    D3D12Material::D3D12Material(
+      const foundation::Vector<D3D12Resource*>& srvs,
+      const foundation::Vector<D3D12Resource*>& uavs)
+      : was_used_this_frame_(false)
     {
-      const foundation::Vector<engine::TextureHandle>& textures = material.textures();
-      
-      D3D12Texture2D* curr_texture;
-
-      for (size_t i = 0; i < textures.size(); ++i)
+      // Yolo (time to kms <3)
+      for (size_t i = 0; i < srvs.size(); ++i)
       {
-        // TODO: I need info whether the texture is an UAV or an SRV....!!!
-        curr_texture = device.texture_asset_manager().GetTexture(textures[i].GetGPUHandle());
-        // Currently assuming all bound textures are SRVs
-
-        // Create SRV for this texture if required
-        if (curr_texture->has_srv_ == false)
-        {
-          device.CreateShaderResourceView(curr_texture);
-        }
-
-        persistent_srv_handles_.push_back(curr_texture->srv_persistent_index_);
-
+        persistent_srv_handles_.push_back(srvs[i]->srv_persistent_index_);
       }
+
+      for (size_t i = 0; i < uavs.size(); ++i)
+      {
+        persistent_uav_handles_.push_back(uavs[i]->uav_persistent_index_);
+      }
+
+      descriptor_table_handle_ = D3D12_GPU_DESCRIPTOR_HANDLE();
+      constant_buffer_handle_ = D3D12_GPU_VIRTUAL_ADDRESS();
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    D3D12Material::D3D12Material(const D3D12Material& other)
+    {
+      for (size_t i = 0; i < other.persistent_srv_handles_.size(); ++i)
+      {
+        persistent_srv_handles_.push_back(other.persistent_srv_handles_[i]);
+      }
+      for (size_t i = 0; i < other.persistent_uav_handles_.size(); ++i)
+      {
+        persistent_uav_handles_.push_back(other.persistent_uav_handles_[i]);
+      }
+
+      // TODO: Should the code below be there :thinking:
+      was_used_this_frame_ = other.was_used_this_frame_;
+	  descriptor_table_handle_ = other.descriptor_table_handle_;
+      constant_buffer_handle_ = other.constant_buffer_handle_;
     }
 
     //------------------------------------------------------------------------------------------------------
     void D3D12Material::Reset()
     {
       was_used_this_frame_ = false;
-
     }
 
     //------------------------------------------------------------------------------------------------------
@@ -54,6 +69,8 @@ namespace sulphur
         return;
       }
 
+      descriptor_table_handle_ = D3D12_GPU_DESCRIPTOR_HANDLE();
+
       D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
       D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle;
 
@@ -62,16 +79,19 @@ namespace sulphur
         frame_desc_heap.CopySRVDescriptor(persistent_srv_handles_[i], cpu_handle, gpu_handle);
         if (i == 0)
         {
-          srv_descriptor_table_handle_ = gpu_handle;
+          descriptor_table_handle_ = gpu_handle;
         }
       }
 
       for (size_t i = 0; i < persistent_uav_handles_.size(); ++i)
       {
-        frame_desc_heap.CopySRVDescriptor(persistent_uav_handles_[i], cpu_handle, gpu_handle);
+        frame_desc_heap.CopyUAVDescriptor(persistent_uav_handles_[i], cpu_handle, gpu_handle);
         if (i == 0)
         {
-          uav_descriptor_table_handle_ = gpu_handle;
+          if (persistent_srv_handles_.empty() == true)
+          {
+            descriptor_table_handle_ = gpu_handle;
+          }
         }
       }
 
@@ -119,9 +139,24 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    void D3D12MaterialManager::SetMaterial(const engine::MaterialPass& material)
+    void D3D12MaterialManager::SetMaterial(const D3D12Material& material)
     {
-      size_t hash_code = graphics::HashState(&material);
+      size_t hash_code = 0;
+      const static size_t random_seed = 54678785653423;
+      const foundation::Vector<uint32_t>& srvs = material.persistent_srv_handles();
+      const foundation::Vector<uint32_t>& uavs = material.persistent_uav_handles();
+
+      for (size_t i = 0; i < srvs.size(); ++i)
+      {
+        graphics::hash_combine(hash_code, srvs[i]);
+      }
+
+      graphics::hash_combine(hash_code, random_seed);
+
+      for (size_t i = 0; i < uavs.size(); ++i)
+      {
+        graphics::hash_combine(hash_code, uavs[i]);
+      }
 
       material_iterator it = materials_.find(hash_code);
       if (it != materials_.end())
@@ -131,14 +166,10 @@ namespace sulphur
         return;
       }
 
-      // Take a reference to the pointer in the map (not constructed yet)
-      // And create it
       D3D12Material*& mat = materials_[hash_code];
-      mat = foundation::Memory::Construct<D3D12Material>(device_, material);
+      mat = foundation::Memory::Construct<D3D12Material>(material);
 
       current_material_ = mat;
     }
-
-
   }
 }

@@ -3,9 +3,13 @@
 #include "engine/systems/components/transform_system.h"
 #include "engine/application/application.h"
 
-#include <graphics/platform/pipeline_state.h>
+#include <foundation/job/data_policy.h>
+#include <foundation/job/job.h>
+#include <foundation/job/job_graph.h>
 
 #include <glm/gtc/matrix_transform.hpp>
+
+#include <lua-classes/camera_system.lua.cc>
 
 namespace sulphur
 {
@@ -13,12 +17,87 @@ namespace sulphur
   {
     //-------------------------------------------------------------------------
     CameraSystem::CameraSystem() :
-      IComponentSystem<CameraComponent, CameraData>("CameraSystem")
+      IComponentSystem("CameraSystem")
     {
     }
 
     //-------------------------------------------------------------------------
-    CameraComponent CameraSystem::Create(Entity entity)
+    void CameraSystem::OnInitialize(Application& app, foundation::JobGraph& job_graph)
+    {
+      renderer_ = &app.platform_renderer();
+      window_ = &app.platform().window();
+
+      // Create g buffer
+      g_buffer_ = GBuffer(window_->GetSize());
+
+      const auto clear_cameras = [](CameraSystem& cs)
+      {
+        for (size_t i = 0; i < cs.component_data_.data.size(); ++i)
+        {
+          bool main_camera = cs.component_data_.entity[i] == cs.component_data_.data.Get<
+            static_cast<size_t>(CameraComponentElements::kEntity)>(cs.main_camera_);
+
+          if (main_camera)
+          {
+            if (static_cast<glm::ivec2>(cs.component_data_.projection_size[i])
+              != cs.window_->GetSize())
+            {
+              cs.component_data_.projection_size[i] = cs.window_->GetSize();
+              cs.UpdateProjection(cs.main_camera_);
+            }
+          }
+
+          if (main_camera || cs.component_data_.render_target[i].render_target_type() != RenderTargetType::kBackBuffer)
+          {
+              switch (cs.component_data_.clear_mode[i])
+              {
+              case CameraEnums::ClearMode::kColor:
+                cs.renderer_->ClearDepthBuffer(cs.component_data_.depth_buffer[i]);
+                cs.renderer_->ClearRenderTarget(
+                  cs.component_data_.render_target[i],
+                  cs.component_data_.clear_color[i]);
+                break;
+              case CameraEnums::ClearMode::kDepthOnly:
+                cs.renderer_->ClearDepthBuffer(cs.component_data_.depth_buffer[i]);
+                break;
+              case CameraEnums::ClearMode::kSky:
+                // TODO: Draw sky
+                break;
+              default:
+                break;
+              }
+          }
+        }
+      };
+
+      foundation::Job clear_camera_job = make_job("camerasystem_clearcameras", 
+                                                  "render", 
+                                                  clear_cameras , 
+                                                  bind_write(*this));
+      clear_camera_job.set_blocker("renderer_startframe");
+      job_graph.Add(std::move(clear_camera_job));
+
+      const auto copy_to_screen = [](CameraSystem& cs)
+      {
+        cs.renderer_->CopyToScreen(cs.g_buffer_);
+      };
+
+      foundation::Job copy_to_screen_job = make_job("camerasystem_copy_to_screen",
+        "render",
+        copy_to_screen,
+        bind_write(*this));
+      copy_to_screen_job.set_blocker("canvassystem_render");
+      job_graph.Add(std::move(copy_to_screen_job));
+    }
+
+    //-------------------------------------------------------------------------
+    void CameraSystem::OnTerminate()
+    {
+      component_data_.data.Clear();
+    }
+
+    //-------------------------------------------------------------------------
+    CameraComponent CameraSystem::Create(Entity& entity)
     {
       if (!entity.Has<TransformComponent>())
       {
@@ -26,22 +105,24 @@ namespace sulphur
       }
 
       CameraComponent ret = CameraComponent(*this, component_data_.data.Add(
-        ProjectionMode::kPerspective,
-        ClearMode::kColor,
+        CameraEnums::ProjectionMode::kPerspective,
+        CameraEnums::ClearMode::kColor,
         foundation::Color::kCornFlower,
-        RenderTarget(),
-        DepthBuffer(),
+        g_buffer_,
+        g_depth_buffer_,
+        PostProcessMaterialHandle(),
         LayerMask(),
         0.3f,
         1000.0f,
         glm::vec2(5.0f),
         60.0f,
-        window_->size(),
+        window_->GetSize(),
         true,
         glm::mat4(),
         true,
         glm::mat4(),
         glm::mat4(),
+        foundation::Frustum(),
         entity));
       UpdateProjection(ret);
 
@@ -52,62 +133,9 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void CameraSystem::Destroy(CameraComponent handle)
+    void CameraSystem::Destroy(ComponentHandleBase handle)
     {
-      //TODO: Validate handle
       component_data_.data.Remove(handle);
-    }
-
-    //-------------------------------------------------------------------------
-    void CameraSystem::OnInitialize(Application& app, foundation::JobGraph&)
-    {
-      renderer_ = &app.platform_renderer();
-      window_ = &app.platform().window();
-    }
-
-    //-------------------------------------------------------------------------
-    void CameraSystem::OnUpdate(float)
-    {}
-
-    //-------------------------------------------------------------------------
-    void CameraSystem::OnPreRender()
-    {
-      // TODO: Sort camera's based on sorting layer
-    }
-
-    void CameraSystem::OnRender()
-    {
-      //---------------------Clear the cameras------------------------------
-      for (int i = 0; i < component_data_.data.size(); ++i)
-      {
-        if (component_data_.entity[i] == component_data_.data.Get<
-          static_cast<size_t>(CameraComponentElements::kEntity)>(main_camera_))
-        {
-          if (static_cast<glm::ivec2>(component_data_.projection_size[i]) 
-            != window_->size())
-          {
-            component_data_.projection_size[i] = window_->size();
-            UpdateProjection(main_camera_);
-          }
-        }
-        switch (component_data_.clear_mode[i])
-        {
-        case ClearMode::kColor:
-          renderer_->ClearDepthBuffer(component_data_.depth_buffer[i]);
-          renderer_->ClearRenderTarget(
-            component_data_.render_target[i],
-            component_data_.clear_color[i]);
-          break;
-        case ClearMode::kDepthOnly:
-          renderer_->ClearDepthBuffer(component_data_.depth_buffer[i]);
-          break;
-        case ClearMode::kSky:
-          // TODO: Draw sky
-          break;
-        default:
-          break;
-        }
-      }
     }
 
     //-------------------------------------------------------------------------
@@ -228,22 +256,22 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void CameraComponent::SetClearMode(const ClearMode& clear_mode)
+    void CameraComponent::SetClearMode(const CameraEnums::ClearMode& clear_mode)
     {
       system_->SetClearMode(*this, clear_mode);
     }
-    void CameraSystem::SetClearMode(CameraComponent handle, const ClearMode& clear_mode)
+    void CameraSystem::SetClearMode(CameraComponent handle, const CameraEnums::ClearMode& clear_mode)
     {
       component_data_.data.Get<
         static_cast<size_t>(CameraComponentElements::kClearMode)>(handle) = clear_mode;
     }
 
     //-------------------------------------------------------------------------
-    ClearMode CameraComponent::GetClearMode() const
+    CameraEnums::ClearMode CameraComponent::GetClearMode() const
     {
       return system_->GetClearMode(*this);
     }
-    ClearMode CameraSystem::GetClearMode(CameraComponent handle) const
+    CameraEnums::ClearMode CameraSystem::GetClearMode(CameraComponent handle) const
     {
       return component_data_.data.Get<
         static_cast<size_t>(CameraComponentElements::kClearMode)>(handle);
@@ -272,11 +300,11 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void CameraComponent::SetProjectionMode(const ProjectionMode& projection)
+    void CameraComponent::SetProjectionMode(const CameraEnums::ProjectionMode& projection)
     {
       system_->SetProjectionMode(*this, projection);
     }
-    void CameraSystem::SetProjectionMode(CameraComponent handle, const ProjectionMode& projection)
+    void CameraSystem::SetProjectionMode(CameraComponent handle, const CameraEnums::ProjectionMode& projection)
     {
       size_t data_index = component_data_.data.GetDataIndex(handle);
       if (component_data_.projection_mode[data_index] == projection)
@@ -288,11 +316,12 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    ProjectionMode CameraComponent::GetProjectionMode() const
+    CameraEnums::ProjectionMode CameraComponent::GetProjectionMode() const
     {
       return system_->GetProjectionMode(*this);
     }
-    ProjectionMode CameraSystem::GetProjectionMode(CameraComponent handle) const
+
+    CameraEnums::ProjectionMode CameraSystem::GetProjectionMode(CameraComponent handle) const
     {
       return component_data_.data.Get<
         static_cast<size_t>(CameraComponentElements::kProjectMode)>(handle);
@@ -368,7 +397,7 @@ namespace sulphur
     {
       UpdateViewProjection(handle);
       return component_data_.data.Get<
-        static_cast<size_t>(CameraComponentElements::kViewProjectionMatrix)>(handle);
+        static_cast<size_t>(CameraComponentElements::kInvViewProjectionMatrix)>(handle);
     }
 
     //-------------------------------------------------------------------------
@@ -378,8 +407,6 @@ namespace sulphur
     }
     glm::vec2 CameraSystem::ScreenToViewportPoint(CameraComponent handle, const glm::vec2& point) const
     {
-      PS_LOG_ONCE(Warning, "This function is unevaluated (also in orthographic mode)");
-
       glm::vec2& projection_size = component_data_.data.Get<
         static_cast<size_t>(CameraComponentElements::kProjectionSize)>(handle);
       glm::vec2 viewPoint;
@@ -395,8 +422,6 @@ namespace sulphur
     }
     glm::vec3 CameraSystem::ScreenToWorldPoint(CameraComponent handle, const glm::vec3& point)
     {
-      PS_LOG_ONCE(Warning, "This function is unevaluated (also in orthographic mode)");
-
       glm::vec2 viewPoint = ScreenToViewportPoint(handle, glm::vec2(point));
       return ViewportToWorldPoint(handle, glm::vec3(viewPoint, point.z));
     }
@@ -408,8 +433,6 @@ namespace sulphur
     }
     glm::vec3 CameraSystem::WorldToViewportPoint(CameraComponent handle, const glm::vec3& point)
     {
-      PS_LOG_ONCE(Warning, "This function is unevaluated (also in orthographic mode)");
-
       UpdateViewProjection(handle);
       glm::mat4& view_projection = component_data_.data.Get<
         static_cast<size_t>(CameraComponentElements::kViewProjectionMatrix)>(handle);
@@ -432,8 +455,6 @@ namespace sulphur
     }
     glm::vec3 CameraSystem::WorldToScreenPoint(CameraComponent handle, const glm::vec3& point)
     {
-      PS_LOG_ONCE(Warning, "This function is unevaluated (also in orthographic mode)");
-
       glm::vec3 viewPoint = WorldToViewportPoint(handle, point);
       return ViewportToScreenPoint(handle, viewPoint);
     }
@@ -447,8 +468,6 @@ namespace sulphur
       CameraComponent handle,
       const glm::vec3& point) const
     {
-      PS_LOG_ONCE(Warning, "This function is unevaluated (also in orthographic mode)");
-
       return point * glm::vec3(component_data_.data.Get<static_cast<size_t>
         (CameraComponentElements::kProjectionSize)>(handle), 1.0f);
     }
@@ -460,55 +479,36 @@ namespace sulphur
     }
     glm::vec3 CameraSystem::ViewportToWorldPoint(CameraComponent handle, const glm::vec3& point)
     {
-      PS_LOG_ONCE(Warning, "This function is unevaluated (also in orthographic mode)");
-
       UpdateViewProjection(handle);
 
-      glm::vec4 tempOrigin = glm::vec4(point.x, point.y, point.z, 1.0f);
-      glm::vec4 ray = tempOrigin * component_data_.data.Get<
+      glm::mat4& inv_view_projection = component_data_.data.Get<
         static_cast<size_t>(CameraComponentElements::kInvViewProjectionMatrix)>(handle);
+
+      glm::vec4 ray(point.x, point.y, point.z, 1.0f);
+      ray = inv_view_projection * ray;
 
       return (glm::vec3(ray.x, ray.y, ray.z) / ray.w);
     }
 
     //-------------------------------------------------------------------------
-    foundation::Array<glm::vec4, 6> CameraComponent::GetFrustumPlanes()
+    const foundation::Frustum& CameraComponent::GetFrustum()
     {
-      return system_->GetFrustumPlanes(*this);
+      return system_->GetFrustum(*this);
     }
-    foundation::Array<glm::vec4, 6> CameraSystem::GetFrustumPlanes(CameraComponent handle)
+    const foundation::Frustum& CameraSystem::GetFrustum(CameraComponent handle)
     {
-      UpdateViewProjection(handle);
-      glm::mat4& viewProj = component_data_.data.Get<
-        static_cast<size_t>(CameraComponentElements::kViewProjectionMatrix)>(handle);
+      const size_t data_index = component_data_.data.GetDataIndex(handle);
+      foundation::Frustum& frustum = component_data_.frustum[data_index];
+      frustum.SetCameraProperties(component_data_.fov[data_index], 
+        component_data_.projection_size[data_index].x / component_data_.projection_size[data_index].y, 
+        component_data_.near_z[data_index], component_data_.far_z[data_index]);
 
-      foundation::Array<glm::vec4, 6> tempFrustumPlane;
-      tempFrustumPlane[0] = glm::normalize(glm::vec4(viewProj[0][3] + viewProj[0][0],
-        viewProj[1][3] + viewProj[1][0],
-        viewProj[2][3] + viewProj[2][0],
-        viewProj[3][3] + viewProj[3][0]));
-      tempFrustumPlane[1] = glm::normalize(glm::vec4(viewProj[0][3] - viewProj[0][0],
-        viewProj[1][3] - viewProj[1][0],
-        viewProj[2][3] - viewProj[2][0],
-        viewProj[3][3] - viewProj[3][0]));
-      tempFrustumPlane[2] = glm::normalize(glm::vec4(viewProj[0][3] - viewProj[0][1],
-        viewProj[1][3] - viewProj[1][1],
-        viewProj[2][3] - viewProj[2][1],
-        viewProj[3][3] - viewProj[3][1]));
-      tempFrustumPlane[3] = glm::normalize(glm::vec4(viewProj[0][3] + viewProj[0][1],
-        viewProj[1][3] + viewProj[1][1],
-        viewProj[2][3] + viewProj[2][1],
-        viewProj[3][3] + viewProj[3][1]));
-      tempFrustumPlane[4] = glm::normalize(glm::vec4(viewProj[0][2], 
-        viewProj[1][2],
-        viewProj[2][2],
-        viewProj[3][2]));
-      tempFrustumPlane[5] = glm::normalize(glm::vec4(viewProj[0][3] - viewProj[0][2],
-        viewProj[1][3] - viewProj[1][2], 
-        viewProj[2][3] - viewProj[2][2],
-        viewProj[3][3] - viewProj[3][2]));
+      TransformComponent transform = GetTransform(handle);
+      frustum.MoveCamera(transform.GetWorldPosition(), 
+        transform.GetWorldPosition() + transform.GetWorldForward(), 
+        transform.GetWorldUp());
 
-      return tempFrustumPlane;
+      return frustum;
     }
 
     //-------------------------------------------------------------------------
@@ -522,7 +522,7 @@ namespace sulphur
 
       switch (component_data_.projection_mode[data_index])
       {
-      case ProjectionMode::kPerspective:
+      case CameraEnums::ProjectionMode::kPerspective:
         component_data_.projection_matrix[data_index] = glm::perspectiveFovLH_ZO(
           glm::radians(component_data_.fov[data_index]),
           component_data_.projection_size[data_index].x,
@@ -530,7 +530,7 @@ namespace sulphur
           component_data_.near_z[data_index],
           component_data_.far_z[data_index]);
         break;
-      case ProjectionMode::kOrthographic:
+      case CameraEnums::ProjectionMode::kOrthographic:
         component_data_.projection_matrix[data_index] = glm::orthoLH_ZO(
           -component_data_.orthographic_size[data_index].x,
           component_data_.orthographic_size[data_index].x,
@@ -541,7 +541,7 @@ namespace sulphur
         component_data_.projection_size[data_index] = 
           component_data_.orthographic_size[data_index] * 2.0f;
         break;
-      case ProjectionMode::kCanvas:
+      case CameraEnums::ProjectionMode::kCanvas:
         component_data_.projection_matrix[data_index] = glm::orthoLH_ZO(
           .0f,
           component_data_.projection_size[data_index].x,
@@ -566,16 +566,12 @@ namespace sulphur
       size_t data_index = component_data_.data.GetDataIndex(handle);
 
       UpdateProjection(handle); // First check if it needs to update the projection matrix as this triggers the viewProj matrix to update as well
-      if (!component_data_.invalid_view_projection[data_index])// && !transform.hasChanged)
-      {
-        return;
-      }
 
       // TODO: add transform invalidation check
       glm::mat4 view = GetViewMatrix(handle);
 
       // TODO: verify view projection matrix
-      glm::mat4 view_projection = view * component_data_.projection_matrix[data_index];
+      glm::mat4 view_projection = component_data_.projection_matrix[data_index] * view;
 
       component_data_.inv_view_projection_matrix[data_index] = glm::inverse(view_projection);
       component_data_.view_projection_matrix[data_index] = view_projection;
@@ -602,6 +598,28 @@ namespace sulphur
         list.push_back(component_data_.entity[i].Get<CameraComponent>());// There is a better way but need to look into that 
       }
       return list;
+    }
+
+    //-------------------------------------------------------------------------
+    PostProcessMaterialHandle CameraComponent::GetPostProcessMaterial() const
+    {
+      return system_->GetPostProcessMaterial(*this);
+    }
+    PostProcessMaterialHandle CameraSystem::GetPostProcessMaterial(CameraComponent handle) const
+    {
+      return component_data_.data.Get<
+        static_cast<size_t>(CameraComponentElements::kPostProcessMaterial)>(handle);
+    }
+
+    //-------------------------------------------------------------------------
+    void CameraComponent::SetPostProcessMaterial(PostProcessMaterialHandle material)
+    {
+      return system_->SetPostProcessMaterial(*this, material);
+    }
+    void CameraSystem::SetPostProcessMaterial(CameraComponent handle, PostProcessMaterialHandle material)
+    {
+      component_data_.data.Get<
+        static_cast<size_t>(CameraComponentElements::kPostProcessMaterial)>(handle) = material;
     }
 
     //-------------------------------------------------------------------------

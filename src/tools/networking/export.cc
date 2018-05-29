@@ -1,5 +1,6 @@
 #define PS_NETWORKING_API_EXPORT
 #include "tools/networking/export.h"
+#include "tools/networking/networking_system.h"
 #include <enet/enet.h>
 #include <foundation/memory/memory.h>
 #include <foundation/utils/lib_loader.h>
@@ -123,7 +124,7 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    unsigned int SNetGetNumPlayers()
+    unsigned int SNetGetNumClients()
     {
       return network_manager_->num_players();
     }
@@ -177,10 +178,9 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    uint16_t SNetCreateSyncValue(const NetworkValueType type, void* location, 
-      NetworkValueOwner owner)
+    uint16_t SNetCreateSyncValue(const NetworkValueType type, NetworkValueOwner owner)
     {
-      return network_manager_->CreateSyncValue(type, location, owner);
+      return network_manager_->CreateSyncValue(type, owner);
     }
 
     //-------------------------------------------------------------------------
@@ -202,36 +202,93 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void SNetSetOnConnectedToServerCallback(std::function<void()> function)
+    void SNetSetOnConnectedToServerCallback(eastl::function<void()> function)
     {
       network_manager_->SetOnConnectedToServerCallback(function);
     }
 
     //-------------------------------------------------------------------------
     void SNetSetOnDisconnectedFromServerCallback(
-      std::function<void(DisconnectionInfo)> function)
+      eastl::function<void(DisconnectionInfo)> function)
     {
       network_manager_->SetOnDisconnectedFromServerCallback(function);
     }
 
     //-------------------------------------------------------------------------
     void SNetSetOnPlayerConnected(
-      std::function<void(NetworkPlayerData)> function)
+      eastl::function<void(NetworkPlayerData)> function)
     {
       network_manager_->SetOnPlayerConnected(function);
     }
 
     //-------------------------------------------------------------------------
     void SNetSetOnPlayerDisconnected(
-      std::function<void(NetworkPlayerData)> function)
+      eastl::function<void(NetworkPlayerData)> function)
     {
       network_manager_->SetOnPlayerDisconnected(function);
     }
 
     //-------------------------------------------------------------------------
-    void SNetSetOnFailedToConnect(std::function<void()> function)
+    void SNetSetOnFailedToConnect(eastl::function<void()> function)
     {
       network_manager_->SetOnFailedToConnect(function);
+    }
+
+    //-------------------------------------------------------------------------
+    unsigned int SNetGetPing(uint8_t id)
+    {
+      return network_manager_->GetPing(id);
+    }
+
+    //-------------------------------------------------------------------------
+    RPCHandle SNetRegisterRPC(eastl::function<void(RPCHandle, NetworkPlayerData,
+      const foundation::Vector<NetworkValue>&)> function, 
+      const foundation::Vector<NetworkValueType>& arguments)
+    {
+      return network_manager_->RegisterRPC(function, arguments);
+    }
+
+    //-------------------------------------------------------------------------
+    void SNetUnregisterRPC(const RPCHandle handle)
+    {
+      network_manager_->UnregisterRPC(handle);
+    }
+
+    //-------------------------------------------------------------------------
+    void SNetInvokeRPC(const RPCHandle handle, const RPCMode mode,
+      const foundation::Vector<NetworkValue>& arguments)
+    {
+      network_manager_->InvokeRPC(handle, mode, arguments);
+    }
+
+    //-------------------------------------------------------------------------
+    void SNetValidateRPC(uint16_t id)
+    {
+      network_manager_->ValidateRPC(id);
+    }
+
+    //-----------------------------------------------------------------------
+    void SNetValidateAllRPCs()
+    {
+      network_manager_->ValidateAllRPCs();
+    }
+
+    //-------------------------------------------------------------------------
+    void SNetSetSyncValue(SyncValueID id, const NetworkValue& value)
+    {
+      return network_manager_->SetSyncValue(id, value);
+    }
+
+    //-------------------------------------------------------------------------
+    bool SNetGetSyncValue(SyncValueID id, NetworkValue* value)
+    {
+      return network_manager_->GetSyncValue(id, value);
+    }
+
+    //-------------------------------------------------------------------------
+    void SNetClearRPCBuffer()
+    {
+      return network_manager_->ClearRPCBuffer();
     }
 
     namespace editor

@@ -14,6 +14,7 @@ namespace sulphur
     */
     struct RaycastHitInfo
     {
+      bool hit; //!< True if the ray hit something
       foundation::Ray ray; //!< The ray that was cast
       glm::vec3 point; //!< The point where the ray intersected a collider
       glm::vec3 normal; //!< The normal of the intersection

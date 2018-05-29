@@ -6,6 +6,7 @@
 #include <LinearMath/btMatrixX.h>
 #include <LinearMath/btMatrix3x3.h>
 #include <LinearMath/btQuaternion.h>
+#include <LinearMath/btTransform.h>
 
 namespace sulphur
 {
@@ -47,6 +48,13 @@ namespace sulphur
       static glm::quat ToGlm(const btQuaternion& quat);
 
       /**
+      * @brief Converts a btTransform to a glm::mat4x4
+      * @param[in] transform (const btTransform&)
+      * @return (glm::mat4x4)
+      */
+      static glm::mat4x4 ToGlm(const btTransform& transform);
+
+      /**
       * @brief Converts a GLM vector3 to the Bullet equivalent.
       * @param[in] vector (const glm::vec3&) Vector to be converted.
       * @return (btVector3) The converted vector.
@@ -73,6 +81,13 @@ namespace sulphur
       * @return (btQuaternion) The converted quaternion.
       */
       static btQuaternion ToBt(const glm::quat& quat);
+
+      /**
+      * @brief Converts a glm::mat4x4 to a btTransform
+      * @param[in] transform (glm::mat4x4)
+      * @return (const btTransform&)
+      */
+      static btTransform ToBt(const glm::mat4x4& transform);
     };
   }
 }
