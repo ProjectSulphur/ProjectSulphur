@@ -1,5 +1,6 @@
 #include "tools/builder/export.h"
 
+#include "tools/builder/pipelines/world_pipeline.h"
 #include "tools/builder/pipelines/audio_pipeline.h"
 #include "tools/builder/pipelines/animation_pipeline.h"
 #include "tools/builder/pipelines/material_pipeline.h"
@@ -53,6 +54,15 @@ namespace sulphur
       }
 
       //---------------------------------------------------------------------------------------------------------
+      PS_BUILDER_C_API void SetProjectDirectory(const char* project_dir)
+      {
+        for (PipelineBase* pipeline : pipelines->pipelines())
+        {
+          pipeline->set_project_dir(project_dir);
+        }
+      }
+
+      //---------------------------------------------------------------------------------------------------------
       PS_BUILDER_C_API void Shutdown()
       {
         if (scene_loader != nullptr)
@@ -95,17 +105,17 @@ namespace sulphur
       PS_BUILDER_C_API bool ImportAudio(const char* path, uint64_t* id)
       {
         bool success = false;
-        foundation::String path_string(path);
         foundation::AudioBankAsset out;
 
         AudioPipeline* pipeline = pipelines->GetPipeline<AudioPipeline>();
-        success = pipeline->Create(path_string, out);
+        success = pipeline->Create(path, out);
+
         if (success == false)
         {
           return success;
         }
 
-        success = pipeline->PackageAudioBank(path_string, out);
+        success = pipeline->PackageAudioBank(path, out);
         *id = out.id;
         return success;
       }
@@ -117,17 +127,25 @@ namespace sulphur
       }
 
       //---------------------------------------------------------------------------------------------------------
+      PS_BUILDER_C_API bool RegisterWorld(const char* path, uint64_t* id)
+      {
+        WorldPipeline* pipeline = pipelines->GetPipeline<WorldPipeline>();
+        return pipeline->Register(path, *id);
+      }
+
+      //---------------------------------------------------------------------------------------------------------
       PS_BUILDER_C_API bool ImportModel(const char* path, bool single_model,
         const char* vertex_shader, const char* pixel_shader, uint64_t* id)
       {
         bool success = false;
-        foundation::String path_string(path);
         ModelPipeline* pipeline = pipelines->GetPipeline<ModelPipeline>();
 
-        foundation::ModelInfo info = pipeline->GetModelInfo(*scene_loader,
-          path_string, single_model);
+        foundation::ModelInfo info = 
+          pipeline->GetModelInfo(*scene_loader, path, single_model);
+
         foundation::Vector<foundation::ModelAsset> models;
-        success = pipeline->Create(*scene_loader,
+        success = pipeline->Create(
+          *scene_loader,
           path,
           single_model,
           info,
@@ -147,7 +165,7 @@ namespace sulphur
 
         for (foundation::ModelAsset& model : models)
         {
-          success = pipeline->PackageModel(path_string,
+          success = pipeline->PackageModel(path,
             model,
             *pipelines->GetPipeline<MeshPipeline>(),
             *pipelines->GetPipeline<SkeletonPipeline>(),
@@ -162,17 +180,16 @@ namespace sulphur
       PS_BUILDER_C_API bool ImportScript(const char* path, uint64_t* id)
       {
         bool success = false;
-        foundation::String path_string(path);
         foundation::ScriptAsset out = {};
-        ScriptPipeline* pipeline = pipelines->GetPipeline<ScriptPipeline>();
 
-        success = pipeline->Create(path_string, out);
+        ScriptPipeline* pipeline = pipelines->GetPipeline<ScriptPipeline>();
+        success = pipeline->Create(path, out);
+
         if (success == false)
         {
           return success;
         }
-
-        success = pipeline->PackageScript(path_string, out);
+        success = pipeline->PackageScript(path, out);
         *id = out.id;
         pipeline->ExportCache();
         return success;
@@ -182,19 +199,19 @@ namespace sulphur
       PS_BUILDER_C_API bool ImportShader(const char* path, uint64_t* id)
       {
         bool success = false;
-        foundation::String path_string(path);
         ShaderPipelineOptions options;
         options.targets = static_cast<uint8_t>(ShaderCompilerBase::Target::kAll);
         foundation::ShaderAsset out;
         ShaderPipeline* pipeline = pipelines->GetPipeline<ShaderPipeline>();
 
-        success = pipeline->Create(path_string, options, out);
+        success = pipeline->Create(path, options, out);
+
         if (success == false)
         {
           return success;
         }
 
-        success = pipeline->PackageShader(path_string, out);
+        success = pipeline->PackageShader(path, out);
         foundation::PackagePtr native_ptr;
         pipeline->GetPackagePtrById(out.id, native_ptr);
         *id = out.id;
@@ -205,17 +222,17 @@ namespace sulphur
       PS_BUILDER_C_API bool ImportTexture(const char* path, uint64_t* id)
       {
         bool success = false;
-        foundation::String path_string(path);
         foundation::TextureAsset out;
         TexturePipeline* pipeline = pipelines->GetPipeline<TexturePipeline>();
 
-        success = pipeline->Create(path_string, out);
+        success = pipeline->Create(path, out);
+
         if (success == false)
         {
           return success;
         }
 
-        success = pipeline->PackageTexture(path_string, out);
+        success = pipeline->PackageTexture(path, out);
         *id = out.id;
         return success;
       }
@@ -275,21 +292,12 @@ namespace sulphur
       }
 
       //---------------------------------------------------------------------------------------------------------
-      PS_BUILDER_C_API bool UpdatePackagePtrs(const char**, uint64_t*, int32_t* asset_types, int32_t count)
+      PS_BUILDER_C_API bool UpdatePackagePtrs(const char**, uint64_t*, int32_t*, int32_t )
       {
-        for (int i = 0; i < count; ++i)
-        {
-          switch (asset_types[i])
-          {
-          case 3: //kShader
-            // update the pointer
-          default:
-            break;
-          }
-        }
         return false;
       }
 
+      //---------------------------------------------------------------------------------------------------------
       PS_BUILDER_C_API void CreateDefaults()
       {
         for (PipelineBase* pipeline : pipelines->pipelines())
@@ -298,7 +306,8 @@ namespace sulphur
           pipeline->ExportCache();
         }
       }
-
+      
+      //---------------------------------------------------------------------------------------------------------
       PS_BUILDER_C_API bool GetAssetPackageName(int32_t type, char* out_buf, int32_t buffer_size)
       {
         foundation::String name = "";
@@ -331,6 +340,9 @@ namespace sulphur
         case 8: // skeleton
           name = pipelines->GetPipeline<SkeletonPipeline>()->GetCacheName();
           break;
+        case 9: // world
+          name = pipelines->GetPipeline<WorldPipeline>()->GetCacheName();
+          break;
         default:
           return false;
         }
@@ -343,6 +355,7 @@ namespace sulphur
         return false;
       }
 
+      //---------------------------------------------------------------------------------------------------------
       void PipelineContainer::Shutdown()
       {
         delete GetPipeline<AnimationPipeline>();

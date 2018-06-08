@@ -1,0 +1,159 @@
+﻿<UserControl x:Class="sulphur.editor.controls.NetworkDebugger"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:sulphur.editor.controls"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+
+    <TabControl>
+        <TabItem Header="General Statistics">
+            <WrapPanel Orientation="Vertical">
+                <ScrollViewer>
+                    <StackPanel Orientation="Vertical">
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Setup state:" Width="150"/>
+                            <Label Name="setup_state"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Connection state:" Width="150"/>
+                            <Label Name="connection_state"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Client name:" Width="150"/>
+                            <Label Name="client_name"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Client ID:" Width="150"/>
+                            <Label Name="client_id"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Tickrate:" Width="150"/>
+                            <Label Name="tickrate"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Number of clients:" Width="150"/>
+                            <Label Name="no_clients"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Clients:" Width="150"/>
+                            <Label Content="Name" Width="150" FontWeight="Bold"/>
+                            <Label Content="ID" Width="150" FontWeight="Bold"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <ListBox Name="player_list"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </WrapPanel>
+        </TabItem>
+        <TabItem Header="Traffic Statistics">
+            <WrapPanel Orientation="Vertical">
+                <ScrollViewer>
+                    <StackPanel Orientation="Vertical">
+                        <StackPanel Orientation="Horizontal">
+                            <Label Width="200"/>
+                            <Label Content="Per tick" Width="150" FontWeight="Bold"/>
+                            <Label Content="Total" Width="150" FontWeight="Bold"/>
+                            <Label Content="Average" Width="150" FontWeight="Bold"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Packets sent:" Width="200"/>
+                            <Label Name="packets_sent_pt" Width="150"/>
+                            <Label Name="packets_sent_ttl" Width="150"/>
+                            <Label Name="packets_sent_avg" Width="150"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Messages sent:" Width="200"/>
+                            <Label Name="messages_sent_pt" Width="150"/>
+                            <Label Name="messages_sent_ttl" Width="150"/>
+                            <Label Name="messages_sent_avg" Width="150"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Packets recieved:" Width="200"/>
+                            <Label Name="packets_recieved_pt" Width="150"/>
+                            <Label Name="packets_recieved_ttl" Width="150"/>
+                            <Label Name="packets_recieved_avg" Width="150"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Messages recieved:" Width="200"/>
+                            <Label Name="messages_recieved_pt" Width="150"/>
+                            <Label Name="messages_recieved_ttl" Width="150"/>
+                            <Label Name="messages_recieved_avg" Width="150"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Packets lost:" Width="200"/>
+                            <Label Name="packets_lost_pt" Width="150"/>
+                            <Label Name="packets_lost_ttl" Width="150"/>
+                            <Label Name="packets_lost_avg" Width="150"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Outgoing bytes:" Width="200"/>
+                            <Label Name="outgoing_bytes_pt" Width="150"/>
+                            <Label Name="outgoing_bytes_ttl" Width="150"/>
+                            <Label Name="outgoing_bytes_avg" Width="150"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Incoming bytes:" Width="200"/>
+                            <Label Name="incoming_bytes_pt" Width="150"/>
+                            <Label Name="incoming_bytes_ttl" Width="150"/>
+                            <Label Name="incoming_bytes_avg" Width="150"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </WrapPanel>
+        </TabItem>
+        <TabItem Header="Sync value list">
+            <WrapPanel>
+                <ScrollViewer>
+                    <StackPanel Orientation="Vertical">
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="ID" Width="150" FontWeight="Bold"/>
+                            <Label Content="Type" Width="150" FontWeight="Bold"/>
+                            <Label Content="Value" Width="150" FontWeight="Bold"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <ListBox Name="value_list"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </WrapPanel>
+        </TabItem>
+        <TabItem Header="RPC list">
+            <WrapPanel>
+                <ScrollViewer>
+                    <StackPanel Orientation="Vertical">
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="ID:" Width="150" FontWeight="Bold"/>
+                            <Label Content="Arguments" Width="150" FontWeight="Bold"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <ListBox Name="rpc_list"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </WrapPanel>
+        </TabItem>
+        <TabItem Header="RPC buffer">
+            <WrapPanel Orientation="Vertical">
+                <ScrollViewer>
+                    <StackPanel Orientation="Vertical">
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Buffer size:" Width="150"/>
+                            <Label Name="rpc_buffer_size"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="ID:" Width="150" FontWeight="Bold"/>
+                            <Label Content="Arguments" Width="150" FontWeight="Bold"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                            <ListBox Name="rpc_buffer_list" HorizontalAlignment="Left"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </WrapPanel>
+        </TabItem>
+    </TabControl>
+
+</UserControl>

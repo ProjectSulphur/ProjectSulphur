@@ -1,18 +1,30 @@
 #include "skinned_mesh_render_system.h"
 
+#include "engine/core/entity_system.h"
 #include "engine/systems/components/transform_system.h"
 #include "engine/systems/components/camera_system.h"
 
 #include "engine/graphics/irenderer.h"
 #include "engine/graphics/debug_render_system.h"
-#include "engine/graphics/animation_state.h"
 #include "engine/application/application.h"
 #include "engine/assets/asset_system.h"
+#include "engine/assets/mesh.h"
+#include "engine/assets/model.h"
+#include "engine/assets/material.h"
+#include "engine/assets/skeleton.h"
 
+#include <foundation/utils/frame.h>
 #include <foundation/job/data_policy.h>
 #include <foundation/job/job.h>
 #include <foundation/job/job_graph.h>
 #include <graphics/platform/pipeline_state.h>
+#include <foundation/memory/memory.h>
+
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/transform.hpp>
+
+#include <lua-classes/skinned_mesh_render_system.lua.cc>
 
 namespace sulphur
 {
@@ -89,9 +101,15 @@ namespace sulphur
           entity,
           MeshHandle(),
           foundation::Vector<MaterialHandle>(),
-          nullptr,
           true,
-          true
+          true,
+          SkeletonHandle(),
+          AnimationHandle(),
+          0.0f,
+          0.0f,
+          false,
+          1.0f,
+          foundation::Vector<glm::mat4>()
         )
       );
     }
@@ -110,7 +128,31 @@ namespace sulphur
     {
       for (int i = 0; i < component_data_.data.size(); ++i)
       {
-        component_data_.animation_state[i]->Update();
+        if (component_data_.is_playing[i] == true && component_data_.playback_speed[i] > 0.0f)
+        {
+          component_data_.global_playback_time_in_seconds[i] += 
+            foundation::Frame::delta_time() * component_data_.playback_speed[i];
+
+          SkeletonHandle skeleton = component_data_.skeleton[i];
+          AnimationHandle animation = component_data_.animation[i];
+
+          if (skeleton.IsValid() && animation.IsValid())
+          {
+            component_data_.local_playback_time_in_ticks[i] =
+              std::fmodf(
+                animation->ticks_per_second() * component_data_.global_playback_time_in_seconds[i],
+                animation->duration()
+              );
+
+            component_data_.bone_matrices[i].resize(skeleton->bones().size());
+
+            CalculateBoneTransform(
+              i, 
+              skeleton->root_node_index(), 
+              component_data_.entity[i].Get<TransformComponent>().GetLocalToWorld()
+            );
+          }
+        }
       }
     }
 
@@ -130,6 +172,7 @@ namespace sulphur
         camera_system_->set_current_camera(camera);
 
         renderer_->SetCamera(
+          camera.GetTransform().GetWorldPosition(),
           camera.GetViewMatrix(),
           camera.GetProjectionMatrix(),
           camera.GetDepthBuffer(),
@@ -141,7 +184,7 @@ namespace sulphur
           
           renderer_->SetModelMatrix(transform.GetLocalToWorld());
           renderer_->SetMesh(component_data_.mesh[i]);
-          renderer_->SetBoneMatrices(component_data_.animation_state[i]->GetTransformedBones());
+          renderer_->SetBoneMatrices(component_data_.bone_matrices[i]);
         
           foundation::Vector<MaterialHandle>& materials = component_data_.materials[i];
           size_t submesh_count = component_data_.mesh[i]->GetSubmeshCount();
@@ -187,7 +230,8 @@ namespace sulphur
               }
         
               // Render the mesh
-              const SubMeshOffset offset = component_data_.mesh[i]->GetSubmesh(static_cast<uint>(j));
+              const SubMeshOffset offset = 
+                component_data_.mesh[i]->GetSubmesh(static_cast<uint>(j));
         
               renderer_->Draw(offset.size, offset.offset);
             }
@@ -197,8 +241,31 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    void SkinnedMeshRenderSystem::SetMesh(SkinnedMeshRenderComponent handle, const MeshHandle& new_mesh)
+    SkinnedMeshRenderSystemData& SkinnedMeshRenderSystem::data()
     {
+      return component_data_;
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    SkinnedMeshRenderComponent::SkinnedMeshRenderComponent() :
+      system_(nullptr)
+    {
+
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    SkinnedMeshRenderComponent::SkinnedMeshRenderComponent(System& system, size_t handle) :
+      ComponentHandleBase(handle),
+      system_(&system)
+    {
+
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderComponent::SetMesh(const MeshHandle& new_mesh)
+    {
+      SkinnedMeshRenderSystemData& data = system_->data();
+
       if (!new_mesh) // Is the new mesh valid?
       {
         PS_LOG(
@@ -214,16 +281,16 @@ namespace sulphur
 
       // Assign the new mesh
       MeshHandle& mesh =
-        component_data_.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMesh)>(handle);
+        data.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMesh)>(*this);
 
       mesh = new_mesh;
       size_t num_submeshes = mesh->GetSubmeshCount();
-      
+
       // Resize the materials vector to be of the same size as the
       // number of submeshes, while making sure that it is filled 
       // with valid materials.
-      foundation::Vector<MaterialHandle>& materials =
-        component_data_.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMaterials)>(handle);
+      foundation::Vector<MaterialHandle>& materials = 
+        data.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMaterials)>(*this);
 
       materials.resize(num_submeshes);
 
@@ -237,16 +304,50 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    const MeshHandle& SkinnedMeshRenderSystem::GetMesh(SkinnedMeshRenderComponent handle)
+    void SkinnedMeshRenderComponent::SetMesh(ScriptableAsset* mesh)
     {
-      return component_data_.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMesh)>(handle);
+      if (mesh->type() != ScriptableAsset::AssetTypes::kMesh)
+      {
+        return;
+      }
+
+      BaseAssetHandle* h = mesh->GetHandle();
+      MeshHandle* m = static_cast<MeshHandle*>(h);
+      SetMesh(*m);
     }
 
     //------------------------------------------------------------------------------------------------------
-    void SkinnedMeshRenderSystem::SetMaterial(SkinnedMeshRenderComponent handle, const MaterialHandle& material, size_t index)
+    void SkinnedMeshRenderComponent::SetModel(const ModelHandle& model)
     {
-      foundation::Vector<MaterialHandle>& materials =
-        component_data_.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMaterials)>(handle);
+      SetMesh(model->mesh_handle());
+      SetMaterials(model->material_handles());
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderComponent::SetModel(ScriptableAsset* model)
+    {
+      if (model->type() != ScriptableAsset::AssetTypes::kModel)
+      {
+        return;
+      }
+
+      BaseAssetHandle* h = model->GetHandle();
+      ModelHandle* m = static_cast<ModelHandle*>(h);
+      SetModel(*m);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    const MeshHandle& SkinnedMeshRenderComponent::GetMesh() const
+    {
+      return system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMesh)>(*this);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderComponent::SetMaterial(const MaterialHandle& material, size_t index)
+    {
+      foundation::Vector<MaterialHandle>& materials = system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMaterials)>(*this);
 
       if (materials.size() > index)
       {
@@ -282,10 +383,11 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    MaterialHandle SkinnedMeshRenderSystem::GetMaterial(SkinnedMeshRenderComponent handle, size_t index)
+    MaterialHandle SkinnedMeshRenderComponent::GetMaterial(size_t index) const
     {
-      foundation::Vector<MaterialHandle>& materials = 
-        component_data_.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMaterials)>(handle);
+      foundation::Vector<MaterialHandle>& materials =
+        system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMaterials)>(*this);
 
       if (materials.size() < index)
       {
@@ -306,12 +408,16 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    void SkinnedMeshRenderSystem::SetMaterials(SkinnedMeshRenderComponent handle, const foundation::Vector<MaterialHandle>& new_materials)
+    void SkinnedMeshRenderComponent::SetMaterials(
+      const foundation::Vector<MaterialHandle>& new_materials
+    )
     {
-      foundation::Vector<MaterialHandle>& materials =
-        component_data_.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMaterials)>(handle);
+      foundation::Vector<MaterialHandle>& materials = system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMaterials)>(*this);
 
-      MeshHandle mesh = component_data_.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMesh)>(handle);
+      MeshHandle mesh = system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMesh)>(*this);
+
       size_t num_submeshes = mesh->GetSubmeshCount();
       size_t num_new_materials = new_materials.size();
 
@@ -363,143 +469,363 @@ namespace sulphur
     }
 
     //------------------------------------------------------------------------------------------------------
-    const foundation::Vector<MaterialHandle>& SkinnedMeshRenderSystem::GetMaterials(SkinnedMeshRenderComponent handle)
+    const foundation::Vector<MaterialHandle>& SkinnedMeshRenderComponent::GetMaterials() const
     {
-      return 
-        component_data_.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMaterials)>(handle);
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    void SkinnedMeshRenderSystem::SetAnimationState(SkinnedMeshRenderComponent handle, AnimationState* animation_state)
-    {
-      component_data_.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kAnimationState)>(handle) =
-        animation_state;
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    AnimationState* SkinnedMeshRenderSystem::GetAnimationState(SkinnedMeshRenderComponent handle)
-    {
-      return 
-        component_data_.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kAnimationState)>(handle);
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    void SkinnedMeshRenderSystem::SetVisible(SkinnedMeshRenderComponent handle, bool visible)
-    {
-      bool& is_visible = 
-        component_data_.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kVisible)>(handle);
-
-      is_visible = visible;
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    bool SkinnedMeshRenderSystem::IsVisible(SkinnedMeshRenderComponent handle)
-    {
-      return 
-        component_data_.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kVisible)>(handle);
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    void SkinnedMeshRenderSystem::SetCastsShadows(SkinnedMeshRenderComponent handle, bool casts_shadow)
-    {
-      bool& is_casting_shadows =
-        component_data_.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kCastsShadows)>(handle);
-
-      is_casting_shadows = casts_shadow;
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    bool SkinnedMeshRenderSystem::CastsShadows(SkinnedMeshRenderComponent handle)
-    {
-      return
-        component_data_.data.Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kCastsShadows)>(handle);
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    SkinnedMeshRenderComponent::SkinnedMeshRenderComponent() :
-      system_(nullptr)
-    {
-
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    SkinnedMeshRenderComponent::SkinnedMeshRenderComponent(System& system, size_t handle) :
-      ComponentHandleBase(handle),
-      system_(&system)
-    {
-
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    void SkinnedMeshRenderComponent::SetMesh(const MeshHandle& mesh)
-    {
-      system_->SetMesh(*this, mesh);
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    const MeshHandle& SkinnedMeshRenderComponent::GetMesh()
-    {
-      return system_->GetMesh(*this);
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    void SkinnedMeshRenderComponent::SetMaterial(const MaterialHandle& material, size_t index)
-    {
-      system_->SetMaterial(*this, material, index);
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    MaterialHandle SkinnedMeshRenderComponent::GetMaterial(size_t index)
-    {
-      return system_->GetMaterial(*this, index);
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    void SkinnedMeshRenderComponent::SetMaterials(const foundation::Vector<MaterialHandle>& materials)
-    {
-      system_->SetMaterials(*this, materials);
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    const foundation::Vector<MaterialHandle>& SkinnedMeshRenderComponent::GetMaterials()
-    {
-      return system_->GetMaterials(*this);
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    void SkinnedMeshRenderComponent::SetAnimationState(AnimationState* animation_state)
-    {
-      system_->SetAnimationState(*this, animation_state);
-    }
-
-    //------------------------------------------------------------------------------------------------------
-    AnimationState* SkinnedMeshRenderComponent::GetAnimationState()
-    {
-      return system_->GetAnimationState(*this);
+      return system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kMaterials)>(*this);
     }
 
     //------------------------------------------------------------------------------------------------------
     void SkinnedMeshRenderComponent::SetVisible(bool visible)
     {
-      system_->SetVisible(*this, visible);
+      bool& is_visible = system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kVisible)>(*this);
+
+      is_visible = visible;
     }
 
     //------------------------------------------------------------------------------------------------------
-    bool SkinnedMeshRenderComponent::IsVisible()
+    bool SkinnedMeshRenderComponent::IsVisible() const
     {
-      return system_->IsVisible(*this);
+      return system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kVisible)>(*this);
     }
 
     //------------------------------------------------------------------------------------------------------
     void SkinnedMeshRenderComponent::SetCastsShadows(bool casts_shadows)
     {
-      system_->SetCastsShadows(*this, casts_shadows);
+      bool& casting_shadows = system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kCastsShadows)>(*this);
+
+      casting_shadows = casts_shadows;
     }
 
     //------------------------------------------------------------------------------------------------------
-    bool SkinnedMeshRenderComponent::CastsShadows()
+    bool SkinnedMeshRenderComponent::CastsShadows() const
     {
-      return system_->CastsShadows(*this);
+      return system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kCastsShadows)>(*this);
+    }
+    
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderComponent::SetAnimation(AnimationHandle animation_handle)
+    {
+      AnimationHandle& animation = system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kAnimation)>(*this);
+
+      animation = animation_handle;
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderComponent::SetAnimation(ScriptableAsset* animation)
+    {
+      if (animation->type() != ScriptableAsset::AssetTypes::kAnimation)
+      {
+        return;
+      }
+
+      BaseAssetHandle* h = animation->GetHandle();
+      AnimationHandle* m = static_cast<AnimationHandle*>(h);
+
+      SetAnimation(*m);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    AnimationHandle SkinnedMeshRenderComponent::GetAnimation() const
+    {
+      return system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kAnimation)>(*this);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderComponent::SetSkeleton(SkeletonHandle skeleton_handle)
+    {
+      SkeletonHandle& skeleton = system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kSkeleton)>(*this);
+
+      skeleton = skeleton_handle;
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderComponent::SetSkeleton(ScriptableAsset* skeleton)
+    {
+      if (skeleton->type() != ScriptableAsset::AssetTypes::kSkeleton)
+      {
+        return;
+      }
+
+      BaseAssetHandle* h = skeleton->GetHandle();
+      SkeletonHandle* m = static_cast<SkeletonHandle*>(h);
+
+      SetSkeleton(*m);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    SkeletonHandle SkinnedMeshRenderComponent::GetSkeleton() const
+    {
+      return system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kSkeleton)>(*this);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderComponent::Play()
+    {
+      SetPlaying(true, true);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderComponent::Stop()
+    {
+      SetPlaying(false, true);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderComponent::Pause()
+    {
+      SetPlaying(false, false);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderComponent::Resume()
+    {
+      SetPlaying(true, false);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderComponent::SetPlaying(bool playing, bool reset_playback_time)
+    {
+      bool& is_playing = system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kIsPlaying)>(*this);
+
+      is_playing = playing;
+
+      if (reset_playback_time == true)
+      {
+        SetPlaybackTime(0.0f);
+      }
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    bool SkinnedMeshRenderComponent::IsPlaying() const
+    {
+      return system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kIsPlaying)>(*this);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    bool SkinnedMeshRenderComponent::TogglePlaying(bool reset_playback_time)
+    {
+      SetPlaying(!IsPlaying(), reset_playback_time);
+
+      return IsPlaying();
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderComponent::SetPlaybackTime(float playback_time)
+    {
+      float& time = system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kGlobalPlaybackTime)>(*this);
+
+      time = playback_time;
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    float SkinnedMeshRenderComponent::GetPlaybackTime() const
+    {
+      return system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kGlobalPlaybackTime)>(*this);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderComponent::SetPlaybackSpeed(float playback_speed)
+    {
+      float& speed = system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kPlaybackSpeed)>(*this);
+
+      speed = playback_speed;
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    float SkinnedMeshRenderComponent::GetPlaybackSpeed() const
+    {
+      return system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kPlaybackSpeed)>(*this);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    const foundation::Vector<glm::mat4>& SkinnedMeshRenderComponent::GetBoneMatrices() const
+    {
+      return system_->data().data.
+        Get<static_cast<size_t>(SkinnedMeshRenderComponentElements::kBoneMatrices)>(*this);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderSystem::CalculateBoneTransform(
+      unsigned int component_index,
+      unsigned int node_index,
+      const glm::mat4& parent_transform
+    )
+    {
+      const SkeletalNode& node = component_data_.skeleton[component_index]->node_at(node_index);
+
+      glm::mat4 node_transform = node.transform;
+
+      unsigned int animation_channel_index = UINT_MAX;
+      GetChannelByNodeName(component_index, node.name, &animation_channel_index);
+
+      if (animation_channel_index != UINT_MAX)
+      {
+        // process the animation channel
+        // set node transform to be result of interpolated animation channel
+        const AnimationChannel& channel = component_data_.
+          animation[component_index]->animation_channels()[animation_channel_index];
+
+        float& local_playback_time = component_data_.local_playback_time_in_ticks[component_index];
+
+        glm::vec3 position = ProcessKeyframes(
+          local_playback_time,
+          channel.position_keys
+        );
+        glm::quat rotation = ProcessKeyframes(
+          local_playback_time,
+          channel.rotation_keys
+        );
+        glm::vec3 scale = ProcessKeyframes(
+          local_playback_time,
+          channel.scale_keys
+        );
+
+        glm::mat4 position_matrix = glm::translate(position);
+        glm::mat4 rotation_matrix = glm::toMat4(rotation);
+        glm::mat4 scaling_matrix = glm::scale(scale);
+
+        node_transform = position_matrix * rotation_matrix * scaling_matrix;
+      }
+
+      glm::mat4 global_transform = parent_transform * node_transform;
+
+      SkeletonHandle skeleton = component_data_.skeleton[component_index];
+
+      if (skeleton->bone_names().find(node.name) != skeleton->bone_names().end())
+      {
+        foundation::Vector<glm::mat4>& bone_matrices = 
+          component_data_.bone_matrices[component_index];
+
+        bone_matrices[component_data_.skeleton[component_index]->bone_names().at(node.name)] =
+          glm::inverse(component_data_.skeleton[component_index]->root_node().transform) *
+          global_transform *
+          skeleton->bones()[skeleton->bone_names().at(node.name)].offset;
+      }
+
+      for (size_t i = 0; i < node.children.size(); i++)
+      {
+        CalculateBoneTransform(component_index, node.children[i], global_transform);
+      }
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    void SkinnedMeshRenderSystem::GetChannelByNodeName(
+      unsigned int component_index,
+      const foundation::String& node_name,
+      unsigned int* out_channel_index) const
+    {
+      AnimationHandle animation = component_data_.animation[component_index];
+
+      for (int i = 0; i < animation->animation_channels().size(); ++i)
+      {
+        if (animation->animation_channels()[i].bone_name == node_name)
+        {
+          *out_channel_index = i;
+          break;
+        }
+      }
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    glm::vec3 SkinnedMeshRenderSystem::ProcessKeyframes(
+      float playback_time,
+      const foundation::Vector<Vector3Keyframe>& keyframes) const
+    {
+      if (keyframes.size() == 0)
+      {
+        return glm::vec3(1.0f, 1.0f, 1.0f);
+      }
+      
+      if (keyframes.size() == 1)
+      {
+        return keyframes[0].value;
+      }
+
+      unsigned int current_key_index = UINT_MAX;
+      unsigned int next_key_index = UINT_MAX;
+
+      for (int i = static_cast<int>(keyframes.size()) - 1; i >= 0; i--)
+      {
+        if (keyframes[i].time < playback_time)
+        {
+          current_key_index = static_cast<unsigned int>(i);
+          break;
+        }
+      }
+
+      if (current_key_index == UINT_MAX)
+      {
+        return keyframes[0].value;
+      }
+
+      next_key_index = static_cast<unsigned int>(fmod(current_key_index + 1, keyframes.size()));
+
+      float delta_time = keyframes[next_key_index].time - keyframes[current_key_index].time;
+      float factor = (playback_time - keyframes[current_key_index].time) / delta_time;
+
+      const glm::vec3& start = keyframes[current_key_index].value;
+      const glm::vec3& end = keyframes[next_key_index].value;
+      glm::vec3 to_end = end - start;
+
+      return start + (to_end * factor);
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    glm::quat SkinnedMeshRenderSystem::ProcessKeyframes(
+      float playback_time,
+      const foundation::Vector<QuaternionKeyframe>& keyframes) const
+    {
+      if (keyframes.size() == 0)
+      {
+        return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+      }
+
+      if (keyframes.size() == 1)
+      {
+        return keyframes[0].value;
+      }
+
+      unsigned int current_key_index = UINT_MAX;
+      unsigned int next_key_index = UINT_MAX;
+
+      for (int i = static_cast<int>(keyframes.size()) - 1; i >= 0; i--)
+      {
+        if (keyframes[i].time < playback_time)
+        {
+          current_key_index = static_cast<unsigned int>(i);
+          break;
+        }
+      }
+
+      if (current_key_index == UINT_MAX)
+      {
+        return keyframes[0].value;
+      }
+
+      next_key_index = static_cast<unsigned int>(fmod(current_key_index + 1, keyframes.size()));
+
+      float delta_time = keyframes[next_key_index].time - keyframes[current_key_index].time;
+      float factor = (playback_time - keyframes[current_key_index].time) / delta_time;
+
+      const glm::quat& start = keyframes[current_key_index].value;
+      const glm::quat& end = keyframes[next_key_index].value;
+
+      return glm::slerp(start, end, factor);
     }
   }
 }

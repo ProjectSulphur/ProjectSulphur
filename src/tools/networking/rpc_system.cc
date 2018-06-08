@@ -51,6 +51,7 @@ namespace sulphur
       {
         id_stack_.push_back(handle.id);
         rpc_stack_[handle.id] = { };
+        SortIDs();
       }
     }
 

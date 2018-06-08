@@ -144,10 +144,22 @@ namespace sulphur
       return asset_id_ == other.asset_id_;
     }
 
+    //------------------------------------------------------------------------------------------------------
+    bool BaseAssetHandle::operator!=(const BaseAssetHandle& other) const
+    {
+      return asset_id_ != other.asset_id_;
+    }
+
     //--------------------------------------------------------------------------------
     bool BaseAssetHandle::operator<(const BaseAssetHandle& other) const
     {
       return asset_id_ < other.asset_id_;
+    }
+
+    //------------------------------------------------------------------------------------------------------
+    bool BaseAssetHandle::IsValid() const
+    {
+      return asset_id_ >= 0;
     }
 
     //--------------------------------------------------------------------------------

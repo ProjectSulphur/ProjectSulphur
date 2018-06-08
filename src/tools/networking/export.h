@@ -328,6 +328,10 @@ namespace sulphur
     * @brief Clears the RPC buffer, usefull to call after a point where everybody is equal again (example: back to the lobby)
     */
     PS_NETWORKING_API void SNetClearRPCBuffer();
+    /**
+    * @brief Sorts IDs for value sync and rpc systems, this is useful when objects get destroyed that rely on this
+    */
+    PS_NETWORKING_API void SNetSortIDs();
     namespace editor
     {
       /**

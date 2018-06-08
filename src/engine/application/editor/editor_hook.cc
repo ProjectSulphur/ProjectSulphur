@@ -21,7 +21,7 @@ namespace sulphur
     foundation::UniquePointer<Platform> Editor::ConstructPlatform(foundation::Resource<foundation::SharedPointer<IRenderer>> renderer)
     {
       connection_ = foundation::Memory::ConstructShared<editor::ConnectionManager>();
-      connection_->Initialize();
+      connection_->Initialize(8008);
       foundation::UniquePointer<Platform> result = nullptr;
       while (result == nullptr)
       {

@@ -112,12 +112,13 @@ namespace sulphur
 
       /**
       * @brief Sets the current camera to use for rendering.
-      * @param[in] view (const glm::mat4& view) The view-matrix to use.
+      * @param[in] pos (const glm::vec3&) The position of the camera.
+      * @param[in] view (const glm::mat4&) The view-matrix to use.
       * @param[in] projection (const glm::mat4&) The projection-matrix to use.
       * @param[in] depth_buffer (const sulphur::engine::DepthBuffer&) The depth buffer to use for depth-testing.
       * @param[in] render_target (const sulphur::engine::RenderTarget&) The render target to use for rendering.
       */
-      virtual void SetCamera(const glm::mat4& view, const glm::mat4& projection, const engine::DepthBuffer& depth_buffer, const engine::RenderTarget& render_target) = 0;
+      virtual void SetCamera(const glm::vec3& pos, const glm::mat4& view, const glm::mat4& projection, const engine::DepthBuffer& depth_buffer, const engine::RenderTarget& render_target) = 0;
 
       /**
       * @see sulphur::engine::IRenderer::Draw

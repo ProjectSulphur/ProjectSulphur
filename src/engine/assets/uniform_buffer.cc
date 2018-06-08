@@ -86,10 +86,10 @@ namespace sulphur
 
         ShaderVarType var_type = ConvertVariableType(buffer.concrete_type);
 
-        data_map_.emplace_back(var_type);
         name_map_.emplace(eastl::make_pair(
           buffer.name, data_map_.size()));
-
+        data_map_.emplace_back(var_type);
+        
         size_ += GetTypeSize(var_type);
       }
     };

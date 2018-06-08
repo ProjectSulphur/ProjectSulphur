@@ -110,8 +110,8 @@ namespace sulphur
       ConcreteType concrete_type; //!< concrete type of the resource. the actual data type of the resource
       uint32_t cols;  //!< resource width ie number of rows in a matrix
       uint32_t vec_size; //!< resource height ie. number of cols in a matrix
-      size_t offset; //!< memory offset in bytes
-      size_t size; //!< size of the resource in bytes
+      uint64_t offset; //!< memory offset in bytes
+      uint64_t size; //!< size of the resource in bytes
       Vector<ShaderResource> members; //!< member fields of a resource i.e. members of a struct
     };
 

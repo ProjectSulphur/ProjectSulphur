@@ -52,6 +52,8 @@ namespace sulphur
      */
     public class id<T> : type_count
     {
+      public static uint GetTypeId<U>(U Obj) { return id<U>.type_id_; }
+
       /**
        *@brief type id for type T. whenever a class with type T is used the type count is incremented by 1.
        * @see sulphur.esitor.type_count.value

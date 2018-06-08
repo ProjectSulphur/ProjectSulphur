@@ -48,7 +48,7 @@ namespace sulphur
       */
       T GetGeneration() const
       {
-        return handle >> kGenerationBits;
+        return handle >> kIndexBits;
       }
       /**
       * @brief Creates an invalid handle

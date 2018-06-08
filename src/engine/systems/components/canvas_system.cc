@@ -32,10 +32,9 @@ namespace sulphur
 
     void CanvasSystem::OnTerminate()
     {
-      for (int i = 0; i < component_data_.data.size(); ++i)
+      for (int i = 0; i < data_.size(); ++i)
       {
-        CanvasComponent component(camera_system_, *this, component_data_.data.GetSparseFromDataIndex(i));
-        CanvasDataRef data = component_data_.data.GetObjectAsStruct<CanvasDataRef>(component);
+        CanvasData& data = data_.at(i);
 
         for (eastl::pair<Entity, BaseUIElementData*> pair : data.elements)
         {
@@ -44,8 +43,9 @@ namespace sulphur
         data.elements.clear();
         data.base_to_entity.clear();
       }
-      component_data_.data.Clear();
     }
+
+    static ShaderHandle shader_handle;
 
     //-------------------------------------------------------------------------
     void CanvasSystem::OnInitialize(Application& app, foundation::JobGraph& job_graph)
@@ -55,6 +55,25 @@ namespace sulphur
       camera_system_ = &world.GetComponent<CameraSystem>();
       transform_system_ = &world.GetComponent<TransformSystem>();
       renderer_ = &app.platform_renderer();
+
+      // TODO (Hilze): Make the no light shaders standard
+//#define UI_SYSTEM_NEW_SHADERS
+#ifdef UI_SYSTEM_NEW_SHADERS
+      auto vertex = AssetSystem::Instance().Load<ShaderProgram>("no_light_vertex");
+      auto pixel = AssetSystem::Instance().Load<ShaderProgram>("no_light_pixel");
+#else
+      auto vertex = AssetSystem::Instance().Load<ShaderProgram>("default_vertex");
+      auto pixel = AssetSystem::Instance().Load<ShaderProgram>("default_pixel");
+#endif
+
+      Shader* asset = foundation::Memory::Construct<Shader>(vertex,
+        ShaderProgramHandle(),
+        ShaderProgramHandle(),
+        ShaderProgramHandle(),
+        pixel
+        );
+
+      shader_handle = AssetSystem::Instance().AddAsset<Shader>(asset, "ui_shader");
 
       const auto render = [](CanvasSystem& canvas_system)
       {
@@ -78,14 +97,15 @@ namespace sulphur
       // TODO (Hilze): Stop hard coding the camera.
       //! Start section here.
 
+      glm::ivec2 size = window_->GetSize();
       if (false == entity.Has<CameraComponent>())
       {
-        glm::ivec2 size = window_->GetSize();
         CameraComponent camera = entity.Add<CameraComponent>();
         camera.SetOrthographicSize(glm::vec2(size.x, size.y) / 2.0f);
         camera.SetProjectionMode(CameraEnums::ProjectionMode::kOrthographic);
-        camera.SetRenderTarget(RenderTarget(RenderTargetType::kTexture2D, glm::vec2(size.x, size.y), TextureFormat::kR8G8B8A8_UNORM));
+        camera.SetRenderTarget(RenderTarget(RenderTargetType::kTexture2D, glm::vec2(8), TextureFormat::kR8G8B8A8_UNORM));
         camera.SetClearMode(CameraEnums::ClearMode::kColor);
+        camera.SetClearColor(foundation::Color::kBlackTransparent);
       }
 
       //! End section here.
@@ -96,14 +116,22 @@ namespace sulphur
         mesh->AttachMesh(Mesh::CreateQuad());
       }
 
-      CanvasComponent component = CanvasComponent(camera_system_, *this, component_data_.data.Add(
+
+
+      CanvasComponent component = CanvasComponent(camera_system_, *this, entity);
+
+      data_.push_back(CanvasData{
+        true,
         CanvasData::UIElementMap(),
         CanvasData::BaseToEntity(),
         meshes,
         0u,
-        entity.Get<CameraComponent>().GetRenderTarget(),
-        entity
-      ));
+        RenderTarget(RenderTargetType::kTexture2D, glm::vec2(size.x, size.y), TextureFormat::kR8G8B8A8_UNORM),
+        entity,
+        true
+      });
+      data_to_entity_[(uint32_t)data_.size() - 1u] = entity;
+      entity_to_data_[entity] = (uint32_t)data_.size() - 1u;
 
       return component;
     }
@@ -111,16 +139,33 @@ namespace sulphur
     //-------------------------------------------------------------------------
     void CanvasSystem::Destroy(ComponentHandleBase handle)
     {
-      component_data_.data.Remove(handle);
+      CanvasComponent* cc = static_cast<CanvasComponent*>(&handle);
+      const auto& it = entity_to_data_.find(cc->entity_);
+      if (it != entity_to_data_.end())
+      {
+        uint32_t id = it->second;
+
+        for (auto i = data_to_entity_.find(id); i != data_to_entity_.end(); i++)
+        {
+          entity_to_data_.at(i->second)--;
+        }
+
+        data_.erase(data_.begin() + id);
+        entity_to_data_.erase(it);
+        data_to_entity_.erase(id);
+      }
     }
 
     //-------------------------------------------------------------------------
     void CanvasSystem::Render()
     {
-      for (int i = 0; i < component_data_.data.size(); ++i)
+      for (CanvasData& data : data_)
       {
-        CanvasComponent component(camera_system_, *this, component_data_.data.GetSparseFromDataIndex(i));
-        component.OnRender(*renderer_);
+        CanvasComponent component(camera_system_, *this, data.canvas_id);
+        if (GetData(component).visible)
+        {
+          component.OnRender(*renderer_);
+        }
       }
     }
 
@@ -143,22 +188,34 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void CanvasSystem::SetCamera(CameraComponent& camera)
+    void CanvasSystem::SetCamera(CameraComponent& camera, const RenderTarget& rt)
     {
       camera_system_->set_current_camera(camera);
 
       renderer_->SetCamera(
+        camera.GetTransform().GetWorldPosition(),
         camera.GetViewMatrix(),
         camera.GetProjectionMatrix(),
-        camera.GetDepthBuffer(),
-        camera.GetRenderTarget()
+        DepthBuffer(),
+        rt
       );
     }
 
-    //-------------------------------------------------------------------------
-    CanvasDataRef CanvasSystem::GetData(CanvasComponent handle)
+    void CanvasSystem::SetVisible(const CanvasComponent & canvas, bool visible)
     {
-      return component_data_.data.GetObjectAsStruct<CanvasDataRef>(handle);
+      GetData(canvas).visible = visible;
+    }
+
+    void CanvasSystem::SetBlendEnabled(const CanvasComponent & canvas, bool enabled)
+    {
+      auto data = GetData(canvas);
+      data.blend_enabled = enabled;
+    }
+
+    //-------------------------------------------------------------------------
+    CanvasData& CanvasSystem::GetData(CanvasComponent handle)
+    {
+      return data_.at(entity_to_data_.at(handle.entity_));
     }
 
     //-------------------------------------------------------------------------
@@ -167,14 +224,20 @@ namespace sulphur
     {
     }
 
-    //-------------------------------------------------------------------------
-    CanvasComponent::CanvasComponent(System& system, size_t handle) :
-      CanvasComponent(nullptr, system, handle)
+    CanvasComponent::CanvasComponent(const CanvasComponent& other) :
+      CanvasComponent(other.camera_system_, *other.system_, other.entity_)
     {
     }
 
-    CanvasComponent::CanvasComponent(CameraSystem* camera_system, System& system, size_t handle) :
-      ComponentHandleBase(handle),
+    //-------------------------------------------------------------------------
+    CanvasComponent::CanvasComponent(System& system, Entity entity) :
+      CanvasComponent(nullptr, system, entity)
+    {
+    }
+
+    CanvasComponent::CanvasComponent(CameraSystem* camera_system, System& system, Entity entity) :
+      ComponentHandleBase(0u),
+      entity_(entity),
       system_(&system),
       camera_system_(camera_system)
     {
@@ -184,7 +247,7 @@ namespace sulphur
     void CanvasComponent::Destroy(BaseUIElementComponent element_handle)
     {
       //TODO: Validate handle
-      CanvasDataRef canvas_data = system_->GetData(*this);
+      CanvasData& canvas_data = system_->GetData(*this);
 
       Entity entity = canvas_data.base_to_entity.at(element_handle);
       canvas_data.base_to_entity.erase(element_handle);
@@ -202,31 +265,39 @@ namespace sulphur
     //-------------------------------------------------------------------------
     void CanvasComponent::OnRender(IRenderer& renderer)
     {
-      CanvasDataRef canvas_data = system_->GetData(*this);
+      CanvasData& canvas_data = system_->GetData(*this);
 
       // TODO (Hilze): This is currently not possible yet. Figure out how to fix this.
-      CameraComponent camera = canvas_data.canvas_id.Get<CameraComponent>();
-      system_->SetCamera(camera);
+      renderer.ClearRenderTarget(canvas_data.render_target, glm::vec4(0.0f));
+      renderer.SetCamera(
+        glm::vec3(0.0f),
+        glm::mat4(1.0f),
+        glm::mat4(1.0f),
+        engine::DepthBuffer(),
+        canvas_data.render_target
+      );
 
       //renderer->ClearDepthBuffer(canvas_data.canvas_id.Get<CameraComponent>().GetDepthBuffer());
       // TODO (Hilze): Figure out why this clear does not work. Can it only happen once?
 
       // TODO (Hilze): Add alpha blending.
-      /*graphics::PipelineState pso;
+#ifndef PS_WIN32
+      graphics::PipelineState pso;
       pso.blend_state.render_target_blend_states[0] = graphics::RenderTargetBlendState{
         true,
         false,
         graphics::BlendFunc::kSrcAlpha,
         graphics::BlendFunc::kInvSrcAlpha,
         graphics::BlendOp::kAdd,
-        graphics::BlendFunc::kZero,
+        graphics::BlendFunc::kOne,
         graphics::BlendFunc::kOne,
         graphics::BlendOp::kAdd,
         graphics::LogicOp::kNoop,
         graphics::ColorWriteEnable::kEnableAll
       };
 
-      renderer.SetPipelineState(pso);*/
+      pso.depth_stencil_state.depth_enable = false;
+#endif
 
       // Do a simple depth sort.
       foundation::Vector<BaseUIElementData*> depth_sort(canvas_data.elements.size());
@@ -256,6 +327,12 @@ namespace sulphur
         
         renderer.SetMaterial(element->GetMaterial());
 
+#ifndef PS_WIN32
+        if (!canvas_data.blend_enabled)
+        {
+          renderer.SetPipelineState(pso);
+        }
+#endif
         renderer.Draw();
       }
 
@@ -264,6 +341,7 @@ namespace sulphur
       // Setup camera.
       camera_system_->set_current_camera(camera_system_->main_camera());
       renderer.SetCamera(
+        glm::vec3(0.0f),
         glm::mat4(1.0f),
         glm::mat4(1.0f),
         camera_system_->main_camera().GetDepthBuffer(),
@@ -285,18 +363,30 @@ namespace sulphur
         )
       );
       // Setup texture.
-      MaterialPass material_pass(AssetSystem::Instance().GetHandle<Shader>("Default_Shader"));
+      MaterialPass material_pass(shader_handle);
       material_pass.SetTexture(0, canvas_data.render_target.GetTextureResource());
       renderer.SetMaterial(material_pass);
       // Render.
+#ifndef PS_WIN32
+      renderer.SetPipelineState(pso);
+#endif
       renderer.Draw();
     }
 
-    //-------------------------------------------------------------------------
-    BaseUIElementData* CanvasComponent::GetData(BaseUIElementComponent element_handle)
+    void CanvasComponent::SetVisible(bool visible)
     {
-      CanvasDataRef canvas_data = system_->GetData(*this);
-      Entity entity = canvas_data.base_to_entity.at(element_handle);
+      system_->SetVisible(*this, visible);
+    }
+
+    void CanvasComponent::SetBlendEnabled(bool enabled)
+    {
+      system_->SetBlendEnabled(*this, enabled);
+    }
+
+    //-------------------------------------------------------------------------
+    BaseUIElementData* CanvasComponent::GetData(Entity entity)
+    {
+      CanvasData& canvas_data = system_->GetData(*this);
       return canvas_data.elements.at(entity);
     }
 
@@ -317,9 +407,10 @@ namespace sulphur
 
     
     //-------------------------------------------------------------------------
-    BaseUIElementComponent::BaseUIElementComponent(CanvasSystem* system, CanvasComponent& canvas) :
+    BaseUIElementComponent::BaseUIElementComponent(CanvasSystem* system, CanvasComponent& canvas, Entity self) :
       canvas(canvas),
-      system(system)
+      system(system),
+      self(self)
     {
     }
 
@@ -356,7 +447,7 @@ namespace sulphur
     //-------------------------------------------------------------------------
     MaterialPass BaseUIElementData::GetMaterial()
     {
-      return MaterialPass(AssetSystem::Instance().GetHandle<Shader>("Default_Shader"));
+      return MaterialPass(shader_handle);
     }
 
     //-------------------------------------------------------------------------
@@ -368,7 +459,7 @@ namespace sulphur
     //-------------------------------------------------------------------------
     BaseUIElementData * BaseUIElementComponent::GetData()
     {
-      return canvas.GetData(*this);
+      return canvas.GetData(self);
     }
   }
 }

@@ -20,19 +20,29 @@ namespace sulphur
       const foundation::Path& file,
       bool single_model)
     {
-      const aiScene* scene = scene_loader.LoadScene(file);
+      if (ValidatePath(file) == false)
+      {
+        PS_LOG_BUILDER(Error,
+          "Invalid file path passed. The path %s does not point to a location in the project directory %s", file.path().c_str(),
+          project_dir().path().c_str());
+        return foundation::ModelInfo();
+      }
+
+      foundation::Path file_path = file.is_relative_path() ? project_dir() + file : file;
+
+      const aiScene* scene = scene_loader.LoadScene(file_path);
       if (scene == nullptr)
       {
         PS_LOG_BUILDER(Error, 
           "Couldn't load the scene. Model info should be discarded. file: %s", 
-          file.GetString().c_str());
+          file_path.GetString().c_str());
         return foundation::ModelInfo();
       }
 
       foundation::Vector<foundation::AssetName> model_names;
       if(scene->mRootNode->mNumMeshes > 0 || single_model == true)
       {
-        model_names.push_back(foundation::AssetName(file.GetFileName()));
+        model_names.push_back(foundation::AssetName(file_path.GetFileName()));
       }
       else
       {
@@ -49,7 +59,7 @@ namespace sulphur
         }
       }
 
-      foundation::ModelInfo model_info(file, static_cast<unsigned int>(model_names.size()));
+      foundation::ModelInfo model_info(file_path, static_cast<unsigned int>(model_names.size()));
       for (unsigned int i = 0u; i < model_info.number_of_models(); ++i)
       {
         model_info.SetAssetName(i, model_names[i].GetCString());
@@ -73,18 +83,28 @@ namespace sulphur
       const foundation::AssetName& pixel_shader,
       foundation::Vector<foundation::ModelAsset>& models)
     {
-      if (file != model_info.GetFile())
+      if (ValidatePath(file) == false)
+      {
+        PS_LOG_BUILDER(Error,
+          "Invalid file path passed. The path %s does not point to a location in the project directory %s", file.path().c_str(), 
+          project_dir().path().c_str());
+        return false;
+      }
+
+      foundation::Path file_path = file.is_relative_path() ? project_dir() + file : file;
+
+      if (file_path != model_info.GetFile())
       {
         PS_LOG_BUILDER(Error,
           "model_info is not related to this scene.");
         return false;
       }
 
-      const aiScene* scene = scene_loader.LoadScene(file);
+      const aiScene* scene = scene_loader.LoadScene(file_path);
       if (scene == nullptr)
       {
         PS_LOG_BUILDER(Error,
-          "Couldn't load the scene. No models created. file: %s", file.GetString().c_str());
+          "Couldn't load the scene. No models created. file: %s", file_path.GetString().c_str());
         return false;
       }
 
@@ -120,7 +140,7 @@ namespace sulphur
         return false;
       }
 
-      const foundation::Path directory = file.GetFolderPath();
+      const foundation::Path directory = file_path.GetFolderPath();
 
       foundation::ModelTextureCache texture_cache;
       if(material_pipeline.CreateTextureCache(scene, directory, texture_pipeline, 
@@ -204,6 +224,15 @@ namespace sulphur
       SkeletonPipeline& skeleton_pipeline, MaterialPipeline& material_pipeline, 
       TexturePipeline& texture_pipeline)
     {
+      if (ValidatePath(asset_origin) == false)
+      {
+        PS_LOG_BUILDER(Error,
+          "Invalid file path passed.");
+        return false;
+      }
+
+      foundation::Path origin = CreateProjectRelativePath(asset_origin);
+
       if (model.name.get_length() == 0)
       {
         PS_LOG_BUILDER(Error, 
@@ -212,7 +241,7 @@ namespace sulphur
       }
 
       foundation::Path output_file = "";
-      if(RegisterAsset(asset_origin, model.name, output_file, model.id) == false)
+      if(RegisterAsset(origin, model.name, output_file, model.id) == false)
       {
         PS_LOG_BUILDER(Error, 
           "Failed to register model. It will not be packaged.");
@@ -221,7 +250,7 @@ namespace sulphur
 
       foundation::BinaryWriter writer(output_file);
 
-      if(mesh_pipeline.PackageMesh(asset_origin, model.data.mesh) == false)
+      if(mesh_pipeline.PackageMesh(origin, model.data.mesh) == false)
       {
         PS_LOG_BUILDER(Error, 
           "Failed to package the mesh used with this model. The model will not be packaged.");
@@ -230,7 +259,7 @@ namespace sulphur
 
       for (int i = 0; i < model.data.skeletons.size(); ++i)
       {
-        if (skeleton_pipeline.PackageSkeleton(asset_origin, model.data.skeletons[i]) == false)
+        if (skeleton_pipeline.PackageSkeleton(origin, model.data.skeletons[i]) == false)
         {
           PS_LOG_BUILDER(Error,
             "Failed to package a skeleton used by this model. The model will not be packaged.");
@@ -248,7 +277,7 @@ namespace sulphur
 
       for (int i = 0; i < model.data.materials.size(); ++i)
       {
-        if (material_pipeline.PackageMaterial(asset_origin, model.data.materials[i]) == false)
+        if (material_pipeline.PackageMaterial(origin, model.data.materials[i]) == false)
         {
           PS_LOG_BUILDER(Error,
             "Failed to package a material used by this model. The model will not be packaged.");

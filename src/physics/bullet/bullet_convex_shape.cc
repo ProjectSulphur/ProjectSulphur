@@ -3,7 +3,6 @@
 #include "physics/bullet/bullet_conversions.h"
 
 #include <foundation/memory/memory.h>
-#include <foundation/containers/vector.h>
 
 namespace sulphur
 {
@@ -18,21 +17,27 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    PhysicsShape::ShapeTypes BulletConvexShape::GetType() const
+    BulletConvexShape::~BulletConvexShape()
     {
-      return ShapeTypes::kConvex;
+      foundation::Memory::Destruct<btConvexHullShape>(shape_);
     }
 
     //-------------------------------------------------------------------------
     void BulletConvexShape::SetVertices(const glm::vec3* points, unsigned int num_points)
     {      
       // Deconstruct the shape and construct again using placement new (no re-allocation)
-      shape_->~btCollisionShape();
+      shape_->~btConvexHullShape();
       new(shape_) btConvexHullShape(reinterpret_cast<const btScalar*>(points),
                                     num_points, sizeof(glm::vec3));
       shape_->setUserPointer(this);
 
       UpdateColliders();
+    }
+
+    //-------------------------------------------------------------------------
+    void* BulletConvexShape::GetInternalShape() const
+    {
+      return shape_;
     }
   }
 }

@@ -39,15 +39,10 @@ namespace sulphur
     class RewindSystem : public IServiceSystem<RewindSystem>
     {
     public:
-      RewindSystem()
-        :
-        IServiceSystem("Rewinder"),
-        frames_to_skip_(0),
-        frame_limit_(0),
-        frame_to_restore_(-1),
-        prev_restored_frame(-1),
-        active_(false)
-      {}
+      /**
+      * @brief The constructor of the system
+      */
+      RewindSystem();
       /**
       * @see sulphur::engine::ISystemBase::OnInitialize
       */

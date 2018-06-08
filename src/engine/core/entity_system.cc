@@ -8,6 +8,8 @@
 #include "engine/rewinder/rewind_system.h"
 #include "engine/rewinder/systems/entity_storage.h"
 
+#include <foundation/job/job_graph.h>
+#include <foundation/job/data_policy.h>
 #include <lua-classes/entity_system.lua.cc>
 
 namespace sulphur
@@ -42,11 +44,13 @@ namespace sulphur
       void* allocated;
       ComponentHandleBase component = cid->Create(*this, world, &allocated);
 
-      system.Link(
-        *this,
-        component,
-        cid->GetSystemID());
-
+      if (system.GetHandle(*this, cid->GetSystemID()).IsValid() == false )
+      {
+        system.Link(
+          *this,
+          component,
+          cid->GetSystemID());
+      }
       ScriptHandle v =
         ScriptUtils::InstantiateType(ss.script_state(), id, allocated);
 
@@ -106,7 +110,7 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void EntitySystem::OnInitialize(Application& app, foundation::JobGraph&)
+    void EntitySystem::OnInitialize(Application& app, foundation::JobGraph& job_graph)
     {
       // @note (Maarten) This is a very-dirty work around for a rather complex issue.
       //                 See the documentation of the function below for more info.
@@ -117,6 +121,14 @@ namespace sulphur
       storage_ = foundation::Memory::Construct<EntityRewindStorage>(*this);
       app.GetService<RewindSystem>().Register(storage_->storage_);
 #endif
+
+      auto destroy_marked_for_destroy = []( EntitySystem& entity_system )
+      {
+        entity_system.DestroyMarkedForDestruction();
+      };
+      foundation::Job destroy = foundation::make_job( "destroy", "end_frame",
+        destroy_marked_for_destroy, bind_write( *this ) );
+      job_graph.Add( std::move( destroy ) );
     }
 
     //-------------------------------------------------------------------------
@@ -158,31 +170,7 @@ namespace sulphur
     //-------------------------------------------------------------------------
     void EntitySystem::Destroy(Entity entity)
     {
-      const size_t idx = entity.GetIndex();
-      ++generation_[idx];
-      free_indices_.push_back(static_cast<uint>(idx));
-
-      EntityComponentData& list = entity_components_[idx];
-      for (int i = 0; i < list.component_types.size(); ++i)
-      {
-        if (list.component_types[i] == foundation::type_id<TransformSystem>())
-        {
-          TransformSystem& transform_system = reinterpret_cast<TransformSystem&>(
-            world_->GetComponent(list.component_types[i]));
-
-          TransformComponent target(transform_system, list.component_handles[i].Handle());
-          foundation::Vector<TransformComponent> children = target.GetChildren();
-          for (int i_child = 0; i_child < children.size(); ++i_child)
-          {
-            Destroy(children[i_child].GetEntity());
-          }
-        }
-
-        world_->GetComponent(list.component_types[i]).Destroy(list.component_handles[i]);
-      }
-
-      list.component_handles.clear();
-      list.component_types.clear();
+      to_destroy.push_back( entity.GetIndex() );
     }
 
     //-------------------------------------------------------------------------
@@ -236,6 +224,40 @@ namespace sulphur
         }
       }
       return ComponentHandleBase::InvalidHandle();
+    }
+    void EntitySystem::DestroyMarkedForDestruction()
+    {
+      for ( int i_index = static_cast<int>(to_destroy.size()) - 1; i_index >= 0; --i_index )
+      {
+        DestroyImmediate( to_destroy[i_index] );
+        to_destroy.pop_back();
+      }
+    }
+    void EntitySystem::DestroyImmediate( size_t index )
+    {
+      ++generation_[index];
+      free_indices_.push_back( static_cast<uint>( index ) );
+
+      EntityComponentData& list = entity_components_[index];
+      for ( size_t i = 0; i < list.component_types.size(); ++i )
+      {
+        if ( list.component_types[i] == foundation::type_id<TransformSystem>() )
+        {
+          TransformSystem& transform_system = reinterpret_cast<TransformSystem&>(
+            world_->GetComponent( list.component_types[i] ) );
+
+          TransformComponent target( transform_system, list.component_handles[i].Handle() );
+          foundation::Vector<TransformComponent> children = target.GetChildren();
+          for ( size_t i_child = 0; i_child < children.size(); ++i_child )
+          {
+            DestroyImmediate( children[i_child].GetEntity().GetIndex() );
+          }
+        }
+        world_->GetComponent( list.component_types[i] ).Destroy( list.component_handles[i] );
+      }
+
+      list.component_handles.clear();
+      list.component_types.clear();
     }
   }
 }

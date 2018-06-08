@@ -28,9 +28,9 @@ namespace sulphur
           const EntityMovedPayload& actual_payload =
             payload.AsFormat<editor::EntityMovedPayload>();
 
-          glm::vec3 translation{ actual_payload.x, actual_payload.y, actual_payload.z };
+          glm::vec3 position{ actual_payload.x, actual_payload.y, actual_payload.z };
           TransformComponent transform = system_->GetByHierarchyIndex(actual_payload.entity_index);
-          transform.TranslateWorld(translation);
+          transform.SetWorldPosition(position);
         }
         else if (id == EditorMessageID::kEntityRotated)
         {
@@ -39,8 +39,7 @@ namespace sulphur
 
           glm::quat rotation{actual_payload.w, actual_payload.x, actual_payload.y, actual_payload.z };
           TransformComponent transform = system_->GetByHierarchyIndex(actual_payload.entity_index);
-
-          transform.SetWorldRotation(transform.GetWorldRotation() * rotation);
+          transform.SetLocalRotation(rotation);
         }
         else if (id == EditorMessageID::kEntityScaled)
         {
@@ -49,9 +48,7 @@ namespace sulphur
 
           glm::vec3 scale { actual_payload.x, actual_payload.y, actual_payload.z };
           TransformComponent transform = system_->GetByHierarchyIndex(actual_payload.entity_index);
-          glm::vec3 transform_scale = transform.GetWorldScale();
-          transform_scale += scale;
-          transform.SetWorldScale(transform_scale);
+          transform.SetWorldScale(scale);
         }
       }
     }

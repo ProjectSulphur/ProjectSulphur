@@ -50,11 +50,36 @@ namespace sulphur
         foundation::Path& package_path, foundation::AssetID& id, 
         bool allow_append_numbers = true);
 
+      /**
+      * @brief Checks if a given path is valid.
+      * @param[in] path (const sulphur::foundation::Path&) The path to be validated
+      * @return True if path is valid false otherwise
+      * @remark If there is no project directory true is always returned.
+      * @remark If a path is relative true is always returned and the path is assumend to be relative to the project directory.
+      * @remark False is returned if an absolute path does not point to a location within the project directory.
+      */
+      bool ValidatePath(const foundation::Path& path) const;
+     
+      /**
+      * @brief makes a project relative path from a given absolute path.
+      * @param[in] abs_path (const foundation::Path& abs_path&) The absolute path to create the relative path from. 
+      * @return (foundation::Path) Path relative to the current project.
+      * @remark If a relative path is given. The input path is returned.
+      * @remark If the absolute path is not valid. The input path is returned.
+      * @see sulphur::builder::PipelineBase::ValidatePath
+      */
+      foundation::Path CreateProjectRelativePath(const foundation::Path& abs_path) const;
     public:
       /**
        * @brief Initializes the pipeline. Loads the package.
        */
       void Initialize();
+
+      /**
+      * @brief set the pipeline project directory.
+      */
+      void set_project_dir(const foundation::Path& project_dir);
+
       /**
        * @brief Stores changes in the package on disk.
        */
@@ -166,6 +191,12 @@ namespace sulphur
       bool GetPackagePtrByName(const foundation::String& name, foundation::PackagePtr& ptr);
 
       bool GetPackagePtrById(const foundation::AssetID& id, foundation::PackagePtr& ptr);
+
+      /**
+      * @brief Get the current project directory.
+      * @return (const foundation::Path&) The path to the current project directory.
+      */
+      const foundation::Path& project_dir() const;
     private:
      /**
        * @brief Checks if the assets in the cache still exist on disk. 
@@ -173,6 +204,7 @@ namespace sulphur
        */
       void RemoveDeletedAssets();
 
+      foundation::Path project_dir_; //!< The project directory to use when processing assets.
       foundation::Path output_path_;  //!< The ouput path of the caches exported by this pipeline.
       foundation::Path package_output_path_; //!< The output path of the packaged exported by this pipeline relative to the output path.
       foundation::Map<foundation::AssetID, foundation::PackagePtr> packaged_assets_; //!< Map of all assets in the package and information about them.

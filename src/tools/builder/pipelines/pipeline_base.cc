@@ -16,7 +16,8 @@ namespace sulphur
     //--------------------------------------------------------------------------------
     PipelineBase::PipelineBase() :
       output_path_(""),
-      package_output_path_("")
+      package_output_path_(""),
+      project_dir_("")
     {
     }
 
@@ -90,6 +91,13 @@ namespace sulphur
     }
 
     //--------------------------------------------------------------------------------
+    bool PipelineBase::ValidatePath(const foundation::Path& path) const
+    {
+      foundation::String path_string = path.GetString();
+      return project_dir_.IsEmpty() ? true : path.is_relative_path() ? true : path_string.find(project_dir_.GetString()) != path_string.npos;
+    }
+
+    //--------------------------------------------------------------------------------
     void PipelineBase::Initialize()
     {
       packaged_assets_.clear();
@@ -101,6 +109,22 @@ namespace sulphur
         packaged_assets_ = reader.ReadMap<foundation::AssetID, foundation::PackagePtr>();
         RemoveDeletedAssets();
       }
+    }
+
+    //--------------------------------------------------------------------------------
+    void PipelineBase::set_project_dir(const foundation::Path& project_dir)
+    {
+      project_dir_ = project_dir;
+    }
+
+    foundation::Path PipelineBase::CreateProjectRelativePath(const foundation::Path& abs_path) const
+    {
+      if (abs_path.is_relative_path() == true || ValidatePath(abs_path) == false)
+      {
+        return abs_path;
+      }
+      
+      return abs_path.GetString().substr(project_dir_.GetString().length());
     }
 
     //--------------------------------------------------------------------------------
@@ -204,6 +228,7 @@ namespace sulphur
       ExportCache();
     }
 
+    //--------------------------------------------------------------------------------
     bool PipelineBase::GetPackagePtrByName(const foundation::String& name, foundation::PackagePtr& ptr)
     {
       foundation::AssetID id = foundation::GenerateId(name);
@@ -211,10 +236,17 @@ namespace sulphur
       return true;
     }
 
+    //--------------------------------------------------------------------------------
     bool PipelineBase::GetPackagePtrById(const foundation::AssetID& id, foundation::PackagePtr& ptr)
     {
       ptr = packaged_assets_[id];
       return true;
+    }
+
+    //--------------------------------------------------------------------------------
+    const foundation::Path& PipelineBase::project_dir() const
+    {
+      return project_dir_;
     }
 
     //--------------------------------------------------------------------------------

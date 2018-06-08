@@ -14,9 +14,11 @@
 
         <controls:DynamicDock x:Name="dynamic_dock" DockPanel.Dock="Left">
             <controls:AssetBrowserControl x:Name="asset_browser" DockPanel.Dock="Bottom" Height="150" controls:DynamicDock.Group="0"/>
-            <controls:HierarchyViewerControl x:Name="hierarchy_viewer" DockPanel.Dock="Left" Width="200"/>
+            <controls:HierarchyViewerControl x:Name="hierarchy_viewer" DockPanel.Dock="Left" Width="200" />
             <controls:Logger x:Name="logger" controls:DynamicDock.Group="0"/>
-            <controls:EngineHostControl x:Name="engine" DockPanel.Dock="Top"/>
+            <controls:InspectorControl x:Name="inspector" DockPanel.Dock="Right" Width="360"/>
+            <controls:EngineHostControl x:Name="engine" DockPanel.Dock="Right" controls:DynamicDock.Group="1"/>
+            <controls:NetworkDebugger x:Name="network_debugger" DockPanel.Dock="Right" controls:DynamicDock.Group="1"/>
         </controls:DynamicDock>
     </DockPanel>
 

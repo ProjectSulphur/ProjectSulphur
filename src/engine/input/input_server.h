@@ -9,4 +9,13 @@ namespace sulphur
     using InputServer = Win32InputServer;
   }
 }
+#else
+#include "../ps4/ps4_input_server.h"
+namespace sulphur
+{
+  namespace engine
+  {
+    using InputServer = PS4InputServer;
+  }
+}
 #endif

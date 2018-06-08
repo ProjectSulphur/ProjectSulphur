@@ -8,7 +8,7 @@ namespace sulphur
   {
 
     //-------------------------------------------------------------------------
-    BulletCollider::BulletCollider(IPhysicsBody* owner, PhysicsShape* shape) :
+    BulletCollider::BulletCollider(IPhysicsBody* owner, IPhysicsShape* shape) :
       PhysicsCollider(owner, shape)
     {
     }

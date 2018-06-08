@@ -318,6 +318,10 @@ namespace sulphur
       * @brief Clears the RPC buffer, usefull to call after a point where everybody is equal again (example: back to the lobby)
       */
       void ClearRPCBuffer();
+      /**
+      * @brief Sorts IDs for value sync and rpc systems, this is useful when objects get destroyed that rely on this
+      */
+      void SortIDS();
     private:
       PacketHandler* packet_handler_; //!<The packet handler
       ValueSyncer* value_syncer_; //!<The value syncer

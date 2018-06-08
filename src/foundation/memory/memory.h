@@ -5,6 +5,7 @@
 #include <EASTL/shared_ptr.h>
 #include <EASTL/weak_ptr.h>
 #include <EASTL/scoped_ptr.h>
+#include <mutex>
 #include <memory>
 
 namespace sulphur
@@ -227,6 +228,7 @@ namespace sulphur
 
       static GeneralAllocator default_allocator_; //!< The default allocator
       static bool initialized_; //!< Is the memory system initialized?
+      static std::mutex alloc_mutex_; //!< mutex for allocation and deallocation
     };
     /**
     * @struct sulphur::foundation::MemoryDeleter <T>

@@ -312,6 +312,7 @@ namespace sulphur
         {
           ret = free_list_.front();
           free_list_.erase(free_list_.begin());
+          sparse_array_[ret].inner_handle = dense_to_sparse_array_.size();
           dense_to_sparse_array_.emplace_back(ret);
         }
         else

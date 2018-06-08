@@ -107,7 +107,7 @@ namespace sulphur
         {
           timer.Start();
           UInt32 id = 0;
-          while(native.Networking.SNetRetrievePacket(ref id, packet.data) == true)
+          while(native.Networking.SNetRetrievePacket(ref id, packet.data, native.Networking.kPacketSize) == true)
           {
             message.id = (native.NetworkMessages)id;
             if (message.id != 0)

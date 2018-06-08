@@ -13,6 +13,7 @@ namespace sulphur
     //--------------------------------------------------------------------------
     GeneralAllocator Memory::default_allocator_;
     bool Memory::initialized_ = false;
+    std::mutex Memory::alloc_mutex_;
 
     //--------------------------------------------------------------------------
     void Memory::Initialize(size_t heap_size)
@@ -32,6 +33,7 @@ namespace sulphur
     //--------------------------------------------------------------------------
     void* Memory::Allocate(size_t size, size_t alignment, IAllocator* allocator)
     {
+      std::lock_guard<std::mutex> lock(alloc_mutex_);
       if (allocator == nullptr)
       {
         allocator = &default_allocator();
@@ -85,6 +87,7 @@ namespace sulphur
     //--------------------------------------------------------------------------
     void Memory::Deallocate(const void* ptr)
     {
+      std::lock_guard<std::mutex> lock(alloc_mutex_);
       MemoryHeader* header = reinterpret_cast<MemoryHeader*>(
         OffsetBytes(ptr, -static_cast<int>(sizeof(MemoryHeader))));
 

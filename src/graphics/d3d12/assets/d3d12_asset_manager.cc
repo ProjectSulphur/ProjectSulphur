@@ -55,6 +55,8 @@ namespace sulphur
       const foundation::Vector<glm::fvec3>& tangents = mesh_data->GetTangents();
       const foundation::Vector<glm::fvec2>& uv = mesh_data->GetUVs();
       const foundation::Vector<foundation::Color>& colors = mesh_data->GetColors();
+      const foundation::Vector<glm::fvec4>& bone_weights = mesh_data->GetBoneWeights();
+      const foundation::Vector<glm::uvec4>& bone_indices = mesh_data->GetBoneIndices();
       const foundation::Vector<uint32_t>& indices = mesh_data->GetIndices();
 
       Vertex temp;
@@ -66,6 +68,8 @@ namespace sulphur
         temp.tangent = tangents.empty() ? glm::fvec3() : tangents[i];
         temp.color = colors.empty() ? foundation::Color::kWhite : colors[i];
         temp.uv = uv.empty() ? glm::fvec2() : uv[i];
+        temp.bone_indices = bone_indices.empty() ? glm::uvec4(UINT_MAX) : bone_indices[i];
+        temp.bone_weights = bone_weights.empty() ? glm::fvec4() : bone_weights[i];
 
         vertices.push_back(temp);
       }
@@ -143,7 +147,7 @@ namespace sulphur
       D3D12_CLEAR_VALUE clear_value;
       bool use_clear_value = false;
       bool ping_pong = false;
-      
+
       D3D12_RESOURCE_DESC desc = {};
 
       switch (texture->format())
@@ -172,7 +176,7 @@ namespace sulphur
         engine::TextureCreateFlags::kAllowRenderTarget) != 0)
       {
         desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-        clear_value = {desc.Format, {clear_color.r, clear_color.g, clear_color.b, clear_color.a}};
+        clear_value = { desc.Format, {clear_color.r, clear_color.g, clear_color.b, clear_color.a} };
         use_clear_value = true;
         ping_pong = true;
       }
@@ -208,7 +212,7 @@ namespace sulphur
       D3D12Texture2D* created_texture = foundation::Memory::Construct<D3D12Texture2D>(
         foundation::Memory::Construct<D3D12Resource>(),
         ping_pong == true ? foundation::Memory::Construct<D3D12Resource>() : nullptr
-      );
+        );
 
       device_.CreateTexture2D(
         texture_data->raw_data().data(),
@@ -218,7 +222,7 @@ namespace sulphur
         1,
         created_texture,
         use_clear_value == true ? &clear_value : nullptr);
-      
+
       engine::GPUAssetHandle& handle = texture.GetGPUHandle();
       handle = engine::GPUAssetHandle(this, static_cast<uintptr_t>(textures_.size()));
 
@@ -341,5 +345,5 @@ namespace sulphur
     }
 
 
-}
+  }
 }

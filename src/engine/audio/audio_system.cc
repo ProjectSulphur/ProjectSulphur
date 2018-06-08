@@ -48,12 +48,10 @@ namespace sulphur
     //------------------------------------------------------------------------------
     void AudioSystem::OnInitialize(Application&, foundation::JobGraph& job_graph)
     {
-      size_t data_size = 1024ul * 1024ul * 100ul;
-      void* data = foundation::Memory::Allocate(data_size);
       
       AudioUtils::CheckError(
-        FMOD::Memory_Initialize(data, static_cast<int>(data_size), 0, 0, 0, FMOD_MEMORY_ALL)
-        );
+        FMOD::Memory_Initialize(nullptr, 0, &AudioAlloc, &AudioReAlloc, &AudioFree, FMOD_MEMORY_ALL)
+      );
       AudioUtils::CheckError(FMOD::Studio::System::create(&system_));
       AudioUtils::CheckError(
         system_->initialize(
@@ -112,18 +110,8 @@ namespace sulphur
     //------------------------------------------------------------------------------
     AudioBank* AudioSystem::LoadBank(const char* path, bool is_master)
     {
-      FMOD::Studio::Bank* fmod_bank;
-      AudioUtils::CheckError(
-        system_->loadBankFile(
-          path,
-          FMOD_STUDIO_LOAD_BANK_NORMAL,
-          &fmod_bank)
-      );
-      AudioBank bank = AudioBank(fmod_bank, is_master);
-      banks_.push_back(bank);
-      bank_names_.push_back(bank.GetPath());
-
-      return &banks_.back();
+      AssetHandle<AudioBankData> bank_data = AssetSystem::Instance().Load<AudioBankData>(path);
+      return LoadBank(bank_data->data.data(), static_cast<int>(bank_data->data.size()), is_master);
     }
 
     //------------------------------------------------------------------------------

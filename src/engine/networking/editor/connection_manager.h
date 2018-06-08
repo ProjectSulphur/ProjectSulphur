@@ -1,5 +1,7 @@
 #pragma once
-#include <foundation/containers/vector.h>
+#include <foundation/containers/queue.h>
+
+#include "engine/networking/editor/editor_messages.h"
 #include <cinttypes>
 
 namespace sulphur
@@ -11,7 +13,6 @@ namespace sulphur
     namespace editor
     {
       enum struct EditorMessageID : uint32_t;
-      struct EditorMessageBuffer;
 
       /**
       * @class sulphur::engine::editor::ConnectionManager
@@ -80,7 +81,7 @@ namespace sulphur
         static constexpr float kTimeOutDelay = 5.0f; //!< This value indicates how long the manager will wait for a connection before cancelling.
 
         uint32_t current_port = UINT32_MAX;
-        foundation::Vector<EditorMessageBuffer> unprocessed_messages;
+        foundation::Queue<EditorMessageBuffer> unprocessed_messages;
 
         const bool as_editor_; //!< A flag to indicate that the application should emulate the editor, in which case a connection is made to an engine instead of an editor.
       };

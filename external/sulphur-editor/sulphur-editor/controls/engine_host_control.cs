@@ -49,14 +49,33 @@ namespace sulphur
          */
         public Subscription[] GetSubscriptions()
         {
-          Subscription[] subscritions = new Subscription[1];
+          Subscription[] subscritions = new Subscription[3];
           subscritions[0] = new Subscription(id<MessageHandler>.type_id_,
                                              HandleNetworkedMessage);
+          subscritions[1] = new Subscription(id<MainWindow>.type_id_,
+                                             HandleMainWindowMessage);
+          subscritions[2] = new Subscription(id<DynamicDock>.type_id_,
+                                             HandleLayoutMessage);
           return subscritions;
         }
         #endregion
 
         private EngineHost engine_; //<! control spawning the engine and handling the reserved window
+
+        private void HandleMainWindowMessage(object sender, NotificationEventArgs e)
+        {
+          engine_.SendWin32WindowMessage(e.notification_id);
+        }
+
+        private void HandleLayoutMessage(object sender, NotificationEventArgs e)
+        {
+          switch ((DynamicDock.Notifications)e.notification_id)
+          {
+            case DynamicDock.Notifications.kLayoutChangeEnded:
+              engine_.SendWin32WindowMessage(0x0232); //WM_EXITSIZEMOVED
+              break;
+          }
+        }
 
         /**
          *@brief handle incomming notifiactaion from the message handler 
@@ -71,7 +90,7 @@ namespace sulphur
             {
               case MessageHandler.Notifications.kConnected:
                 byte[] data = Utils.StructToBytes(engine_.window.ToInt64());
-                native.Networking.ErrorMessage msg = 
+                native.Networking.ErrorMessage msg =
                   native.Networking.SNetSendData((UInt32)native.NetworkMessages.kWindowHandle,
                                                  data,
                                                  (uint)data.Length);
@@ -127,6 +146,7 @@ namespace sulphur
           native.Win32.RegisterClassW(ref window_class);
 
           int style = 0;
+          style |= 0x02000000;
           style |= 0x40000000; //WS_CHILD
           style |= 0x10000000; // WS_VISIBLE
           style |= 0x00800000; //WS_BORDER 
@@ -145,10 +165,10 @@ namespace sulphur
                                                 IntPtr.Zero,
                                                 IntPtr.Zero);
           engine_process_ = new Process();
-          engine_process_.StartInfo.FileName = App.app_directory + "\\sulphur-engine.exe";
+          engine_process_.StartInfo.FileName = App.app_directory + "\\sulphur-test.exe";
           engine_process_.StartInfo.UseShellExecute = false;
           engine_process_.StartInfo.RedirectStandardOutput = true;
-          engine_process_.StartInfo.Arguments = "\"" + Project.directory_path + "\"";
+                    engine_process_.StartInfo.Arguments = "\"D:\\Perforce\\Y2017A-Y3-Sulphur\\sulphur-projects\\lobby-test\\processed\"";// "\"" + Project.directory_path + "\"";
           engine_process_.OutputDataReceived += EngineOutputWriter.engine_output_func;
           engine_process_.Start();
           engine_process_.BeginOutputReadLine();
@@ -166,6 +186,11 @@ namespace sulphur
           {
             engine_process_.Close();
           }
+        }
+
+        public void SendWin32WindowMessage(uint msg)
+        {
+          native.Win32.SendMessage(window, msg, IntPtr.Zero, IntPtr.Zero);
         }
 
         private uint width_; //<! current width of the window in pixels

@@ -12,34 +12,37 @@ namespace sulphur
     //-------------------------------------------------------------------------
     BulletBoxShape::BulletBoxShape()
     {
-      glm::vec3 default_extents(PhysicsShape::kDefaultExtents,
-        PhysicsShape::kDefaultExtents,
-        PhysicsShape::kDefaultExtents);
+      glm::vec3 default_extents(IPhysicsShape::kDefaultExtents,
+                                IPhysicsShape::kDefaultExtents,
+                                IPhysicsShape::kDefaultExtents);
       shape_ = foundation::Memory::Construct<btBoxShape>(
         BulletConversions::ToBt(default_extents));
       shape_->setUserPointer(this);
     }
 
     //-------------------------------------------------------------------------
-    PhysicsShape::ShapeTypes BulletBoxShape::GetType() const
+    BulletBoxShape::~BulletBoxShape()
     {
-      return ShapeTypes::kBox;
+      foundation::Memory::Destruct<btBoxShape>(shape_);
     }
 
     //-------------------------------------------------------------------------
-    void BulletBoxShape::SetExtents(
-      const glm::vec3& extents)
+    void BulletBoxShape::SetExtents(const glm::vec3& extents)
     {
-      reinterpret_cast<btBoxShape*>(shape_)->setImplicitShapeDimensions(
-        BulletConversions::ToBt(extents));
+      shape_->setImplicitShapeDimensions(BulletConversions::ToBt(extents));
       UpdateColliders();
     }
 
     //-------------------------------------------------------------------------
     glm::vec3 BulletBoxShape::GetExtents() const
     {
-      return BulletConversions::ToGlm(
-        reinterpret_cast<btBoxShape*>(shape_)->getHalfExtentsWithoutMargin());
+      return BulletConversions::ToGlm(shape_->getHalfExtentsWithoutMargin());
+    }
+
+    //-------------------------------------------------------------------------
+    void* BulletBoxShape::GetInternalShape() const
+    {
+      return shape_;
     }
   }
 }

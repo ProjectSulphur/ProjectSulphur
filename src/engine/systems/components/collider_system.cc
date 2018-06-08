@@ -25,13 +25,13 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void ColliderComponent::SetShape(physics::PhysicsShape* shape)
+    void ColliderComponent::SetShape(physics::IPhysicsShape* shape)
     {
       system_->SetShape(*this, shape);
     }
 
     //-------------------------------------------------------------------------
-    physics::PhysicsShape* ColliderComponent::GetShape() const
+    physics::IPhysicsShape* ColliderComponent::GetShape() const
     {
       return system_->GetShape(*this);
     }
@@ -361,25 +361,44 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
+    MeshColliderComponent::MeshColliderComponent(System& system, size_t handle) :
+      ColliderComponent(system, handle)
+    {
+    }
+
+    //-------------------------------------------------------------------------
+    void MeshColliderComponent::SetMesh(MeshHandle mesh)
+    {
+      system_->SetMesh(*this, mesh);
+    }
+
+    //-------------------------------------------------------------------------
+    MeshHandle MeshColliderComponent::GetMesh() const
+    {
+      return system_->GetMesh(*this);
+    }
+
+    //-------------------------------------------------------------------------
     void ColliderSystem::SetMesh(ColliderComponent handle, MeshHandle mesh)
     {
-      if (!(handle.GetShape()->GetType() == physics::PhysicsShape::ShapeTypes::kConvex ||
-          handle.GetShape()->GetType() == physics::PhysicsShape::ShapeTypes::kMesh))
+      if (!(handle.GetShape()->GetType() == physics::IPhysicsShape::ShapeTypes::kConvex ||
+          handle.GetShape()->GetType() == physics::IPhysicsShape::ShapeTypes::kMesh))
       {
         PS_LOG(Warning, "Attempted to set a mesh on a primitive collider component.");
         return;
       }
 
       bool is_convex = true;
-      if (handle.GetShape()->GetType() == physics::PhysicsShape::ShapeTypes::kMesh)
+      if (handle.GetShape()->GetType() == physics::IPhysicsShape::ShapeTypes::kMesh)
       {
         is_convex = false;
       }
 
+      physics_service_->DestroyCollider(GetCollider(handle));
+
       physics::PhysicsCollider* col =
         physics_service_->CreateMeshCollider(GetEntity(handle), mesh, is_convex);
 
-      physics_service_->DestroyCollider(GetCollider(handle));
       component_data_.data.
         Get<static_cast<size_t>(ColliderComponentElements::kCollider)>(handle) = col;
       component_data_.data.
@@ -439,7 +458,7 @@ namespace sulphur
 
     //-------------------------------------------------------------------------
     void ColliderSystem::SetShape(ColliderComponent handle,
-      physics::PhysicsShape* shape)
+      physics::IPhysicsShape* shape)
     {
       physics_service_->DestroyCollider(GetCollider(handle));
       physics::PhysicsCollider* col = physics_service_->CreateCollider(GetEntity(handle), shape);
@@ -448,7 +467,7 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    physics::PhysicsShape* ColliderSystem::GetShape(ColliderComponent handle) const
+    physics::IPhysicsShape* ColliderSystem::GetShape(ColliderComponent handle) const
     {
       return GetCollider(handle)->shape();
     }

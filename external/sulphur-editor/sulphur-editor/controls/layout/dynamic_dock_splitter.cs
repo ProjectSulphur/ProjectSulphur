@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -14,6 +15,9 @@ namespace sulphur.editor.controls
    */
   public class DynamicDockSplitter : Control
   {
+    public event EventHandler resizing_started;
+    public event EventHandler resizing_stopped;
+
     Point start_pos_; //!< Position of the mouse when the user started dragging this control.
     FrameworkElement root_; //!< Element to be resized when the control is dragged around.
     double root_size_; //!< Size of the element that is controlled by the spliiter.
@@ -97,6 +101,7 @@ namespace sulphur.editor.controls
         root_size_ = root_.ActualWidth;
       }
       CaptureMouse();
+      resizing_started?.Invoke(this, new EventArgs());
     }
 
     /**
@@ -191,6 +196,7 @@ namespace sulphur.editor.controls
     {
       base.OnMouseUp(e);
       ReleaseMouseCapture();
+      resizing_stopped?.Invoke(this , new EventArgs());
     }
   }
 }

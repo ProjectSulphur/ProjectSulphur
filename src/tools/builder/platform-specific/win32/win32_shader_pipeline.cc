@@ -1,5 +1,6 @@
 #include "tools/builder/pipelines/shader_pipeline.h"
 
+#ifndef PS_PS4_TOOLS
 namespace sulphur
 {
   namespace builder
@@ -27,3 +28,4 @@ namespace sulphur
     }
   }
 }
+#endif

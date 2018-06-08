@@ -21,13 +21,19 @@ namespace sulphur.editor.controls
    */
   public class DynamicDock : DockPanel, ISubscribeable
   {
+    public enum Notifications
+    {
+      kLayoutChangeStarted,
+      kLayoutChangeEnded
+    }
+
  
-    public static readonly DependencyProperty group_property = DependencyProperty.RegisterAttached(
-  "Group",
-  typeof(uint),
-  typeof(DynamicDock),
-  new FrameworkPropertyMetadata(uint.MaxValue, FrameworkPropertyMetadataOptions.Inherits)
-  ); //!< Group Attached property that can be used to group controls together in the same tab control.
+    public static readonly DependencyProperty GroupProperty = DependencyProperty.RegisterAttached(
+      "Group",
+      typeof(uint),
+      typeof(DynamicDock),
+      new FrameworkPropertyMetadata(uint.MaxValue, FrameworkPropertyMetadataOptions.Inherits)
+      ); //!< Group Attached property that can be used to group controls together in the same tab control.
 
     /**
      * @brief Sets the group for a UIElement
@@ -36,7 +42,7 @@ namespace sulphur.editor.controls
      */
     public static void SetGroup(UIElement element, uint value)
     {
-      element.SetValue(group_property, value);
+      element.SetValue(GroupProperty, value);
     }
 
     /**
@@ -46,7 +52,7 @@ namespace sulphur.editor.controls
      */
     public static uint GetGroup(UIElement element)
     {
-      return (uint)element.GetValue(group_property);
+      return (uint)element.GetValue(GroupProperty);
     }
 
     /**
@@ -123,7 +129,26 @@ namespace sulphur.editor.controls
         SetDock(pair.element, pair.dockmode);
         if (paired_children_.Count != 0)
         {
-          paired_children_[paired_children_.Count - 1].CreateSplitter();
+          Pair back = paired_children_[paired_children_.Count - 1];
+          back.CreateSplitter();
+
+          back.splitter.resizing_started += (object sender, EventArgs args) => 
+            notify_subscribers_?.Invoke(
+              sender, 
+              new NotificationEventArgs(
+                null, 
+                (uint)Notifications.kLayoutChangeStarted, 
+                id<DynamicDock>.type_id_)
+            );
+
+          back.splitter.resizing_stopped += (object sender, EventArgs args) =>
+            notify_subscribers_?.Invoke(
+              sender,
+              new NotificationEventArgs(
+                null,
+                (uint)Notifications.kLayoutChangeEnded,
+                id<DynamicDock>.type_id_)
+            );
         }
         paired_children_.Add(pair);
       }
@@ -171,7 +196,7 @@ namespace sulphur.editor.controls
     /**
      *@brief Event fired when subscribers need to be notified.
      */
-    private event OnNotification notify_subscribers_;
+    public event OnNotification notify_subscribers_;
     #endregion
 
     /**

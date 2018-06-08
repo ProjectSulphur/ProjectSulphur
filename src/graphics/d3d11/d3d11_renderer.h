@@ -37,7 +37,7 @@ namespace sulphur
       void SetPipelineState(const PipelineState& pipeline_state) override;
       void SetMaterial(const engine::MaterialPass& pass) override;
       void SetComputePass(const engine::ComputePass& pass) override;
-      void SetCamera(const glm::mat4& view, const glm::mat4& projection, const engine::DepthBuffer& depth_buffer, const engine::RenderTarget& render_target) override;
+      void SetCamera(const glm::vec3& pos, const glm::mat4& view, const glm::mat4& projection, const engine::DepthBuffer& depth_buffer, const engine::RenderTarget& render_target) override;
       void SetModelMatrix(const glm::mat4& model_matrix) override;
       void SetScissorRect(const glm::vec4& rect) override;
       void SetViewport(const glm::vec4& rect) override;
@@ -63,6 +63,7 @@ namespace sulphur
         glm::mat4 world;
         glm::mat4 view;
         glm::mat4 projection;
+        glm::vec3 eye_position;
       } cb_per_obj_;
 
       struct DrawCall

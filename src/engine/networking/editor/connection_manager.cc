@@ -1,7 +1,5 @@
 #include "connection_manager.h"
 
-#include "engine/networking/editor/editor_messages.h"
-
 #include <foundation/logging/logger.h>
 #include <foundation/utils/timer.h>
 
@@ -37,9 +35,9 @@ namespace sulphur
         }
         else
         {
-          *out_id = unprocessed_messages.back().id;
-          *out_payload = unprocessed_messages.back().payload;
-          unprocessed_messages.pop_back();
+          *out_id = unprocessed_messages.front().id;
+          *out_payload = unprocessed_messages.front().payload;
+          unprocessed_messages.pop();
 
           return true;
         }
@@ -60,7 +58,7 @@ namespace sulphur
           // Verify the message's identifier
           if (static_cast<uint32_t>(buffer.id) < static_cast<uint32_t>(EditorMessageID::kNumMessages))
           {
-            unprocessed_messages.push_back(buffer);
+            unprocessed_messages.push(buffer);
           }
           else
           {

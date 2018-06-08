@@ -22,14 +22,24 @@ namespace sulphur
     bool TexturePipeline::Create(const foundation::Path& image_file,
       foundation::TextureAsset& texture) const
     {
-      if(image_file.GetString().empty() == true)
+      if (ValidatePath(image_file) == false)
+      {
+        PS_LOG_BUILDER(Error,
+          "Invalid file path passed. The path %s does not point to a location in the project directory %s", image_file.path().c_str(),
+          project_dir().path().c_str());
+        return false;
+      }
+
+      foundation::Path file_path = image_file.is_relative_path() ? project_dir() + image_file : image_file;
+
+      if(file_path.GetString().empty() == true)
       {
         PS_LOG_BUILDER(Error, 
           "image_file is empty. Texture should be discarded.");
         return false;
       }
 
-      if(LoadImage(image_file, texture) == false)
+      if(LoadImage(file_path, texture) == false)
       {
         PS_LOG_BUILDER(Error,
           "Failed to load the image file. Texture should be discarded.");
@@ -43,6 +53,16 @@ namespace sulphur
     bool TexturePipeline::PackageTexture(const foundation::Path& asset_origin, 
       foundation::TextureAsset& texture)
     {
+      if (ValidatePath(asset_origin) == false)
+      {
+        PS_LOG_BUILDER(Error,
+          "Invalid file path passed. The path %s does not point to a location in the project directory %s", asset_origin.path().c_str(),
+          project_dir().path().c_str());
+        return false;
+      }
+
+      foundation::Path origin = CreateProjectRelativePath(asset_origin);
+
       if (texture.name.get_length() == 0)
       {
         PS_LOG_BUILDER(Warning,
@@ -58,7 +78,7 @@ namespace sulphur
       }
 
       foundation::Path output_file = "";
-      if (RegisterAsset(asset_origin, texture.name, output_file, texture.id) == false)
+      if (RegisterAsset(origin, texture.name, output_file, texture.id) == false)
       {
         PS_LOG_BUILDER(Warning,
           "Failed to register texture. It will not be packaged.");

@@ -1,145 +1,191 @@
 #pragma once
 #include "physics/iphysics_hinge_constraint.h"
+#include "physics/platform_physics_body.h"
 
-#include <glm/glm.hpp>
-#include "physics/bullet/bullet_include.h"
+class btDynamicsWorld;
+class btHingeConstraint;
 
 namespace sulphur
 {
   namespace physics
   {
     /**
-    * @class sulphur::physics::BulletFixedConstraint : public sulphur::physics::IPhysicsHingeConstraint
-    * @brief Fixed constraint implementation
-    * @author Benjamin Waanders
+    * @class sulphur::physics::BulletHingeConstraint : public sulphur::physics::IPhysicsHingeConstraint
+    * @brief Hinge constraint implementation.
+    * @author Benjamin Waanders, Angelo van der Mark
     */
     class BulletHingeConstraint : public IPhysicsHingeConstraint
     {
     public:
+      
       /**
-      * @brief constructor default values, currently up to bullets restrictions
+      * @brief Constructor.
+      * @param[in] body_a (sulphur::physics::PhysicsBody*) The main body.
+      * @param[in] world (btDynamicsWorld*) The dynamics world this constraint will live in.
       */
-      BulletHingeConstraint(btRigidBody* body_a, btRigidBody* body_b, btDynamicsWorld* world);
+      BulletHingeConstraint(PhysicsBody* body_a, btDynamicsWorld* world);
 
       /**
-      * @brief the default deconstructor
+      * @brief Destructor.
       */
-      virtual ~BulletHingeConstraint();
+      ~BulletHingeConstraint();
 
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::SetTorqueLimit
+      * @see sulphur::physics::IPhysicsConstraint::SetTorqueLimit
       */
-      virtual void SetTorqueLimit(float limit) override;
+      void SetTorqueLimit(float limit) override;
+
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::SetForceLimit
+      * @see sulphur::physics::IPhysicsConstraint::SetForceLimit
       */
-      virtual void SetForceLimit(float limit) override;
+      void SetForceLimit(float limit) override;
+
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::GetForceLimit
+      * @see sulphur::physics::IPhysicsConstraint::GetForceLimit
       */
-      virtual float GetForceLimit() const override;
+      float GetForceLimit() const override;
+
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::GetTorqueLimit
+      * @see sulphur::physics::IPhysicsConstraint::GetTorqueLimit
       */
-      virtual float GetTorqueLimit() const override;
+      float GetTorqueLimit() const override;
+
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::GetBodyA
+      * @see sulphur::physics::IPhysicsConstraint::SetEnabled
       */
-      virtual PhysicsBody * GetBodyA() override;
+      void SetEnabled(bool enabled) override;
+
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::GetBodyB
+      * @see sulphur::physics::IPhysicsConstraint::IsEnabled
       */
-      virtual PhysicsBody * GetBodyB() override;
+      bool IsEnabled() const override;
+
+      /**
+      * @see sulphur::physics::IPhysicsConstraint::GetBodyA
+      */
+      PhysicsBody* GetBodyA() override;
+
+      /**
+      * @see sulphur::physics::IPhysicsConstraint::SetBodyB
+      */
+      void SetBodyB(PhysicsBody* body_b) override;
+
+      /**
+      * @see sulphur::physics::IPhysicsConstraint::GetBodyB
+      */
+      PhysicsBody* GetBodyB() override;
 
       /**
       * @see sulphur::physics::IPhysicsFixedConstraint::SetFrameA
       */
-      virtual void SetFrameA(const glm::vec3 & pivot, const glm::vec3 & axis, bool calc_b) override;
+      void SetFrameA(const glm::mat4x4& transform) override;
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::SetFrameA
+      * @see sulphur::physics::IPhysicsFixedConstraint::SetFrameB
       */
-      virtual void SetFrameB(const glm::vec3 & pivot, const glm::vec3 & axis) override;
+      void SetFrameB(const glm::mat4x4& transform) override;
+      /**
+      * @see sulphur::physics::IPhysicsFixedConstraint::GetFrameA
+      */
+      glm::mat4x4 GetFrameA() const override;
+      /**
+      * @see sulphur::physics::IPhysicsFixedConstraint::GetFrameB
+      */
+      glm::mat4x4 GetFrameB() const override;
 
       /**
       * @see sulphur::physics::IPhysicsFixedConstraint::GetPivotA
       */
-      virtual const glm::vec3 GetPivotA() const override;
+      glm::vec3 GetPivotA() const override;
       /**
       * @see sulphur::physics::IPhysicsFixedConstraint::GetPivotB
       */
-      virtual const glm::vec3 GetPivotB() const override;
+      glm::vec3 GetPivotB() const override;
       /**
       * @see sulphur::physics::IPhysicsFixedConstraint::GetAxisA
       */
-      virtual const glm::vec3 GetAxisA() const override;
+      glm::vec3 GetAxisA() const override;
       /**
       * @see sulphur::physics::IPhysicsFixedConstraint::GetAxisB
       */
-      virtual const glm::vec3 GetAxisB() const override;
+      glm::vec3 GetAxisB() const override;
 
       /**
       * @see sulphur::physics::IPhysicsFixedConstraint::SetPivotB
       */
-      virtual void SetPivotB(const glm::vec3& pivot) override;
+      void SetPivotB(const glm::vec3& pivot) override;
       /**
       * @see sulphur::physics::IPhysicsFixedConstraint::SetPivotA
       */
-      virtual void SetPivotA(const glm::vec3& pivot) override;
+      void SetPivotA(const glm::vec3& pivot) override;
       /**
       * @see sulphur::physics::IPhysicsFixedConstraint::SetAxisA
       */
-      virtual void SetAxisA(const glm::vec3& axis) override;
+      void SetAxisA(const glm::vec3& axis) override;
       /**
       * @see sulphur::physics::IPhysicsFixedConstraint::SetAxisB
       */
-      virtual void SetAxisB(const glm::vec3& axis) override; 
+      void SetAxisB(const glm::vec3& axis) override;
 
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::SetMin
+      * @see sulphur::physics::IPhysicsHingeConstraint::SetMinimumAngle
       */
-      virtual void SetMin(float min) override;
-      /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::SetMax
-      */
-      virtual void SetMax(float max) override;
-      /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::GetMin
-      */
-      virtual float GetMin() const override;
-      /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::GetMax
-      */
-      virtual float GetMax() const override;
+      void SetMinimumAngle(float angle) override;
 
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::SetFrameA
+      * @see sulphur::physics::IPhysicsHingeConstraint::SetMaximumAngle
       */
-      virtual void SetFrameA(const glm::mat4x4 & transform) override;
+      void SetMaximumAngle(float angle) override;
+
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::SetFrameB
+      * @see sulphur::physics::IPhysicsHingeConstraint::GetHingeAngle
       */
-      virtual void SetFrameB(const glm::mat4x4 & transform) override;
+      float GetHingeAngle() const override;
+
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::GetFrameA
+      * @see sulphur::physics::IPhysicsHingeConstraint::GetMinimumAngle
       */
-      virtual const glm::mat4x4 GetFrameA() const override;
+      float GetMinimumAngle() const override;
+
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::GetFrameB
+      * @see sulphur::physics::IPhysicsHingeConstraint::GetMaximumAngle
       */
-      virtual const glm::mat4x4 GetFrameB() const override;
+      float GetMaximumAngle() const override;
+
+      /**
+      * @see sulphur::physics::IPhysicsHingeConstraint::SetSoftness
+      */
+      void SetSoftness(float softness) override;
+
+      /**
+      * @see sulphur::physics::IPhysicsHingeConstraint::GetSoftness
+      */
+      float GetSoftness() const override;
+
+      /**
+      * @see sulphur::physics::IPhysicsHingeConstraint::SetBiasFactor
+      */
+      void SetBiasFactor(float bias) override;
+
+      /**
+      * @see sulphur::physics::IPhysicsHingeConstraint::GetBiasFactor
+      */
+      float GetBiasFactor() const override;
+
+      /**
+      * @see sulphur::physics::IPhysicsHingeConstraint::SetRelaxationFactor
+      */
+      void SetRelaxationFactor(float relaxation) override;
+
+      /**
+      * @see sulphur::physics::IPhysicsHingeConstraint::GetRelaxationFactor
+      */
+      float GetRelaxationFactor() const override;
+
     private:
       btHingeConstraint* bullet_constraint_; //!< The internal constraint
       btDynamicsWorld* world_; //!< pointer to the dynamics world that the constraint lives in
-      btRigidBody* body_a_; //!< The A body
-      btRigidBody* body_b_; //!< The B body
-
-      btVector3 pivot_a_; //!< Local stored pivot
-      btVector3 pivot_b_; //!< Local stored pivot
-      btVector3 axis_a_; //!< Local stored axis
-      btVector3 axis_b_; //!< Local stored axis
-
-      float limit_min_; //!< Local min range
-      float limit_max_; //!< Local max range
+      PhysicsBody* body_a_; //!< The A body
+      PhysicsBody* body_b_; //!< The B body
     };
   }
 }

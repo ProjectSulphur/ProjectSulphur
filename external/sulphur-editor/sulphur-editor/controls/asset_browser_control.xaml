@@ -23,8 +23,8 @@
                 <!--proxy for relaying datacontext-->
             </HierarchicalDataTemplate.Resources>
 
-            <controls:EditBox text_="{Binding Path=name}" ToolTip="{Binding Path=path}" allow_edit_="{Binding Path=editable}" 
-                              RenamedCallback="{Binding Path=callback}">
+            <controls:EditBox Text="{Binding Path=name}" ToolTip="{Binding Path=path}" AllowEdit="{Binding Path=editable}" 
+                              RenamedCallback="{Binding Path=rename_folder_cmd}">
                 <controls:EditBox.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="delete folder" Command="{Binding Source={StaticResource proxy}, Path=data.delete_folder_cmd}"
@@ -79,7 +79,7 @@
                      Drop="OnContentDrop"
                      KeyDown="OnContentKeyDown"
                      MouseDoubleClick="OnMouseDoubleClick"
-                     ItemTemplate="{StaticResource asset_browser_layout}">
+                     ItemTemplate="{StaticResource asset_browser_layout}" SelectionChanged="content_SelectionChanged">
                 <ListBox.ItemsSource>
                     <MultiBinding Converter="{StaticResource dictionary_converter}">
                         <Binding ElementName="folder_explorer" Path="SelectedValue"></Binding>

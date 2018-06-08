@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.IO;
+using System.Numerics;
 
 namespace sulphur
 {
@@ -14,6 +15,7 @@ namespace sulphur
      */
     public class BinaryReader
     {
+      
       /**
        *@brief bool indicating if the file is valid
        */
@@ -72,6 +74,17 @@ namespace sulphur
 
         Buffer.BlockCopy(data_, (int)read_pos_, buf, 0, buf.Length);
         read_pos_ += (uint)buf.Length;
+      }
+
+      /**
+      *@brief read a 32 bit boolean value
+      *@return (Boolean) value of the 32 bit boolean
+      */
+      public Boolean ReadBoolean()
+      {
+        Boolean result = BitConverter.ToBoolean(data_, (int)read_pos_);
+        read_pos_ += sizeof(Boolean);
+        return result;
       }
 
       /**
@@ -180,12 +193,13 @@ namespace sulphur
       *@param[out] out_list (List<T>) List of objects of type T read from the buffer
       *@remark this function is used to read data written with the sulphur::foundation::BinaryWriter::Write(const Vector<T>& val) function
       */
-      public void ReadList<T>(out List<T> out_list) where T : IBinarySerializable
+      public void ReadList<T>(out List<T> out_list) where T : IBinarySerializable, new()
       {
-        UInt64 size = ReadU64();
-        out_list = new List<T>((int)size);
-        for(int i = 0; i < out_list.Count; ++i)
+        int size = (int)ReadU64();
+        out_list = new List<T>(size);
+        for (int i = 0; i < size; ++i)
         {
+          out_list.Add(new T());
           ReadSerializable(out_list[i]);
         }
       }
@@ -298,10 +312,7 @@ namespace sulphur
 
       private uint read_pos_; //<! current position in the buffer
 
-      private byte[] data_; //<! data buffer to read from. with the data from the file given in the constructor
-
-      private delegate object Convert<T>();
-
+      private byte[] data_; //<! data buffer to read from. with the data from the file given in the constructor.
     }
   }
 }

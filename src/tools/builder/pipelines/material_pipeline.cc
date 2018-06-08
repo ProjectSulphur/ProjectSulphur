@@ -452,6 +452,7 @@ namespace sulphur
                 foundation::TextureAsset& texture = texture_cache.textures[it.second];
                 if (texture.id == 0)
                 {
+      
                   if (texture_pipeline.PackageTexture(it.first, texture) == false)
                   {
                     PS_LOG_BUILDER(Error,

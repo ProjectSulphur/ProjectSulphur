@@ -42,7 +42,7 @@ namespace sulphur
        * @param[in] verbosity (sulphur.editor.Log.Verbosity) The way the log should be formatted.
        * @param[in] message (string) Message to be displayed in the logger.
        */
-      public static void Write(Verbosity verbosity, string message)
+      private static void AddLog(Verbosity verbosity, string message)
       {
         App.Current.Dispatcher.Invoke((Action)delegate
         {
@@ -63,6 +63,82 @@ namespace sulphur
           log_entry.Content = log;
           controls.Logger.logs_.Add(log_entry);
         });
+      }
+
+      /**
+       * @brief Adds a log entry to the sulphur.editor.controls.Logger
+       * @param[in] verbosity (sulphur.editor.Log.Verbosity) The way the log should be formatted.
+       * @param[in] message (string) Message to be displayed in the logger.
+       */
+      public static void Write(Verbosity verbosity, string message)
+      {
+        AddLog(verbosity, message);
+      }
+
+      /**
+      * @brief Formats the string and adds a log entry to the sulphur.editor.controls.Logger.
+      * @param[in] verbosity (sulphur.editor.Log.Verbosity) The way the log should be formatted.
+      * @param[in] message (string) Message to be displayed in the logger.
+      * @param[in] arg0 (object) first argument in the string.
+      */
+      public static void Write(Verbosity verbosity, string message, object arg0)
+      {
+        string formatted_messages = string.Format(message, arg0);
+        AddLog(verbosity, formatted_messages);
+      }
+
+      /**
+      * @brief Formats the string and adds a log entry to the sulphur.editor.controls.Logger.
+      * @param[in] verbosity (sulphur.editor.Log.Verbosity) The way the log should be formatted.
+      * @param[in] message (string) Message to be displayed in the logger.
+      * @param[in] arg0 (object) first argument in the string.
+      * @param[in] arg1 (object) second argument in the string.
+      */
+      public static void Write(Verbosity verbosity, string message, object arg0, object arg1)
+      {
+        string formatted_messages = string.Format(message, arg0, arg1);
+        AddLog(verbosity, formatted_messages);
+      }
+
+      /**
+      * @brief Formats the string and adds a log entry to the sulphur.editor.controls.Logger.
+      * @param[in] verbosity (sulphur.editor.Log.Verbosity) The way the log should be formatted.
+      * @param[in] message (string) Message to be displayed in the logger.
+      * @param[in] arg0 (object) first argument in the string.
+      * @param[in] arg1 (object) second argument in the string.
+      * @param[in] arg2 (object) third argument in the string.
+      */
+      public static void Write(Verbosity verbosity, string message, object arg0, object arg1, object arg2)
+      {
+        string formatted_messages = string.Format(message, arg0, arg1, arg2);
+        AddLog(verbosity, formatted_messages);
+      }
+
+      /**
+      * @brief Formats the string and adds a log entry to the sulphur.editor.controls.Logger.
+      * @param[in] verbosity (sulphur.editor.Log.Verbosity) The way the log should be formatted.
+      * @param[in] message (string) Message to be displayed in the logger.
+      * @param[in] arg0 (object) first argument in the string.
+      * @param[in] arg1 (object) second argument in the string.
+      * @param[in] arg2 (object) third argument in the string.
+      * @param[in] arg3 (object) fourth argument in the string.
+      */
+      public static void Write(Verbosity verbosity, string message, object arg0, object arg1, object arg2, object arg3)
+      {
+        string formatted_messages = string.Format(message, arg0, arg1, arg2, arg3);
+        AddLog(verbosity, formatted_messages);
+      }
+
+      /**
+      * @brief Formats the string and adds a log entry to the sulphur.editor.controls.Logger.
+      * @param[in] verbosity (sulphur.editor.Log.Verbosity) The way the log should be formatted.
+      * @param[in] message (string) Message to be displayed in the logger.
+      * @param[in] args (params object[]) arguments used to format the string.
+      */
+      public static void Write(Verbosity verbosity, string message, params object[] args)
+      {
+        string formatted_messages = string.Format(message, args);
+        AddLog(verbosity, formatted_messages);
       }
     }
 
@@ -99,7 +175,7 @@ namespace sulphur
 
     namespace controls
     {
-      
+
       /**
        * @class sulphur.editor.controls.Logger : TabControl
        * @brief Control that displays the logs written by the editor and captured from the engine.
@@ -107,7 +183,7 @@ namespace sulphur
        */
       public class Logger : TabControl
       {
-        
+
 
         TabItem editor_tab; //!< Tab that displays the editor logs.
         TabItem engine_tab; //!< Tab that displays the engine logs.

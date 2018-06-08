@@ -54,6 +54,7 @@ namespace sulphur
       }
       id_stack_.push_back(id);
       all_values_.pop_back();
+      SortIDs();
     }
 
     //-------------------------------------------------------------------------

@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
-using System.Windows.Controls;
+using System.Numerics;
 using System.Windows;
 using System.Windows.Media;
 
@@ -132,10 +132,35 @@ namespace sulphur
        */
       public Subscription[] GetSubscriptions()
       {
-        Subscription[] subscriptions = new Subscription[2];
+        Subscription[] subscriptions = new Subscription[3];
         subscriptions[0] = new Subscription(id<controls.HierarchyViewerControl>.type_id_, OnNotification);
         subscriptions[1] = new Subscription(id<MessageHandler>.type_id_, HandleEngineMessage);
+        subscriptions[2] = new Subscription(id<controls.AssetBrowserControl>.type_id_, HandleAssetBrowsermessages);
         return subscriptions;
+      }
+
+      /**
+       * @brief Handle incomming messages from the attached asset browser control.
+       * @param[in] sender (object) The asset browser control that send the notification.
+       * @param[in] e (NotificationEventArgs) Argument send with the event.
+       */
+      void HandleAssetBrowsermessages(object sender, NotificationEventArgs e)
+      {
+        if (e.notification_id == (int)controls.AssetBrowserControl.Notifications.kAssetInstantiated)
+        {
+          AssetCacheData data = (AssetCacheData)e.notification_data;
+          if (data.type == AssetType.kWorld)
+          {
+            
+            App.Current.Dispatcher.Invoke(delegate
+            {
+              Clear();  
+              hierarchy.LoadFromDisk(data.origin);
+              Project.current_world_ = data.origin.Remove(0, Project.directory_path.Length + 1);
+            });
+          }
+          return;
+        }
       }
 
       /**
@@ -154,25 +179,44 @@ namespace sulphur
             case native.NetworkMessages.kEntityMoved:
               {
                 native.messages.EntityMovedMessage data = (native.messages.EntityMovedMessage)msg.data;
+                Vector3 translation = new Vector3(data.x, data.y, data.z);
+                TransformComponent transform = hierarchy.GetObjectAtIndex((int)data.entity_index).transform_;
+                transform.TranslateWorld(translation);
+                data.x = transform.position_.X;
+                data.y = transform.position_.Y;
+                data.z = transform.position_.Z;
                 byte[] byte_data = Utils.StructToBytes(data);
                 native.Networking.SNetSendData((uint)msg.id, byte_data, (uint)byte_data.Length);
-                native.Networking.SNetFlushPackets();
+                
                 break;
               }
             case native.NetworkMessages.kEntityRotated:
               {
                 native.messages.EntityRotateMessage data = (native.messages.EntityRotateMessage)msg.data;
+                Quaternion rotation = new Quaternion(data.x, data.y, data.z, data.w);
+                TransformComponent transform = hierarchy.GetObjectAtIndex((int)data.entity_index).transform_;
+                transform.RotateLocal(rotation);
+                data.x = transform.local_rotation_.X;
+                data.y = transform.local_rotation_.Y;
+                data.z = transform.local_rotation_.Z;
+                data.w = transform.local_rotation_.W;
                 byte[] byte_data = Utils.StructToBytes(data);
                 native.Networking.SNetSendData((uint)msg.id, byte_data, (uint)byte_data.Length);
-                native.Networking.SNetFlushPackets();
+                
                 break;
               }
             case native.NetworkMessages.kEntityScaled:
               {
                 native.messages.EntityScaleMessage data = (native.messages.EntityScaleMessage)msg.data;
+                Vector3 scale = new Vector3(data.x, data.y, data.z);
+                TransformComponent transform = hierarchy.GetObjectAtIndex((int)data.entity_index).transform_;
+                transform.scale_ += scale;
+                data.x = transform.scale_.X;
+                data.y = transform.scale_.Y;
+                data.z = transform.scale_.Z;
                 byte[] byte_data = Utils.StructToBytes(data);
                 native.Networking.SNetSendData((uint)msg.id, byte_data, (uint)byte_data.Length);
-                native.Networking.SNetFlushPackets();
+                
               }
               // send modification to engine that data has been modified
               break;
@@ -218,12 +262,13 @@ namespace sulphur
         msg.new_parent_old_index = new_parent_old_index;
         msg.new_sibling_index = (UInt64)target.GetSiblingIndex();
 
+        // rebuild the target transform component
         byte[] data = Utils.StructToBytes(msg);
         native.Networking.SNetSendData(
           (uint)native.NetworkMessages.kEntityReparented,
           data,
           (uint)data.Length);
-        native.Networking.SNetFlushPackets();
+        
       }
 
       /**
@@ -251,12 +296,53 @@ namespace sulphur
         msg.sibling_index = (UInt64)new_object.GetSiblingIndex();
         msg.parent_index = parent != null ? (UInt64)parent.GetIndex() : UInt64.MaxValue;
 
+        msg.position = new float[3] { 0.0f, 0.0f, 0.0f };
+        msg.rotation = new float[4] { 0.0f, 0.0f, 0.0f, 0.0f };
+        msg.scale = new float[3] { 1.0f, 1.0f, 1.0f };
+
         byte[] data = Utils.StructToBytes(msg);
         native.Networking.SNetSendData(
           (uint)native.NetworkMessages.kEntityCreated,
           data,
           (uint)data.Length);
-        native.Networking.SNetFlushPackets();
+        
+      }
+
+      /**
+       * @brief Implementation of the new_root_entity_cmd_ and new_entity_cmd_ commands
+       * @param[in] obj (WorldObject) The entity to add to the hierarchy.
+       * @param[in] parent (sulphur.editor.WorldObject) The parameter passed to the
+       *   command. This parameter will become the parent for the newly created
+       *   entity.
+       * @remarks Passing null for the parent will parent the entity to the root.
+       * @remarks This function is mainly used to construct an entity before adding it to the hierarchy. this way all components can be added to the entity up front.
+       */
+      public void AddEntity(WorldObject obj, WorldObject parent)
+      {
+        WorldObject new_object = hierarchy.Add(obj, parent);
+
+        OnNotification handler = notify_subscribers_;
+        NotificationEventArgs args = new NotificationEventArgs(
+          new_object,
+          (uint)Notifications.kEntityAdded,
+          id<WorldHierarchy>.type_id_);
+        handler?.Invoke(this, args);
+
+        // Notify the engine
+        native.messages.EntityCreatedMessage msg = new native.messages.EntityCreatedMessage();
+        msg.entity_index = (UInt64)new_object.GetIndex();
+        msg.sibling_index = (UInt64)new_object.GetSiblingIndex();
+        msg.parent_index = parent != null ? (UInt64)parent.GetIndex() : UInt64.MaxValue;
+
+        msg.position = new float[3] { 0.0f, 0.0f, 0.0f };
+        msg.rotation = new float[4] { 0.0f, 0.0f, 0.0f, 0.0f };
+        msg.scale = new float[3] { 1.0f, 1.0f, 1.0f };
+
+        byte[] data = Utils.StructToBytes(msg);
+        native.Networking.SNetSendData(
+          (uint)native.NetworkMessages.kEntityCreated,
+          data,
+          (uint)data.Length);
       }
 
       /**
@@ -286,7 +372,18 @@ namespace sulphur
           (uint)native.NetworkMessages.kEntityDestroyed,
           data,
           (uint)data.Length);
-        native.Networking.SNetFlushPackets();
+      }
+
+      /**
+       * @brief Empties the entire hierarchy.
+       * @remark For every root entity destroyed a message is send to the connected engine(s)
+       */
+      public void Clear()
+      {
+        while (hierarchy.root.Count > 0)
+        {
+          DeleteEntity(hierarchy.root[0]);
+        }
       }
     }
   }

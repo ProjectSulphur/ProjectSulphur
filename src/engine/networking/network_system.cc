@@ -214,6 +214,12 @@ namespace sulphur
       networking::SNetClearRPCBuffer();
     }
 
+    //-------------------------------------------------------------------------
+    void NetworkSystem::SortIDs()
+    {
+      networking::SNetSortIDs();
+    }
+
 
     //-------------------------------------------------------------------------
     NetworkSystem* ScriptableNetworking::network_ = nullptr;
@@ -426,6 +432,12 @@ namespace sulphur
     void ScriptableNetworking::ClearRPCBuffer()
     {
       network_->ClearRPCBuffer();
+    }
+
+    //-------------------------------------------------------------------------
+    void ScriptableNetworking::SortIDs()
+    {
+      network_->SortIDs();
     }
 
     //-------------------------------------------------------------------------

@@ -4,20 +4,10 @@
 #include "engine/systems/component_system.h"
 #include "engine/physics/physics_system.h"
 
-#include <foundation/containers/vector.h>
-#include <foundation/containers/hash_map.h>
-#include <foundation/memory/memory.h>
-
-#include <physics/platform_physics_constraint.h>
+#include <physics/iphysics_constraint.h>
 
 namespace sulphur
 {
-
-  namespace physics
-  {
-    class IPhysicsConstraint;
-  }
-
   namespace engine
   {
     class ConstraintSystem;
@@ -25,7 +15,7 @@ namespace sulphur
     /**
     * @class sulphur::engine::ConstraintComponent : public sulphur::engine::ComponentHandleBase
     * @brief A component that allows you to add a constraint to an entity.
-    * @author Daniel Konings, Benjamin Waanders
+    * @author Daniel Konings, Benjamin Waanders, Angelo van der Mark
     */
     class ConstraintComponent : public ComponentHandleBase
     {
@@ -46,8 +36,8 @@ namespace sulphur
       ConstraintComponent(System& system, size_t handle);
 
       /**
-      * @brief Adds an entity to the constraint component and encouples it, realising the constraint.
-      * @param[in] entity (sulphur::engine::Entity) The entity to which the constraint is linked (entity B).
+      * @brief Adds an entity to the constraint component and encouples it.
+      * @param[in] entity (sulphur::engine::Entity*) The entity to which the constraint is linked (entity B).
       */
       SCRIPT_FUNC_EX() void AttachEntity(Entity* entity);
 
@@ -81,38 +71,50 @@ namespace sulphur
       SCRIPT_FUNC_EX() float GetForceLimit() const;
 
       /**
-      * @brief Get the constraint frame for A
-      * @return (glm::mat4x4)
+      * @brief Sets whether a constraint is active in the world. Can be used to re-enable broken constraints.
+      * @param[in] enabled (bool) Whether the constraint should be active or not.
+      */
+      SCRIPT_FUNC_EX() void SetEnabled(bool enabled);
+
+      /**
+      * @brief Returns whether the constraint is active or not. Broken constraints are considered inactive.
+      * @return (bool) True if the constraint is active.
+      */
+      SCRIPT_FUNC_EX() bool IsEnabled() const;
+
+      /**
+      * @brief Sets the reference frame of the owning entity relative to the constraint.
+      * @param[in] transform (const glm::mat4x4&) The relative transform.
+      */
+      SCRIPT_FUNC_EX() void SetFrameA(const glm::mat4x4& transform);
+
+      /**
+      * @brief Returns the reference frame of the owning entity relative to the constraint.
+      * @return (glm::mat4x4) The relative transform.
       */
       SCRIPT_FUNC_EX() glm::mat4x4 GetFrameA() const;
 
       /**
-      * @brief Get the constraint frame for B
-      * @return (glm::mat4x4)
+      * @brief Sets the reference frame of the attached entity relative to the constraint.
+      * @param[in] transform (const glm::mat4x4&) The relative transform.
+      */
+      SCRIPT_FUNC_EX() void SetFrameB(const glm::mat4x4& transform);
+
+      /**
+      * @brief Returns the reference frame of the attached entity relative to the constraint.
+      * @return (glm::mat4x4) The relative transform.
       */
       SCRIPT_FUNC_EX() glm::mat4x4 GetFrameB() const;
 
       /**
-      * @brief Set the constraint frame for A
-      * @param[in] frame (const glm::mat4x4&)
-      */
-      SCRIPT_FUNC_EX() void SetFrameAMat(const glm::mat4x4& frame);
-
-      /**
-      * @brief Set the constraint frame for B
-      * @param[in] frame (const glm::mat4x4&)
-      */
-      SCRIPT_FUNC_EX() void SetFrameBMat(const glm::mat4x4& frame);
-
-      /**
       * @brief Gets the A entity of this constraint (owner).
-      * @return (sulphur::engine::Entity)
+      * @return (sulphur::engine::Entity) Handle to the entity.
       */
       SCRIPT_FUNC_EX() Entity GetEntityA() const;
 
       /**
-      * @brief Gets the B entity of this constraint.
-      * @return (sulphur::engine::Entity)
+      * @brief Gets the B entity of this constraint if there is one.
+      * @return (sulphur::engine::Entity) Handle to the entity, or invalid handle.
       */
       SCRIPT_FUNC_EX() Entity GetEntityB() const;
 
@@ -123,6 +125,7 @@ namespace sulphur
     /**
     * @class sulphur::engine::FixedConstraintComponent : public sulphur::engine::ConstraintComponent
     * @brief The fixed constraint component to couple two components together via a fixed constraint.
+    * @author Benjamin Waanders
     */
     SCRIPT_CLASS() class FixedConstraintComponent : public ConstraintComponent
     {
@@ -145,7 +148,8 @@ namespace sulphur
 
     /**
     * @class sulphur::engine::HingeConstraintComponent : public sulphur::engine::ConstraintComponent
-    * @brief The hinge constraint component To couple two components together via a hinge constraint.
+    * @brief The hinge constraint component to couple two components together via a hinge constraint.
+    * @author Benjamin Waarnders, Angelo van der Mark
     */
     SCRIPT_CLASS() class HingeConstraintComponent : public ConstraintComponent
     {
@@ -169,25 +173,31 @@ namespace sulphur
       * @brief Sets the maximum range for the hinge in radians.
       * @param[in] angle (float) The maximum angle.
       */
-      SCRIPT_FUNC() void SetMaxAngle(float angle);
+      SCRIPT_FUNC() void SetMaximumAngle(float angle);
 
       /**
       * @brief Sets the minimum range for the hinge in radians.
       * @param[in] angle (float) The minimum angle.
       */
-      SCRIPT_FUNC() void SetMinAngle(float angle);
+      SCRIPT_FUNC() void SetMinimumAngle(float angle);
 
       /**
       * @brief Gets the minimum range for the hinge in radians.
       * @return (float) The minimum angle.
       */
-      SCRIPT_FUNC() float GetMinAngle() const;
+      SCRIPT_FUNC() float GetMinimumAngle() const;
 
       /**
       * @brief Gets the maximum range for the hinge in radians.
       * @return (float) The maximum angle.
       */
-      SCRIPT_FUNC() float GetMaxAngle() const;
+      SCRIPT_FUNC() float GetMaximumAngle() const;
+
+      /**
+      * @brief Gets the current angle of the constraint.
+      * @return (float) The angle in radians.
+      */
+      SCRIPT_FUNC() float GetHingeAngle() const;
 
       /**
       * @brief Sets the axis to rotate around relative to point A.
@@ -200,6 +210,18 @@ namespace sulphur
       * @param[in] axsis (const glm::vec3&) The axis.
       */
       SCRIPT_FUNC() void SetAxisB(const glm::vec3& axis);
+
+      /**
+      * @brief Gets the axis to rotate around relative to point A.
+      * @return (glm::vec3) The axis.
+      */
+      SCRIPT_FUNC() glm::vec3 GetAxisA() const;
+
+      /**
+      * @brief Gets the axis to rotate around relative to point B.
+      * @return (glm::vec3) The axis.
+      */
+      SCRIPT_FUNC() glm::vec3 GetAxisB() const;
 
       /**
       * @brief Sets the pivot point relative to point A.
@@ -226,30 +248,40 @@ namespace sulphur
       SCRIPT_FUNC() glm::vec3 GetPivotA() const;
 
       /**
-      * @brief Gets the axis to rotate around relative to point A.
-      * @return (glm::vec3) The axis.
+      * @brief Sets the softness of the constraint.
+      * @param[in] softness (float) Softness factor.
       */
-      SCRIPT_FUNC() glm::vec3 GetAxisA() const;
+      SCRIPT_FUNC() void SetSoftness(float softness);
 
       /**
-      * @brief Gets the axis to rotate around relative to point B.
-      * @return (glm::vec3) The axis.
+      * @brief Gets the softness of the constraint.
+      * @return (float) Softness factor.
       */
-      SCRIPT_FUNC() glm::vec3 GetAxisB() const;
+      SCRIPT_FUNC() float GetSoftness() const;
 
       /**
-      * @brief Sets the Frame from a pivot point and an axis for frame A.
-      * @param[in] pivot (const glm::vec3&) The pivot point.
-      * @param[in] axis (const glm::vec3&) The axis.
+      * @brief Sets the bias factor of the constraint.
+      * @param[in] bias (float) The bias factor.
       */
-      SCRIPT_FUNC() void SetFrameA(const glm::vec3& pivot, const glm::vec3& axis);
+      SCRIPT_FUNC() void SetBiasFactor(float bias);
 
       /**
-      * @brief Sets the Frame from a pivot point and an axis for frame B.
-      * @param[in] pivot (const glm::vec3&) The pivot point.
-      * @param[in] axis (const glm::vec3&) The axis.
+      * @brief Gets the bias factor of the constraint.
+      * @return (float) The bias factor.
       */
-      SCRIPT_FUNC() void SetFrameB(const glm::vec3& pivot, const glm::vec3& axis);
+      SCRIPT_FUNC() float GetBiasFactor() const;
+
+      /**
+      * @brief Sets the relaxation factor of the constraint.
+      * @param[in] relaxation (float) The relaxation factor.
+      */
+      SCRIPT_FUNC() void SetRelaxationFactor(float relaxation);
+
+      /**
+      * @brief Gets the relaxation factor of the constraint.
+      * @return (float) The relaxation factor.
+      */
+      SCRIPT_FUNC() float GetRelaxationFactor() const;
     };
 
 
@@ -294,7 +326,7 @@ namespace sulphur
     /**
     * @class sulphur::engine::ConstraintSystem : public sulphur::engine::IComponentSystem
     * @brief The ComponentSystem that manages all Constraints in the World. 
-    * @author Daniel Konings, Benjamin Waanders
+    * @author Daniel Konings, Benjamin Waanders, Angelo van der Mark
     */
     class ConstraintSystem : public IComponentSystem
     {
@@ -352,11 +384,17 @@ namespace sulphur
       Entity GetEntityB(ConstraintComponent handle) const;
 
       /**
-      * @brief Adds an entity to the constraint component and encouples it, realising the constraint.
+      * @brief Adds an entity to the constraint component and encouples it.
       * @param[in] handle (sulphur::engine::ConstraintComponent) The component handle.
       * @param[in] entity (sulphur::engine::Entity) The entity to which the constraint is linked (entity B).
       */
       void AttachEntity(ConstraintComponent handle, Entity entity);
+
+      /**
+      * @brief Detaches the secondary entity from the constraint component if it exists.
+      * @param[in] handle (sulphur::engine::ConstraintComponent) The component handle.
+      */
+      void DetachEntity(ConstraintComponent handle);
 
     private:
       PhysicsSystem* physics_service_; //!< The physics service.
@@ -365,8 +403,8 @@ namespace sulphur
 
 
     //-------------------------------------------------------------------------
-    template<typename ComponentT>
-    inline ComponentT ConstraintSystem::Create(Entity & entity)
+    template<>
+    inline FixedConstraintComponent ConstraintSystem::Create(Entity& entity)
     {
       physics::PhysicsBody* body = physics_service_->GetPhysicsBody(entity);
 
@@ -375,10 +413,35 @@ namespace sulphur
         body = physics_service_->CreatePhysicsBody(entity);
       }
 
-      return ComponentT(static_cast<typename ComponentT::System&>(*this),
+      physics::IPhysicsConstraint* constraint =
+        physics_service_->CreateConstraint(entity,
+          physics::IPhysicsConstraint::ConstraintTypes::kFixed);
+
+      return FixedConstraintComponent(*this,
         this->component_data_.data.Add(
-        nullptr,
-        entity));
+        constraint,
+        entity, Entity()));
      }
+
+    //-------------------------------------------------------------------------
+    template<>
+    inline HingeConstraintComponent ConstraintSystem::Create(Entity& entity)
+    {
+      physics::PhysicsBody* body = physics_service_->GetPhysicsBody(entity);
+
+      if (body == nullptr)
+      {
+        body = physics_service_->CreatePhysicsBody(entity);
+      }
+
+      physics::IPhysicsConstraint* constraint =
+        physics_service_->CreateConstraint(entity,
+          physics::IPhysicsConstraint::ConstraintTypes::kHinge);
+
+      return HingeConstraintComponent(*this,
+        this->component_data_.data.Add(
+          constraint,
+          entity, Entity()));
+    }
   }
 }

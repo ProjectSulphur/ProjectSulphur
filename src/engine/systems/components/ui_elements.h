@@ -30,6 +30,7 @@ namespace sulphur
       TextureHandle texture; // !< The texture that this image uses for rendering.
       foundation::Color color = foundation::Color::kWhite; // !< The color of the image.
       Rect texture_rect = Rect(glm::vec2(0.0f), glm::vec2(1.0f)); // !< The texture rect of this image.
+      float rotation = 0.0f; //!< The rotation of the image.
       /**
       * @brief Returns the global bounds of this image.
       * @param[in] clipped (const bool&) Currently not used.
@@ -65,8 +66,8 @@ namespace sulphur
       * @param[in] system (CanvasSystem*) The canvas system that this component is attached to.
       * @param[in] canvas (CanvasComponent&) The canvas component that this component is attached to.
       */
-      ImageUIElementComponent(CanvasSystem* system, CanvasComponent& canvas) :
-        BaseUIElementComponent(system, canvas) {};
+      ImageUIElementComponent(CanvasSystem* system, CanvasComponent& canvas, const Entity& entity) :
+        BaseUIElementComponent(system, canvas, entity) {};
       /**
       * @brief Copies component data from one component into the other.
       * @param[in] other (const ImageUIElementComponent&) The component which will be copied into this component.
@@ -93,6 +94,11 @@ namespace sulphur
       * @param[in] texture_rect (const Rect&) The texture rect that this image should be using.
       */
       void SetTextureRect(const Rect& texture_rect);
+      /**
+      * @brief Sets the rotation of this UI element. HACK NEEDS TO BE REMOVED.
+      * @param[in] rotation (const float&) The new rotation.
+      */
+      void SetRotation(const float& rotation);
     };
 
     using ImageUIConstructor = UIElementConstructor<ImageUIElementComponent, ImageUIElementData>;

@@ -26,9 +26,9 @@ namespace sulphur.editor
     public static string name_ { get; private set; } = "";
 
     /**
-     * @brief Id of the currently loaded world.
+     * @brief Project relative path to the current world being edited.
      */
-    public int curr_world_id { get; private set; }
+    public static string current_world_ { get; set; } = "";
 
     /**
      * @brief Loads a new project at a given filepath
@@ -53,11 +53,10 @@ namespace sulphur.editor
           }
         }
       }
-      
+      native.AssetProcessor.SetProjectDirectory(directory_path);
       native.AssetProcessor.SetOutputPath(directory_path);
-      native.AssetProcessor.SetPackageOutputPath(".\\resources");
+      native.AssetProcessor.SetPackageOutputPath("resources");
       native.AssetProcessor.CreateDefaults();
-
       return true;
     }
 
@@ -73,20 +72,6 @@ namespace sulphur.editor
     {
       path_ = path;
       directory_path = path.Substring(0, path.LastIndexOf("\\"));
-
-      // write the settings to a new project file
-      XmlWriterSettings settings = new XmlWriterSettings();
-      settings.Indent = true;
-      settings.IndentChars = "\t";
-      XmlWriter writer = XmlWriter.Create(path, settings);
-      using (writer)
-      {
-        writer.WriteStartElement("ProjectSettings");
-        writer.WriteAttributeString("Name", path.Substring(path.LastIndexOf("\\") + 1));
-        writer.WriteElementString("Directory", directory_path);
-        writer.WriteEndElement();
-      }
-
       // create the folders required
       if (Directory.Exists(directory_path + "\\resources") == false)
       {
@@ -97,30 +82,38 @@ namespace sulphur.editor
       {
         Directory.CreateDirectory(directory_path + "\\assets");
       }
-
-      StreamWriter file_writer = new StreamWriter(directory_path + "\\assets\\main.lua");
-      file_writer.WriteLine("function OnInitialize()");
-      file_writer.WriteLine("end");
-      file_writer.WriteLine();
-      file_writer.WriteLine("function Update(dt)");
-      file_writer.WriteLine("end");
-      file_writer.WriteLine();
-      file_writer.WriteLine("function FixedUpdate()");
-      file_writer.WriteLine("end");
-      file_writer.Flush();
-      file_writer.Close();
       
+      current_world_ = "assets\\main.swo";
+
+      // write the settings to a new project file
+      XmlWriterSettings settings = new XmlWriterSettings();
+      settings.Indent = true;
+      settings.IndentChars = "\t";
+      XmlWriter xml_writer = XmlWriter.Create(path, settings);
+      using (xml_writer)
+      {
+        xml_writer.WriteStartElement("ProjectSettings");
+        xml_writer.WriteAttributeString("Name", path.Substring(path.LastIndexOf("\\") + 1));
+        xml_writer.WriteElementString("World", current_world_);
+        xml_writer.WriteEndElement();
+        xml_writer.Close();
+      }
+      native.AssetProcessor.SetProjectDirectory(directory_path);
       native.AssetProcessor.SetOutputPath(directory_path);
-      native.AssetProcessor.SetPackageOutputPath(".\\resources");
+      native.AssetProcessor.SetPackageOutputPath("resources");
       native.AssetProcessor.CreateDefaults();
 
-      ulong id = 0;
-      if (native.AssetProcessor.ImportScript(directory_path + "\\assets\\main.lua", ref id) == false)
+      if(CreateEmptyWorld() == false)
       {
+        Log.Write(Log.Verbosity.kError, "Unable to create or register world");
         return false;
       }
-      
-      //TODO: create a new world upon project creation
+
+      if (CreateEmptyMainScript() == false)
+      {
+        Log.Write(Log.Verbosity.kError, "Unable to create or register empty main script");
+        return false;
+      }
       return true;
     }
 
@@ -138,8 +131,8 @@ namespace sulphur.editor
       {
         switch (reader.Name)
         {
-          case "Directory":
-            directory_path = reader.ReadElementContentAsString();
+          case "World":
+            current_world_ = reader.ReadElementContentAsString();
             break;
         }
 
@@ -148,6 +141,32 @@ namespace sulphur.editor
           break;
         }
       }
+    }
+
+    private static bool CreateEmptyMainScript()
+    {
+      StreamWriter file_writer = new StreamWriter(directory_path + "\\assets\\main.lua");
+      file_writer.WriteLine("function OnInitialize()");
+      file_writer.WriteLine("end");
+      file_writer.WriteLine();
+      file_writer.WriteLine("function Update(dt)");
+      file_writer.WriteLine("end");
+      file_writer.WriteLine();
+      file_writer.WriteLine("function FixedUpdate()");
+      file_writer.WriteLine("end");
+      file_writer.Close();
+
+      ulong id = 0;
+      native.AssetProcessor.RegisterWorld(current_world_, ref id);
+      return native.AssetProcessor.ImportScript("assets\\main.lua", ref id);
+    }
+
+    private static bool CreateEmptyWorld()
+    {
+      File.CreateText(directory_path + "\\assets\\main.swo").Close();
+      File.CreateText(directory_path + "\\resources\\main.sbw").Close();
+      ulong id = 0;
+      return native.AssetProcessor.RegisterWorld(current_world_, ref id);
     }
   }
 }

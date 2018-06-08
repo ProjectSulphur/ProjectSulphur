@@ -2,6 +2,9 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System;
+using System.Collections.Specialized;
+using Newtonsoft.Json;
+using System.IO;
 
 namespace sulphur
 {
@@ -12,8 +15,37 @@ namespace sulphur
      * @brief A world object roughly represents an entity with a transform component and display information.
      * @author Maarten ten Velden
      */
+    [JsonObject(MemberSerialization.OptIn)]
     public class WorldObject : INotifyPropertyChanged
     {
+      private bool is_dirty_; //!< Value indicating that this object has changed since it was last serialized.
+      /**
+       * @brief Property used to get and set the is_dirty value
+       */
+      public bool is_dirty
+      {
+        get { return is_dirty_; }
+        set
+        {
+          if (is_dirty_ != value && value == true)
+          {
+            object_changed_event?.Invoke(this, new EventArgs());
+          }
+          is_dirty_ = value;
+        }
+      }
+
+      /**
+       * @brief Event fired when the is_dirty flag gets set to true.
+       */
+      public event EventHandler object_changed_event;
+
+      /**
+       * transform component of this world object
+       */
+      [JsonProperty]
+      public TransformComponent transform_ { get; private set; }
+
       /**
        * @brief The event that is fired when a property changes
        *@see https://msdn.microsoft.com/en-us/library/system.componentmodel.inotifypropertychanged(v=vs.110).aspx 
@@ -33,10 +65,11 @@ namespace sulphur
         set
         {
           name_ = value;
+          is_dirty = true;
           NotifyPropertyChanged("name");
         }
       }
-      
+
       private WorldObject previous_; //!< The actual value of the entity that precedes this one in the hierarchy
       /**
        * @brief Getter and (protected) setter for the entity that precedes this one in the hierarchy
@@ -90,6 +123,14 @@ namespace sulphur
         protected set
         {
           parent_ = value;
+          if (value != null)
+          {
+            transform_.SetParent(value.transform_);
+          }
+          else
+          {
+            transform_.SetParent(null);
+          }
           NotifyPropertyChanged("parent");
         }
       }
@@ -119,6 +160,33 @@ namespace sulphur
       {
         this.name = name;
         children_ = new ObservableCollection<WorldObject>();
+        children_.CollectionChanged += ChilderChanged;
+        transform_ = new TransformComponent(this);
+        is_dirty = true;
+      }
+
+      /**
+       * @brief Event handler for when the children collection changes.
+       * @param[in] sender (object) The list of children that changed.
+       * @param[in] e (NotifyCollectionChangedEventArgs) Armguments containing information about what objects got added / removed from the collection
+       */
+      private void ChilderChanged(object sender, NotifyCollectionChangedEventArgs e)
+      {
+        if (e.NewItems != null)
+        {
+          foreach (WorldObject obj in e.NewItems)
+          {
+            transform_.AttachChild(obj.transform_);
+          }
+        }
+
+        if (e.OldItems != null)
+        {
+          foreach (WorldObject obj in e.OldItems)
+          {
+            transform_.DetachChild(obj.transform_);
+          }
+        }
       }
 
       /**
@@ -189,9 +257,9 @@ namespace sulphur
        */
       public WorldObject GetLastChild()
       {
-        return HasChildren() == true? children_[children_.Count - 1] : null;
+        return HasChildren() == true ? children_[children_.Count - 1] : null;
       }
-      
+
       /**
        * @brief Get the next entity in the hierarchy whose parent is the same as this one's parent.
        * @remarks If this entity is the last in the hierarchy
@@ -215,7 +283,7 @@ namespace sulphur
        */
       public WorldObject GetLastHeir()
       {
-        if(HasChildren() == false)
+        if (HasChildren() == false)
         {
           return null;
         }
@@ -242,6 +310,108 @@ namespace sulphur
         return 0;
       }
 
+
+
+      /**
+       * @class WorldObject.HierarchyConverter : JsonConverter
+       * @brief Jsonconverter class implementation used to convert a hierary from and to Json format.
+       * @author Stan Pepels
+       */
+      class HierarchyConverter : JsonConverter
+      {
+        /**
+         * @brief Checks whether an object of type 'type'  can be converted by this converter.
+         * @param[in] type (Type) The type of the object to be converted.
+         */
+        public override bool CanConvert(Type type)
+        {
+          return type == typeof(List<WorldObject>);
+        }
+
+        /**
+         * @brief Reads Json and returns a list of objects representing the hierarchy.
+         * @param[in] reader (JsonReader) Reader used to read the file.
+         * @param[in] type (Type) Type of the object currently being deserialized.
+         * @param[in] existsing_value (existing_value) The value of the parent object if the object being serialized is a member field.
+         * @param[in] serializer (serializer) Serializer used to deserialize an object.
+         */
+        public override object ReadJson(JsonReader reader, Type type, object existsing_value, JsonSerializer serializer)
+        {
+          List<WorldObject> hierarchy = new List<WorldObject>();
+          Stack<int> child_counts = new Stack<int>(); // each item represents the last parent
+          Stack<int> parents = new Stack<int>();
+          WorldObject obj = null;
+          while (reader.Read())
+          {
+            switch (reader.TokenType)
+            {
+              case JsonToken.StartObject:
+                continue;
+              case JsonToken.PropertyName:
+                {
+                  obj = new WorldObject(reader.Value as string);
+                  reader.Read(); // read startobject
+                  reader.Read(); // read property name of child count
+
+                  int child_count = reader.ReadAsInt32().Value;
+                  reader.Read(); // read components propertyname
+                  reader.Read(); // read startobject
+                  serializer.Populate(reader, obj);
+                  obj.parent = parents.Count > 0 ? hierarchy[parents.Peek()] : null;
+                  hierarchy.Add(obj);
+                  if (child_count > 0)
+                  {
+                    child_counts.Push(child_count);
+                    parents.Push(hierarchy.Count - 1);
+                  }
+                  else if (child_counts.Count > 0 && child_counts.Peek() > 0)
+                  {
+                    int curr = child_counts.Pop();
+                    child_counts.Push(--curr);
+                  }
+                  while (child_counts.Count > 0 && child_counts.Peek() == 0)
+                  {
+                    child_counts.Pop();
+                    parents.Pop();
+                    if (child_counts.Count > 0 && child_counts.Peek() > 0)
+                    {
+                      int curr = child_counts.Pop();
+                      child_counts.Push(--curr);
+                    }
+                  }
+                }
+                break;
+            }
+          }
+          return hierarchy;
+        }
+
+        /**
+         * @brief Writes an object to Json format.
+         * @param[in] writer (JsonWriter) Writer used to write the Json file.
+         * @param[in] value (object) The value to serialize.
+         * @param[in] serializer (JsonSerializer) Serializer used to serialize the object.
+         */
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+          List<WorldObject> hierarchy = (List<WorldObject>)value;
+          writer.WriteStartObject();
+          for (int i = 0; i < hierarchy.Count; ++i)
+          {
+            WorldObject obj = hierarchy[i];
+            writer.WritePropertyName(obj.name);
+            writer.WriteStartObject();
+            writer.WritePropertyName("child_count");
+            writer.WriteValue(obj.children.Count);
+            writer.WritePropertyName("components");
+            serializer.Serialize(writer, obj);
+            obj.is_dirty = false;
+            writer.WriteEndObject();
+          }
+          writer.WriteEndObject();
+        }
+      }
+
       /**
        * @class sulphur.editor.WorldObject.Hierarchy
        * @brief Represents a hierarchy that can manage (add, remove, modify) world objects
@@ -251,6 +421,20 @@ namespace sulphur
        */
       public class Hierarchy
       {
+        public bool is_dirty { get; set; } //!< Value indicating that the hierarchy has changed since it was last svaed to disk.
+
+        /**
+         * @brief Event handler for handling object changed events
+         * @param[in] sender (object) The world object that changed.
+         * @param[in] e (EventArgs) No arguments are send with this event
+         * @see sulphur.editor.WorldObject.
+         */
+        private void HandleObjectChanged(object sender, EventArgs e)
+        {
+          is_dirty = true;
+        }
+
+
         private readonly List<WorldObject> hierarchy_; //!< The sequential entity data
         private readonly ObservableCollection<WorldObject> root_; //!< The actual value of the entities whose parent is the root
         /**
@@ -274,6 +458,25 @@ namespace sulphur
         }
 
         /**
+         * @brief Gets an object at an index in the hieracrhy.
+         * @param[in] index (int) The hierarchy index of the object to retrieve.
+         * @return (WorldObject) The world object at the specified index.
+         */
+        public WorldObject GetObjectAtIndex(int index)
+        {
+          return index >= hierarchy_.Count ? null : hierarchy_[index];
+        }
+
+        /**
+         * @brief Get the number of objects in the hierarchy.
+         * @return (int) The number of objects in the hierarchy.
+         */
+        public int GetObjectCount()
+        {
+          return hierarchy_.Count;
+        }
+
+        /**
          * @brief Add a new entity to the hierarchy with an optional parent
          * @param[in] name (string) The new entity's display name
          * @param[in] parent (sulphur.editor.WorldObject) The new entity's parent
@@ -282,7 +485,8 @@ namespace sulphur
         public WorldObject Create(string name, WorldObject parent = null)
         {
           WorldObject node = new WorldObject(name);
-          
+          node.object_changed_event += HandleObjectChanged;
+
           if (parent == null)
           {
             InsertNode(node, hierarchy_.Count);
@@ -294,9 +498,37 @@ namespace sulphur
 
           node.parent_ = parent;
           AddParentViews(node);
-
+          is_dirty = true;
           return node;
         }
+
+        /**
+         * @brief Add an entity to the hierarchy with an optional parent
+         * @param[in] obj (WorldObject) The Entity to add to the hierarchy.
+         * @param[in] parent (sulphur.editor.WorldObject) The new entity's parent
+         * @return (sulphur.editor.WorldObject) The added entity
+         * @remarks This function is mainly used to construct an entity before adding it to the hierarchy. This way all components can be added to the entity up front.
+         */
+        public WorldObject Add(WorldObject obj, WorldObject parent = null)
+        {
+          WorldObject node = obj;
+          node.object_changed_event += HandleObjectChanged;
+
+          if (parent == null)
+          {
+            InsertNode(node, hierarchy_.Count);
+          }
+          else
+          {
+            InsertNode(node, parent.GetIndex() + parent.GetNumHeirs() + 1);
+          }
+
+          node.parent_ = parent;
+          AddParentViews(node);
+          is_dirty = true;
+          return node;
+        }
+
         /**
          * @brief Remove an entity and all its children from the hierarchy
          * @param[in] target (sulphur.editor.WorldObject) The target entity to remove
@@ -561,6 +793,90 @@ namespace sulphur
           {
             target.parent.children_.Remove(target);
           }
+        }
+
+        /**
+         * @brief Loads a '*.swo' file from disk and fils the hierarchy with its contents.
+         * @param[in] path (string) The path to the *.swo file.
+         */
+        public void LoadFromDisk(string path)
+        {
+          JsonSerializer serializer = new JsonSerializer();
+          serializer.Converters.Add(new HierarchyConverter());
+          serializer.Formatting = Formatting.Indented;
+          List<WorldObject> objects = null;
+          using (StreamReader sw = new StreamReader(path))
+          using (JsonReader reader = new JsonTextReader(sw))
+          {
+            objects = serializer.Deserialize<List<WorldObject>>(reader);
+          }
+
+          if(objects == null)
+          {
+            is_dirty = false;
+            return;
+          }
+
+          foreach (WorldObject obj in objects)
+          {
+            obj.is_dirty = false;
+            Add(obj, obj.parent);
+
+            // temp code untill engine side serialization is done
+            native.messages.EntityCreatedMessage msg = new native.messages.EntityCreatedMessage();
+            msg.entity_index = (UInt64)obj.GetIndex();
+            msg.sibling_index = (UInt64)obj.GetSiblingIndex();
+            msg.parent_index = obj.parent != null ? (UInt64)obj.parent.GetIndex() : UInt64.MaxValue;
+            msg.position = new float[3];
+            msg.rotation = new float[4];
+            msg.scale = new float[3];
+
+            msg.position[0] = obj.transform_.position_.X;
+            msg.position[1] = obj.transform_.position_.Y;
+            msg.position[2] = obj.transform_.position_.Z;
+
+            msg.rotation[0] = obj.transform_.rotation_.X;
+            msg.rotation[1] = obj.transform_.rotation_.Y;
+            msg.rotation[2] = obj.transform_.rotation_.Z;
+            msg.rotation[3] = obj.transform_.rotation_.W;
+
+            msg.scale[0] = obj.transform_.scale_.X;
+            msg.scale[1] = obj.transform_.scale_.Y;
+            msg.scale[2] = obj.transform_.scale_.Z;
+
+            byte[] data = Utils.StructToBytes(msg);
+            native.Networking.SNetSendData(
+              (uint)native.NetworkMessages.kEntityCreated,
+              data,
+              (uint)data.Length);
+            
+            // end temp code
+          }
+          is_dirty = false;
+        }
+
+        /**
+         * @brief Saves the hierarchy to a file so it can loaded back in at a later ime.
+         * @remark The file written to is the currently loaded world.
+         * @see sulphur.editor.Project.current_world_ 
+         */
+        public void SaveToDisk()
+        {
+          if (is_dirty == false)
+          {
+            return;
+          }
+
+          JsonSerializer serializer = new JsonSerializer();
+          serializer.Converters.Add(new HierarchyConverter());
+          serializer.Formatting = Formatting.Indented;
+
+          using (StreamWriter sw = new StreamWriter(Project.directory_path + "\\" + Project.current_world_))
+          using (JsonWriter writer = new JsonTextWriter(sw))
+          {
+            serializer.Serialize(writer, hierarchy_);
+          }
+          is_dirty = false;
         }
       }
     }

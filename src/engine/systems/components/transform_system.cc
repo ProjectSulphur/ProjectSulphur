@@ -205,9 +205,9 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void TransformComponent::SetParent(TransformComponent parent)
+    void TransformComponent::SetParent(TransformComponent* parent)
     {
-      system_->SetParent(*this, parent);
+      system_->SetParent(*this, *parent);
     }
     
     //-------------------------------------------------------------------------
@@ -217,15 +217,15 @@ namespace sulphur
     }
     
     //-------------------------------------------------------------------------
-    void TransformComponent::AttachChild(TransformComponent child)
+    void TransformComponent::AttachChild(TransformComponent* child)
     {
-      system_->AttachChild(*this, child);
+      system_->AttachChild(*this, *child);
     }
     
     //-------------------------------------------------------------------------
-    void TransformComponent::DetachChild(TransformComponent child)
+    void TransformComponent::DetachChild(TransformComponent* child)
     {
-      system_->UnsetParent(child);
+      system_->UnsetParent(*child);
     }
 
     //-------------------------------------------------------------------------
@@ -645,14 +645,14 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    TransformComponent TransformComponent::Concatenate(TransformComponent /*other*/)
+    TransformComponent TransformComponent::Concatenate(TransformComponent* /*other*/)
     {
       assert(false && "Not implemented");
       return{};
     }
     
     //-------------------------------------------------------------------------
-    TransformComponent TransformComponent::Blend(TransformComponent /*target*/, float /*alpha*/)
+    TransformComponent TransformComponent::Blend(TransformComponent* /*target*/, float /*alpha*/)
     {
       assert(false && "Not implemented");
       return{};
@@ -737,7 +737,6 @@ namespace sulphur
       // NOTE: Should be moved to update onces all globals are handled correctly
       foundation::Job renderer_endframe_job = make_job("transformsystem_clearchangedflag", "render", 
                                                        clear_changed_flag, bind_write(*this));
-      renderer_endframe_job.set_blocker("physicssystem_gatherchangedtransforms");
       job_graph.Add(std::move(renderer_endframe_job));
       rewind_storage_ = foundation::Memory::Construct<TransformRewindStorage>(*this);
       app.GetService<RewindSystem>().Register(rewind_storage_->storage_);

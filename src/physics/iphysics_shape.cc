@@ -1,20 +1,20 @@
-#include "physics/physics_shape.h"
+#include "physics/iphysics_shape.h"
 
 namespace sulphur
 {
   namespace physics
   {
     //-------------------------------------------------------------------------
-    const float PhysicsShape::kDefaultExtents = 0.5f;
+    const float IPhysicsShape::kDefaultExtents = 0.5f;
 
     //-------------------------------------------------------------------------
-    const foundation::Vector<PhysicsCollider*>& PhysicsShape::instances() const
+    const foundation::Vector<PhysicsCollider*>& IPhysicsShape::instances() const
     {
       return instances_;
     }
 
     //-------------------------------------------------------------------------
-    void PhysicsShape::UpdateColliders()
+    void IPhysicsShape::UpdateColliders()
     {
       for (PhysicsCollider* collider : instances_)
       {
@@ -23,13 +23,13 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void PhysicsShape::AddCollider(PhysicsCollider* instance)
+    void IPhysicsShape::AddCollider(PhysicsCollider* instance)
     {
       instances_.push_back(instance);
     }
 
     //-------------------------------------------------------------------------
-    void PhysicsShape::RemoveCollider(PhysicsCollider* instance)
+    void IPhysicsShape::RemoveCollider(PhysicsCollider* instance)
     {
       for (unsigned int i = 0; i < instances_.size(); ++i)
       {

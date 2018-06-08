@@ -131,7 +131,7 @@ namespace sulphur
       */
       Entity Create();
       /**
-      * @brief Destroys the entity, increments the generation and removes the linking and destroys the components.
+      * @brief Adds the entity to the destruction list to be destroyed at the end of the frame.
       * @param[in] entity (sulphur::engine::Entity) The entity to destroy.
       */
       void Destroy(Entity entity);
@@ -167,7 +167,18 @@ namespace sulphur
       */
       ComponentHandleBase GetHandle(Entity entity, size_t type) const;
 
+      /**
+      * @brief Destroys the entities that were marked for destruction, increments the generations and removes the links and destroys the components.
+      * @param[in] entity (size_t) The entity index to destroy.
+      */
+      void DestroyMarkedForDestruction();
     private:
+
+      /**
+      * @brief Adds the entity to be destroyed immediately
+      * @param[in] entity (sulphur::engine::Entity) The entity to destroy.
+      */
+      void DestroyImmediate( size_t index );
       /**
       * @brief Creates a new entity that is owned by the editor
       * @param[in] with_editor (bool) Setting this to true indicates the editor instantiated this
@@ -183,6 +194,7 @@ namespace sulphur
       foundation::Vector<byte> generation_;//!< Stores the current generation of the entity which is used in the Alive function @see sulphur::engine::EntitySystem::Alive.
       foundation::Deque<uint> free_indices_;//!< Stores free entity slots for reuse.
       foundation::Vector<EntityComponentData> entity_components_;//!< Stores the linking information of the components.
+      foundation::Vector<size_t> to_destroy;//!< Stores entity indices that need to be destroyed.
     };
 
     //-------------------------------------------------------------------------

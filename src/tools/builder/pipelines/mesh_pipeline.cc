@@ -78,6 +78,16 @@ namespace sulphur
     //--------------------------------------------------------------------------------
     bool MeshPipeline::PackageMesh(const foundation::Path& asset_origin, foundation::MeshAsset& mesh)
     {
+      if (ValidatePath(asset_origin) == false)
+      {
+        PS_LOG_BUILDER(Error,
+          "Invalid file path passed. The path %s does not point to a location in the project directory %s", asset_origin.path().c_str(),
+          project_dir().path().c_str());
+        return false;
+      }
+
+      foundation::Path origin = CreateProjectRelativePath(asset_origin);
+
       if (mesh.name.get_length() == 0)
       {
         PS_LOG_BUILDER(Error, 
@@ -93,7 +103,7 @@ namespace sulphur
       }
 
       foundation::Path output_file = "";
-      if(RegisterAsset(asset_origin, mesh.name, output_file, mesh.id) == false)
+      if(RegisterAsset(origin, mesh.name, output_file, mesh.id) == false)
       {
         PS_LOG_BUILDER(Error,
           "Failed to register mesh. The mesh will not be packaged.");

@@ -2,6 +2,8 @@
 
 #include "engine/systems/components/transform_system.h"
 #include "engine/application/application.h"
+#include "engine/rewinder/rewind_system.h"
+#include "engine/rewinder/system_stored_data.h"
 
 #include <foundation/job/data_policy.h>
 #include <foundation/job/job.h>
@@ -20,7 +22,20 @@ namespace sulphur
       IComponentSystem("CameraSystem")
     {
     }
-
+    //-------------------------------------------------------------------------
+    template<typename T>
+    inline void* Store( T* buffer, size_t size )
+    {
+      void* raw_array = foundation::Memory::Allocate( size * sizeof( T ), 64 );
+      memcpy_s( raw_array, size * sizeof( T ), buffer, size * sizeof( T ) );
+      return raw_array;
+    }
+    //-------------------------------------------------------------------------
+    template<typename T>
+    inline void Restore( T* buffer, void* old, size_t size )
+    {
+      memcpy_s( buffer, size * sizeof( T ), old, size * sizeof( T ) );
+    }
     //-------------------------------------------------------------------------
     void CameraSystem::OnInitialize(Application& app, foundation::JobGraph& job_graph)
     {
@@ -88,6 +103,25 @@ namespace sulphur
         bind_write(*this));
       copy_to_screen_job.set_blocker("canvassystem_render");
       job_graph.Add(std::move(copy_to_screen_job));
+
+      rewind_storage_ = foundation::Memory::Construct<RewindStorage>( &component_data_.data, StoreFunc<CameraEnums::ProjectionMode>() );
+      rewind_storage_->AddFunction( StoreFunc<CameraEnums::ClearMode>() );
+      rewind_storage_->AddFunction( StoreFunc<foundation::Color>() );
+      rewind_storage_->AddFunction( StoreFunc<RenderTarget>() );
+      rewind_storage_->AddFunction( StoreFunc<DepthBuffer>() );
+      rewind_storage_->AddFunction( StoreFunc<PostProcessMaterialHandle>() );
+      rewind_storage_->AddFunction( StoreFunc<LayerMask>() );
+      rewind_storage_->AddFunction( StoreFunc<float>() );
+      rewind_storage_->AddFunction( StoreFunc<float>() );
+      rewind_storage_->AddFunction( StoreFunc<glm::vec2>() );
+      rewind_storage_->AddFunction( StoreFunc<float>() );
+      rewind_storage_->AddFunction( StoreFunc<glm::vec2>() );
+      rewind_storage_->AddFunction( StoreFunc<bool>() );
+      rewind_storage_->AddFunction( StoreFunc<glm::mat4>() );
+      rewind_storage_->AddFunction( StoreFunc<glm::mat4>() );
+      rewind_storage_->AddFunction( StoreFunc<foundation::Frustum>() );
+      rewind_storage_->AddFunction( StoreFunc<Entity>() );
+      app.GetService<RewindSystem>().Register( *rewind_storage_ );
     }
 
     //-------------------------------------------------------------------------
@@ -705,5 +739,32 @@ namespace sulphur
     {
       system_->set_main_camera(*this);
     }
+
+    template void* Store<CameraEnums::ProjectionMode>( CameraEnums::ProjectionMode*, size_t size );
+    template void Restore<CameraEnums::ProjectionMode>( CameraEnums::ProjectionMode*, void*, size_t size );
+    template void* Store<CameraEnums::ClearMode>( CameraEnums::ClearMode*, size_t size );
+    template void Restore<CameraEnums::ClearMode>( CameraEnums::ClearMode*, void*, size_t size );
+    template void* Store<foundation::Color>( foundation::Color*, size_t size );
+    template void Restore<foundation::Color>( foundation::Color*, void*, size_t size );
+    template void* Store<RenderTarget>( RenderTarget*, size_t size );
+    template void Restore<RenderTarget>( RenderTarget*, void*, size_t size );
+    template void* Store<DepthBuffer>( DepthBuffer*, size_t size );
+    template void Restore<DepthBuffer>( DepthBuffer*, void*, size_t size );
+    template void* Store<PostProcessMaterialHandle>( PostProcessMaterialHandle*, size_t size );
+    template void Restore<PostProcessMaterialHandle>( PostProcessMaterialHandle*, void*, size_t size );
+    template void* Store<LayerMask>( LayerMask*, size_t size );
+    template void Restore<LayerMask>( LayerMask*, void*, size_t size );
+    template void* Store<float>( float*, size_t size );
+    template void Restore<float>( float*, void*, size_t size );
+    template void* Store<glm::vec2>( glm::vec2*, size_t size );
+    template void Restore<glm::vec2>( glm::vec2*, void*, size_t size );
+    template void* Store<bool>( bool*, size_t size );
+    template void Restore<bool>( bool*, void*, size_t size );
+    template void* Store<glm::mat4>( glm::mat4*, size_t size );
+    template void Restore<glm::mat4>( glm::mat4*, void*, size_t size );
+    template void* Store<foundation::Frustum>( foundation::Frustum*, size_t size );
+    template void Restore<foundation::Frustum>( foundation::Frustum*, void*, size_t size );
+    template void* Store<Entity>( Entity*, size_t size );
+    template void Restore<Entity>( Entity*, void*, size_t size );
   }
 }

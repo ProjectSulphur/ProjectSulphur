@@ -104,7 +104,17 @@ namespace sulphur
       * @param[in] storage (const sulphur::engine::FrameStorage&) The frame to restore
       */
       void Restore(const FrameStorage& storage);
-
+      /*
+      * @brief Simple function to avoid the long template function names
+      * @tparam T (typename) The current function pair type
+      * @param[in] typed_func (T&&) The current function pair
+      */
+      template<typename T>
+      void AddFunction( T&& /*typed_func*/ )
+      {
+        store_functions_.push_back( &T::Store );
+        restore_functions_.push_back( &T::Restore );
+      }
     private:
       /*
       * @brief Templated loop to add the variadic number of function ptrs

@@ -8,6 +8,7 @@
 #include "engine/assets/render_target.h"
 #include "engine/core/entity_system.h"
 
+#include <foundation/containers/map.h>
 #include <foundation/utils/color.h>
 
 #include <glm/glm.hpp>
@@ -29,6 +30,10 @@ namespace sulphur
 #ifdef PS_WIN32
     class Win32Window;
     using Window = Win32Window;
+#endif
+#ifdef PS_PS4
+    class PS4Window;
+    using Window = PS4Window;
 #endif
   }
 }
@@ -207,7 +212,7 @@ namespace sulphur
       * @param[in] system (CanvasSystem*) The canvas system that this component exists in.
       * @param[in] canvas (CanvasComponent&) The canvas that this component exists in.
       */
-      BaseUIElementComponent(CanvasSystem* system, CanvasComponent& canvas);
+      BaseUIElementComponent(CanvasSystem* system, CanvasComponent& canvas, Entity self);
       /**
       * @brief Sets the depth of this UI element.
       * @param[in] depth (const float&) The depth this UI element should be at.
@@ -229,7 +234,7 @@ namespace sulphur
 
       CanvasComponent& canvas; // !< The canvas that this UI element lives on.
       System* system; // !< The canvas system that this UI elements canvas lives on.
-
+      Entity self;
     };
 
     /**
@@ -262,18 +267,22 @@ namespace sulphur
       */
       CanvasComponent();
       /**
+      * @brief Copies other canvas component over into this one.
+      */
+      CanvasComponent(const CanvasComponent& component);
+      /**
       * @brief Constructor which will set the system and the handle.
       * @param[in] system (System&) The canvas system that this component lives in.
       * @param[in] handle (size_t) The handle of this component.
       */
-      CanvasComponent(System& system, size_t handle);
+      CanvasComponent(System& system, Entity entity);
       /**
       * @brief Constructor which will set the system, the handle and the camera system.
       * @param[in] camera_system (CameraSystem*) The camera system for some reason.
       * @param[in] system (System&) The canvas system that this component lives in.
       * @param[in] handle (size_t) The handle of this component.
       */
-      CanvasComponent(CameraSystem* camera_system, System& system, size_t handle);
+      CanvasComponent(CameraSystem* camera_system, System& system, Entity entity);
       /**
       * @brief Destroys an UI element.
       * @param[in] handle (BaseUIElementComponent) The UI element that needs to be destroyed.
@@ -285,7 +294,7 @@ namespace sulphur
       */
       void OnRender(IRenderer& renderer);
       /**
-      * @brief Destroys an UI element.
+      * @brief Constructs an UI element.
       * @tparam C (typename) The component that needs to be constructed.
       * @tparam D (typename) The data structure associated with the component.
       * @param[in] handle (UIElementConstructor < C, D >) The UI element that needs to be constructed.
@@ -296,15 +305,38 @@ namespace sulphur
       */
       template<typename C, typename D>
       C Create(UIElementConstructor<C, D>, Entity& entity);
+      /**
+      * @brief Gets an UI element.
+      * @tparam C (typename) The component that you want to get.
+      * @tparam D (typename) The data structure associated with the component.
+      * @param[in] handle (UIElementConstructor < C, D >) The constructor used for creation.
+      * C stands for the component and D for the data structure. This UIElementConstructor is supposed
+      * to make constructing and getting UI elements easier.
+      * @param[in] entity (Entity&) The entity that this new UI element needs to be attached to.
+      * @return (C) The retrieved component.
+      */
+      template<typename C, typename D>
+      C Get(UIElementConstructor<C, D>, Entity& entity);
+      /**
+      * @brief Make this UI element visible or invisible.
+      * @param[in] enabled (bool) Whether or not this UI element is visible.
+      */
+      void SetVisible(bool visible);
+      /**
+      * @brief Enable or disable blend.
+      * @param[in] enabled (bool) Whether or not blend is enabled.
+      */
+      void SetBlendEnabled(bool enabled);
 
     protected:
       friend class BaseUIElementComponent;
+      friend class CanvasSystem;
       /**
       * @brief Returns the data associated with an UI element.
       * @param[in] handle (BaseUIElementComponent) The component of which the data needs to be recieved.
       * @return (BaseUIElementData*) The associated data.
       */
-      BaseUIElementData* GetData(BaseUIElementComponent handle);
+      BaseUIElementData* GetData(Entity entity);
 
     private:
       /**
@@ -331,24 +363,12 @@ namespace sulphur
       */
       void SetupComponent(Entity& entity, BaseUIElementComponent& component);
 
+    protected:
+      Entity entity_;
+
+    private:
       System* system_; // !< The canvas system that this canvas is attached to.
       CameraSystem* camera_system_; // !< The camera system required for rendering.
-    };
-
-    /**
-    * @enum sulphur::engine::CanvasDataElements
-    * @brief All of the different elements that the canvas data is made out of.
-    * required by the new entity component system.
-    * @author Hilze Vonck
-    */
-    enum struct CanvasDataElements
-    {
-      kElements, // !< The UI elements.
-      kBaseToElement, // !< A map converting handles to entities.
-      kMeshes, // !< The meshes that this canvas can use to render.
-      kMeshIndex, // !< The current mesh that is being renderered.
-      kRenderTarget, // !< The render target that this UI system will render to.
-      kCanvasId // !< The entity that this canvas is attached to.
     };
 
     /**
@@ -361,72 +381,25 @@ namespace sulphur
       using BaseToEntity = foundation::Map<BaseUIElementComponent, Entity>;
       using MeshVector   = foundation::Vector<MeshHandle>;
       using ComponentSystemData = SystemData<
+        bool,
         UIElementMap,
         BaseToEntity,
         MeshVector,
         size_t,
         RenderTarget,
-        Entity>;
-      /**
-      * @brief Sets up the data with this element.
-      */
-      CanvasData() :
-        data((void**)&elements)
-      {
-      }
-
+        Entity,
+        int>;
+      
+      bool visible;
       UIElementMap elements; // !< The UI elements contained on this canvas.
       BaseToEntity base_to_entity; // !< The map converting components to entities.
       MeshVector   meshes; // !< The meshes that this canvas can use for rendering.
       size_t       mesh_index; // !< The index of the mesh that is currently being used for rendering.
       RenderTarget render_target; // !< The render target that this canvas will render to.
       Entity       canvas_id; // !< The entity that this canvas is attached to.
-
-      ComponentSystemData data; // !< The data structure required by the entity component system.
+      int blend_enabled;
     };
-
-    /**
-    * @struct Sulphur::Engine::CanvasDataRef
-    * @brief A structure which acts like a reference structure for the CanvasData struct.
-    * Required since it is inpossible to get a reference to the CanvasData struct from the ECS.
-    * @author Hilze Vonck
-    */
-    struct CanvasDataRef
-    {
-      /**
-      * @brief Constructor which takes references to all elements within the CanvasData struct.
-      * Required since it is inpossible to get a reference to the CanvasData struct from the ECS.
-      * @param[in] elements (CanvasData::UIElementMap&) Reference to UI elements map.
-      * @param[in] base_to_entity (CanvasData::BaseToEntity&) Reference to base to entity map.
-      * @param[in] meshes (CanvasData::MeshVector&) Reference to base to mesh vector.
-      * @param[in] mesh_index (size_t&) Reference to base to mesh index.
-      * @param[in] render_target (RenderTarget&) Reference to base to render target.
-      * @param[in] canvas_id (Entity&) Reference to base to canvas id.
-      */
-      CanvasDataRef(
-        CanvasData::UIElementMap& elements,
-        CanvasData::BaseToEntity& base_to_entity,
-        CanvasData::MeshVector& meshes,
-        size_t& mesh_index,
-        RenderTarget& render_target,
-        Entity& canvas_id
-      ) :
-        elements(elements),
-        base_to_entity(base_to_entity),
-        meshes(meshes),
-        mesh_index(mesh_index),
-        render_target(render_target),
-        canvas_id(canvas_id)
-      {}
     
-      CanvasData::UIElementMap& elements; // !< See Sulphur::Engine::CanvasData::elements
-      CanvasData::BaseToEntity& base_to_entity; // !< See Sulphur::Engine::CanvasData::base_to_entity
-      CanvasData::MeshVector&   meshes; // !< See Sulphur::Engine::CanvasData::meshes
-      size_t& mesh_index; // !< See Sulphur::Engine::CanvasData::mesh_index
-      RenderTarget& render_target; // !< See Sulphur::Engine::CanvasData::render_target
-      Entity& canvas_id; // !< See Sulphur::Engine::CanvasData::canvas_id
-    };
-
     /**
     * @class sulphur::engine::CanvasSystem : public IComponentSystem< CanvasComponent, CanvasData >
     * @brief The system which handles the creation, destruction and rendering of canvases.
@@ -443,6 +416,10 @@ namespace sulphur
       */
       CanvasSystem();
       /**
+      * @brief Destructor.
+      */
+      virtual ~CanvasSystem() {};
+      /**
       * @brief Destructor which destroys all of the associated canvases.
       */
       void OnTerminate() override;
@@ -453,15 +430,13 @@ namespace sulphur
       */
       void OnInitialize(Application& app, foundation::JobGraph& job_graph) override;
       /**
-      * @see sulphur::engine::IComponentSystem::Create
+      * @brief Creates a canvas component and attaches it to the entity provided.
+      * Templated for some reason probably defined in IComponentSystem.
+      * @param[in] entity (Entity&) The entity that this canvas should be associated with.
+      * @return (CanvasComponent) The canvas that is now associated with the passed in entity.
       */
       template<typename ComponentT>
       ComponentT Create(Entity& entity) { return Create(entity); };
-      /**
-      * @brief Destroys a canvas component and all of its UI elements.
-      * @param[in] handle (CanvasComponent) The canvas component that needs to be destroyed.
-      */
-      void Destroy(ComponentHandleBase handle) override;
       /**
       * @brief Creates a canvas component.
       * @param[in] entity (Entity&) The entity that this canvas should be associated with.
@@ -469,10 +444,25 @@ namespace sulphur
       */
       CanvasComponent Create(Entity& entity);
       /**
+      * @brief Destroys a canvas component and all of its UI elements.
+      * @param[in] handle (CanvasComponent) The canvas component that needs to be destroyed.
+      */
+      void Destroy(ComponentHandleBase handle) override;
+      /**
       * @brief Helper function for setting the camera.
       * @param[in] camera (CameraComponent&) The camera component that needs to be set.
       */
-      void SetCamera(CameraComponent& camera);
+      void SetCamera(CameraComponent& camera, const RenderTarget& rt);
+      /**
+      * @brief Make this UI element visible or invisible.
+      * @param[in] enabled (bool) Whether or not this UI element is visible.
+      */
+      void SetVisible(const CanvasComponent& canvas, bool visible);
+      /**
+      * @brief Enable or disable blend.
+      * @param[in] enabled (bool) Whether or not blend is enabled.
+      */
+      void SetBlendEnabled(const CanvasComponent& canvas, bool enabled);
 
     protected:
       /**
@@ -480,7 +470,7 @@ namespace sulphur
       * @param[in] handle (CanvasComponent&) The canvas component of which you want the data.
       * @return (CanvasDataRef) The canvas data that is associated with the passed in component.
       */
-      CanvasDataRef GetData(CanvasComponent handle);
+      CanvasData& GetData(CanvasComponent handle);
 
     private:
       /**
@@ -499,9 +489,9 @@ namespace sulphur
       Window* window_; // !< The active window during intialization. Is used to find out if a canvas has the right size.
       IRenderer* renderer_; // !< The active renderer during initialization. Will be used for rendering.
       size_t current_mesh_count_ = 0; // !< The current amount of created meshes using GetMeshes().
-
-      CanvasData component_data_; //!< An instance of the container that stores per-component data
-
+      foundation::Vector<CanvasData> data_; //!< A vector of canvas data elements.
+      foundation::Map<Entity, uint32_t> entity_to_data_; //!< Get the data associated to the entity.
+      foundation::Map<uint32_t, Entity> data_to_entity_; //!< Get the entity associated to the data.
     public:
       static const size_t kMaxMeshCount = 10u; // !< The maximum amount of meshes that each GetMeshes() function call can return.
     };
@@ -513,10 +503,16 @@ namespace sulphur
     }
 
     template<typename C, typename D>
+    inline C CanvasComponent::Get(UIElementConstructor<C, D>, Entity& entity)
+    {
+      return C(system_, *this, entity);
+    }
+
+    template<typename C, typename D>
     inline C CanvasComponent::Create(Entity& entity)
     {
-      CanvasDataRef canvas_data = system_->GetData(*this);
-      C component(system_, *this);
+      CanvasData& canvas_data = system_->GetData(*this);
+      C component(system_, *this, entity);
       SetupComponent(entity, component);
 
       D* data = foundation::Memory::Construct<D>();

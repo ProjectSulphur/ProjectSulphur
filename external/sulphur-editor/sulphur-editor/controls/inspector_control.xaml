@@ -1,0 +1,77 @@
+﻿<UserControl x:Class="sulphur.editor.controls.InspectorControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:sulphur.editor.controls"
+             xmlns:inspector="clr-namespace:sulphur.editor.controls.inspector"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="360">
+    <Grid x:Name="grid1" MinWidth="100" Background="WhiteSmoke">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="3*"/>
+            <ColumnDefinition Width="7*"/>
+        </Grid.ColumnDefinitions>
+        
+        <!-- Image Selector -->
+        
+        <Label Content="Image:" Margin="5,7" VerticalAlignment="Center" Height="16" Padding="5,0"/>
+        <inspector:ImageInspector Grid.Column="1"/>
+        
+
+        <!-- Color Selector -->
+        <Label Content="Color:" Margin="5,7" VerticalAlignment="Center" Height="16" Padding="5,0" Grid.Row="1"/>
+        <inspector:ColorInspector Grid.Column="1" Grid.Row="1"/>
+
+        <!-- Slider Inspector -->
+        <Label Content="Slider:" Margin="5,7" VerticalAlignment="Center" Height="16" Padding="5,0" Grid.Row="2"/>
+        <inspector:SliderInspector Grid.Column="1" Grid.Row="2"/>
+
+        <!-- Number Inspector -->
+        <Label Content="Number:" Margin="5,7" VerticalAlignment="Center" Height="16" Padding="5,0" Grid.Row="3"/>
+        <inspector:NumberInspector Grid.Column="1" Grid.Row="3"/>
+
+        <!-- Float2 Selector -->
+        <Label Content="Vector 2:" Margin="5,7" VerticalAlignment="Center" Height="16" Padding="5,0" Grid.Row="4"/>
+        <inspector:Vector2Inspector Grid.Column="1" Grid.Row="4"/>
+        
+        <!-- Float3 Selector -->
+        <Label Content="Vector 3:" Margin="5,7" VerticalAlignment="Center" Height="16" Padding="5,0" Grid.Row="5"/>
+        <inspector:Vector3Inspector Grid.Column="1" Grid.Row="5"/>
+
+        <!-- Float4 Selector -->
+        <Label Content="Vector 4:" Margin="5,7" VerticalAlignment="Center" Height="16" Padding="5,0" Grid.Row="6"/>
+        <inspector:Vector4Inspector Grid.Column="1" Grid.Row="6"/>
+
+        <!-- Combo Selector -->
+        <Label Content="ComboBox:" Margin="5,7" VerticalAlignment="Center" Height="16" Padding="5,0" Grid.Row="7"/>
+        <inspector:ComboBoxInspector Grid.Column="1" Grid.Row="7"/>
+
+        <!-- Checkbox Selector -->
+        <Label Content="Boolean:" Margin="5,7" VerticalAlignment="Center" Height="16" Padding="5,0" Grid.Row="8"/>
+        <inspector:CheckBoxInspector Grid.Column="1" Grid.Row="8"/>
+
+        <!-- Matrix4x4 Inspector -->
+        <Label Content="Matrix4x4:" Margin="5,7" VerticalAlignment="Center" Height="16" Padding="5,0" Grid.Row="9"/>
+        <inspector:Matrix4x4Inspector Grid.Column="1" Grid.Row="9" Grid.RowSpan="4"/>
+
+    </Grid>
+</UserControl>

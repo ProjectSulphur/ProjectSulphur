@@ -8,12 +8,14 @@ namespace sulphur
 {
   namespace physics
   {
+    class PhysicsCollider;
+
     /**
-    * @class sulphur::physics::PhysicsShape
+    * @class sulphur::physics::IPhysicsShape
     * @brief The platform-independent base class for every shape to use
     * @author Daniel Konings, Angelo van der Mark
     */
-    class PhysicsShape
+    class IPhysicsShape
     {
     public:
 
@@ -34,7 +36,7 @@ namespace sulphur
       /**
       * @brief Virtual destructor.
       */
-      virtual ~PhysicsShape() = default;
+      virtual ~IPhysicsShape() = default;
 
       /**
       * @brief Returns the type of this shape.

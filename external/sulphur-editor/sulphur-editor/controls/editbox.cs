@@ -42,49 +42,50 @@ namespace sulphur.editor
      */
     public class EditBox : Control
     {
-      public static readonly DependencyProperty text_property =
-        DependencyProperty.Register("text_",
+      public static readonly DependencyProperty TextProperty =
+        DependencyProperty.Register("Text",
           typeof(string),
           typeof(EditBox),
           new PropertyMetadata("")); //!< Property backed by the WPF property system. This allows for binding expressions to be used in this property. This property holds the text value of the textbox.
 
-      public static readonly DependencyProperty allow_edit_property =
-        DependencyProperty.Register("allow_edit_",
+      public static readonly DependencyProperty AllowEditProperty =
+        DependencyProperty.Register("AllowEdit",
           typeof(bool),
           typeof(EditBox),
           new PropertyMetadata(true)); //!< Property backed by the WPF property system. This allows for binding expressions to be used in this property. This property can be used to turn the edit features on and of.
 
-      public static readonly DependencyProperty is_editing_property =
-        DependencyProperty.Register("is_editing_",
+      public static readonly DependencyProperty IsEditingProperty =
+        DependencyProperty.Register("IsEditing",
           typeof(bool),
           typeof(EditBox),
           new PropertyMetadata(false)); //!< Property backed by the WPF property system. This allows for binding expressions to be used in this property. This property can be used to poll the current state of the control.
 
-      public static readonly DependencyProperty renamed_callback_property =
+      public static readonly DependencyProperty RenamedCallbackProperty =
         DependencyProperty.Register("RenamedCallback",
-          typeof(EditBoxCallback),
+          typeof(utils.CommandHandler),
           typeof(EditBox),
           new FrameworkPropertyMetadata(null)); //!< Property backed by the WPF property system. This allows for binding expressions to be used in this property. This property can be used to perform an action when the text in the editbox has changed.
-
+      
       /**
       * @brief Value of Renamed callback. This property can be bound to since it is backed by the WPF property system.
-      * @see sulphur.editor.controls.EditBox.text_property
+      * @see sulphur.editor.controls.EditBox.TextProperty
       * @see https://docs.microsoft.com/en-us/dotnet/framework/wpf/advanced/dependency-properties-overview
       */
-      public EditBoxCallback RenamedCallback
+      public utils.CommandHandler RenamedCallback
       {
-        get { return (EditBoxCallback)GetValue(renamed_callback_property); }
-        set { SetValue(renamed_callback_property, value); }
+        get { return (utils.CommandHandler)GetValue(RenamedCallbackProperty); }
+        set { SetValue(RenamedCallbackProperty, value); }
       }
+
       /**
        * @brief Value of the textbox as currently displayed. This property can be bound to since it is backed by the WPF property system.
-       * @see sulphur.editor.controls.EditBox.text_property
+       * @see sulphur.editor.controls.EditBox.TextProperty
        * @see https://docs.microsoft.com/en-us/dotnet/framework/wpf/advanced/dependency-properties-overview
        */
-      public string text_
+      public string Text
       {
-        get { return (string)GetValue(text_property); }
-        set { SetValue(text_property, value); }
+        get { return (string)GetValue(TextProperty); }
+        set { SetValue(TextProperty, value); }
       }
 
       /**
@@ -92,10 +93,10 @@ namespace sulphur.editor
        * @see sulphur.editor.controls.EditBox.allow_edit_property
        * @see https://docs.microsoft.com/en-us/dotnet/framework/wpf/advanced/dependency-properties-overview
        */
-      public bool allow_edit_
+      public bool AllowEdit
       {
-        get { return (bool)GetValue(allow_edit_property); }
-        set { SetValue(allow_edit_property, value); }
+        get { return (bool)GetValue(AllowEditProperty); }
+        set { SetValue(AllowEditProperty, value); }
       }
 
       /**
@@ -103,14 +104,14 @@ namespace sulphur.editor
       * @see sulphur.editor.controls.EditBox.allow_edit_property
       * @see https://docs.microsoft.com/en-us/dotnet/framework/wpf/advanced/dependency-properties-overview
       */
-      public bool is_editing_
+      public bool IsEditing
       {
-        get { return (bool)GetValue(is_editing_property); }
-        set { SetValue(is_editing_property, value); }
+        get { return (bool)GetValue(IsEditingProperty); }
+        set { SetValue(IsEditingProperty, value); }
       }
 
       private EditBoxAdorner adorner_; //!< Adorner used to edit the text on the textblock. This adorner is displayed over the textblock.
-      private TextBlock textblock_; //!< Textblock that displays the value in the text_ property. This control servers as a binding target.
+      private TextBlock textblock_; //!< Textblock that displays the value in the Text property. This control servers as a binding target.
       private TextBox textbox_; //!< Textbox uses by the adorner to capture input so the text in the textblock can be changed.
       private AdornerLayer layer_; //!< Layer the adorner should live on when enables. Each EditBox control has its own layer created by WPF.
       private Control parent_; //!< Parent container of this control. This is only used when the EditBox is part of another collection such as a Treeview or ListBox. This Control will point to the Container of the EditBox. For example in case of the treeview the underlying type will be type of TreeviewItem
@@ -154,7 +155,7 @@ namespace sulphur.editor
       }
 
       /**
-       * @brief OnApplyTemplate override. This function sets up the bindings between the textblock_, textbox_ controls and the text_ property.
+       * @brief OnApplyTemplate override. This function sets up the bindings between the textblock_, textbox_ controls and the Text property.
        * @see https://msdn.microsoft.com/nl-nl/library/system.windows.frameworkelement.onapplytemplate(v=vs.110).aspx
        * @remark If no adornerlayer can be found an error will be thrown which can be viewed in the logger. This will also stop the adorner and TextBox from being created meaning this control will be used like a normal textblcok control.
        */
@@ -170,7 +171,7 @@ namespace sulphur.editor
 
         Binding textbinding = new Binding();
         textbinding.Source = this;
-        textbinding.Path = new PropertyPath("text_");
+        textbinding.Path = new PropertyPath("Text");
         textblock_.SetBinding(TextBlock.TextProperty, textbinding);
 
         if (layer_ == null)
@@ -204,12 +205,12 @@ namespace sulphur.editor
        */
       protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
       {
-        if (e.ClickCount != 2 || allow_edit_ == false)
+        if (e.ClickCount != 2 || AllowEdit == false)
         {
           return;
         }
 
-        if (allow_edit_ == true)
+        if (AllowEdit == true)
         {
           EnableAdorner();
         }
@@ -223,7 +224,7 @@ namespace sulphur.editor
       */
       protected override void OnKeyDown(KeyEventArgs e)
       {
-        if (allow_edit_ == false)
+        if (AllowEdit == false)
         {
           return;
         }
@@ -242,7 +243,7 @@ namespace sulphur.editor
       */
       private void Control_KeyDown(object sender, KeyEventArgs e)
       {
-        if (allow_edit_ == false)
+        if (AllowEdit == false)
         {
           return;
         }
@@ -289,7 +290,7 @@ namespace sulphur.editor
        */
       private void HandleKeyDown(object sender, KeyEventArgs e)
       {
-        if (is_editing_ == false)
+        if (IsEditing == false)
         {
           return;
         }
@@ -306,7 +307,7 @@ namespace sulphur.editor
        */
       void FocusAdorner()
       {
-        if (is_editing_ == true)
+        if (IsEditing == true)
         {
           textbox_.CaptureMouse();
           textbox_.SelectAll();
@@ -319,9 +320,9 @@ namespace sulphur.editor
        */
       void EnableAdorner()
       {
-        if (is_editing_ == false)
+        if (IsEditing == false)
         {
-          is_editing_ = true;
+          IsEditing = true;
           layer_.Add(adorner_);
           old_value_ = textbox_.Text;
         }
@@ -333,7 +334,7 @@ namespace sulphur.editor
        */
       void DisableAdorner()
       {
-        if (is_editing_ == true)
+        if (IsEditing == true)
         {
           if (textbox_.Text.Length == 0)
           {
@@ -345,9 +346,9 @@ namespace sulphur.editor
 
           if (args.old_value != args.new_value)
           {
-            RenamedCallback?.Invoke(this, args);
+            RenamedCallback?.Execute(args);
           }
-          is_editing_ = false;
+          IsEditing = false;
         }
       }
     }

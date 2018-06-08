@@ -70,7 +70,7 @@ namespace sulphur
       * @brief Set the parent of the node
       * @param[in] parent (sulphur::engine::TransformComponent) The target parent component
       */
-      SCRIPT_FUNC() void SetParent(TransformComponent parent);
+      SCRIPT_FUNC() void SetParent(TransformComponent* parent);
       /**
       * @brief Set the parent of the node to the root node.
       */
@@ -79,12 +79,12 @@ namespace sulphur
       * @brief Sets the parent of the child node to this node
       * @see sulphur::engine::TransformComponent::SetParent
       */
-      SCRIPT_FUNC() void AttachChild(TransformComponent child);
+      SCRIPT_FUNC() void AttachChild(TransformComponent* child);
       /**
       * @brief Set the parent of the child node to the root node
       * @see sulphur::engine::TransformComponent::UnsetParent
       */
-      SCRIPT_FUNC() void DetachChild(TransformComponent child);
+      SCRIPT_FUNC() void DetachChild(TransformComponent* child);
 
       /**
       * @brief Test if the node's parent is not the root node
@@ -532,7 +532,7 @@ namespace sulphur
       * @todo Still has to be implemented
       * @return (sulphur::engine::TransformComponent) The caller node (for chaining)
       */
-      SCRIPT_FUNC() TransformComponent Concatenate(TransformComponent other);
+      SCRIPT_FUNC() TransformComponent Concatenate(TransformComponent* other);
       /**
       * @brief Partially apply the transformation (scale, rotation, translation) of another node to this node
       * @param[in] target (sulphur::engine::TransformComponent) The transform component that is the target transformation
@@ -540,7 +540,7 @@ namespace sulphur
       * @todo Still has to be implemented
       * @return (sulphur::engine::TransformComponent) The caller node (for chaining)
       */
-      SCRIPT_FUNC() TransformComponent Blend(TransformComponent target, float alpha);
+      SCRIPT_FUNC() TransformComponent Blend(TransformComponent* target, float alpha);
       /**
       * @brief Set the rotation of this node by setting its forward vector to point at a target position
       * @param[in] target (const glm::vec3&) The target position in the coordinate space of the root node

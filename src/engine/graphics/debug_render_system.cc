@@ -28,11 +28,7 @@ namespace sulphur
     MeshHandle DebugRenderSystem::mesh_plane_;
     MeshHandle DebugRenderSystem::mesh_pyramid_;
     MeshHandle DebugRenderSystem::mesh_sphere_;
-
-    MeshHandle DebugRenderSystem::mesh_transform_;
-    MeshHandle DebugRenderSystem::mesh_scale_;
-    MeshHandle DebugRenderSystem::mesh_rotation_;
-
+    
     bool DebugRenderSystem::force_wireframe = false;
     bool DebugRenderSystem::force_default_material = false;
 
@@ -64,25 +60,17 @@ namespace sulphur
         "__pixel_white");
 
       default_material_ = asset_system.AddAsset(
-        foundation::Memory::Construct<Material>(),
+        foundation::Memory::Construct<Material>(default_shader),
         "Default_Material");
-
-      MaterialPass white_pass(default_shader);
-      white_pass.SetTexture(0, white_pixel);
-      default_material_->AddMaterialPass(white_pass);
-
 
       TextureHandle magenta_pixel = asset_system.AddAsset(
         foundation::Memory::Construct<Texture>(foundation::Color::kMagenta.AsBytes(), 1u, 1u),
         "__pixel_magenta");
 
       error_material_ = asset_system.AddAsset(
-        foundation::Memory::Construct<Material>(),
+        foundation::Memory::Construct<Material>(default_shader),
         "Error_Material");
-
-      MaterialPass magenta_pass(default_shader);
-      magenta_pass.SetTexture(0, magenta_pixel);
-      error_material_->AddMaterialPass(magenta_pass);
+      error_material_->SetTexture(0, magenta_pixel);
 
       // Setup debug meshes
       mesh_cone_ = asset_system.AddAsset(
@@ -106,35 +94,6 @@ namespace sulphur
       mesh_sphere_ = asset_system.AddAsset(
         foundation::Memory::Construct<Mesh>(Mesh::CreateSphere()),
         "__Sphere");
-
-
-      Mesh arrow_mesh;
-      arrow_mesh.AttachMesh(
-        Mesh::CreateCylinder(1.0f, 0.5f, 0.5f, 6),
-        glm::vec3(0.0f, 0.5f, 0.0f),
-        glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-        glm::vec3(0.05f, 1.0f, 0.05f));
-
-      arrow_mesh.AttachMesh(
-        Mesh::CreateCone(1.0f),
-        glm::vec3(0.0f, 1.0f, 0.0f),
-        glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-        glm::vec3(.125f, .25f, .125f));
-
-      Mesh* transform_mesh = foundation::Memory::Construct<Mesh>();
-
-
-      mesh_transform_ = asset_system.AddAsset(
-        transform_mesh,
-        "__Transform_Gizmo");
-
-      mesh_scale_ = asset_system.AddAsset(
-        foundation::Memory::Construct<Mesh>(Mesh::CreateSphere()),
-        "__Scale_Gizmo");
-
-      mesh_rotation_ = asset_system.AddAsset(
-        foundation::Memory::Construct<Mesh>(Mesh::CreateSphere()),
-        "__Rotation_Gizmo");
     }
 
     //-------------------------------------------------------------------------
@@ -210,10 +169,6 @@ namespace sulphur
       mesh_plane_ = MeshHandle();
       mesh_pyramid_ = MeshHandle();
       mesh_sphere_ = MeshHandle();
-
-      mesh_transform_ = MeshHandle();
-      mesh_scale_ = MeshHandle();
-      mesh_rotation_ = MeshHandle();
     }
 
     //-------------------------------------------------------------------------
@@ -228,6 +183,7 @@ namespace sulphur
       
       camera_system_->set_current_camera(camera);
       renderer_->SetCamera(
+        camera.GetTransform().GetWorldPosition(),
         camera.GetViewMatrix(),
         camera.GetProjectionMatrix(),
         camera.GetDepthBuffer(),

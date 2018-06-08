@@ -18,7 +18,7 @@
         <MenuItem Header="file">
             <MenuItem Header="new project" Command="{Binding ElementName=root, Path=create_cmd}"></MenuItem>
             <MenuItem Header="open" Command="{Binding ElementName=root, Path=open_file_cmd}"></MenuItem>
-            <MenuItem Header="save"></MenuItem>
+            <MenuItem Header="save" Command="{Binding ElementName=root, Path=save_cmd}" CommandParameter="{Binding Source={StaticResource world_hierarchy}}"></MenuItem>
         </MenuItem>
          <MenuItem Header="view" 
                    ItemsSource="{Binding Source={StaticResource layout}, Path=elements}" 

@@ -295,7 +295,9 @@ namespace sulphur
           return false;
         }
 
-        PS_LOG_BUILDER(Info, "Succesfully packaged shader %s", shader.name.GetCString());
+        PS_LOG_BUILDER(Info, "Succesfully packaged shader %s [HLSL:%i PSSL:%i]", 
+          shader.name.GetCString(), shader.data.hlsl_data.empty() == false, 
+          shader.data.pssl_data.empty() == false);
         return true;
       };
 
@@ -658,6 +660,7 @@ namespace sulphur
       eastl::function<bool(const foundation::String&)> func =
         [this, &out](const foundation::Path& file)
       {
+        out = {};
         foundation::String extension = file.GetFileExtension();
         if (extension != "lua")
         {
@@ -858,9 +861,9 @@ namespace sulphur
       ShaderPipelineOptions options;
       options.targets = static_cast<uint8_t>(ShaderCompilerBase::Target::kAll);
       options.additional_include_dirs = { "./include/" };
-      foundation::ShaderAsset shader = {};
       for (size_t i = 0; i < shaders.size(); ++i)
       {
+        foundation::ShaderAsset shader = {};
         if (shader_pipeline_->Create(shaders[i], options, shader) == false)
         {
           PS_LOG_BUILDER(Error, "Failed to create shader from %s", shaders[i].c_str());
@@ -966,7 +969,7 @@ namespace sulphur
           extension == "dds" ||
           extension == "jpg")
         {
-          foundation::TextureAsset texture;
+          foundation::TextureAsset texture = {};
           if (texture_pipeline_->Create(rest[i], texture) == false)
           {
             PS_LOG_BUILDER(Error, "Failed to create texture from %s", rest[i].c_str());
@@ -983,7 +986,7 @@ namespace sulphur
         }
         else if(extension == "lua")
         {
-          foundation::ScriptAsset script;
+          foundation::ScriptAsset script = {};
           if (script_pipeline_->Create(rest[i], script) == false)
           {
             PS_LOG_BUILDER(Error, "Failed to create script from %s", rest[i].c_str());
@@ -1000,7 +1003,7 @@ namespace sulphur
         }
         else if (extension == "bank")
         {
-          foundation::AudioBankAsset audio_bank;
+          foundation::AudioBankAsset audio_bank = {};
           if (audio_pipeline_->Create(rest[i], audio_bank) == false)
           {
             PS_LOG_BUILDER(Error, "Failed to create audio bank from %s", rest[i].c_str());

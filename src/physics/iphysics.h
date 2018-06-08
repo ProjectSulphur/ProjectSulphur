@@ -1,10 +1,9 @@
 #pragma once
 
 #include "physics/raycast.h"
-#include "foundation/memory/memory.h"
 #include "physics/platform_physics_body.h"
 #include "physics/physics_manifold.h"
-#include "physics/platform_physics_constraint.h"
+#include "physics/iphysics_constraint.h"
 
 #include <foundation/containers/vector.h>
 #include <foundation/containers/map.h>
@@ -15,12 +14,10 @@ namespace sulphur
 {
   namespace physics
   {
-    using Manifolds = foundation::Map<PhysicsBody*, foundation::Vector<PhysicsManifold>>;
-
     /**
     * @class sulphur::physics::IPhysics
     * @brief The low level physics interface that the physics SDKs should implement
-    * @author Daniel Konings, Benjamin Waanders
+    * @author Daniel Konings, Benjamin Waanders, Angelo van der Mark
     */
     class IPhysics
     {
@@ -52,6 +49,20 @@ namespace sulphur
       * @param[in] body (sulphur::physics::PhysicsBody*) The physics body to remove
       */
       virtual void RemovePhysicsBody(PhysicsBody* body) = 0;
+
+      /**
+      * @brief Creates a constraint for a body of the specified type.
+      * @param[in] owner (sulphur::physics::PhysicsBody*) The owner of the constraint.
+      * @param[in] type (sulphur::physics::IPhysicsConstraint::ConstraintTypes) The constraint type.
+      * @return (sulphur::physics::IPhysicsConstraint*) The created constraint.
+      */
+      virtual IPhysicsConstraint* AddConstraint(PhysicsBody* owner, IPhysicsConstraint::ConstraintTypes type) = 0;
+
+      /**
+      * @brief Removes a constraint from the simulation.
+      * @param[in] constraint (sulphur::physics::IPhysicsConstraint*) The constraint to remove.
+      */
+      virtual void RemoveConstraint(IPhysicsConstraint* constraint) = 0;
 
       /**
       * @brief Sets the global gravity of the physics implementation
@@ -97,24 +108,29 @@ namespace sulphur
       static const glm::vec3 kDefaultGravity;
 
       /**
-      * @brief Returns a const reference of manifolds from the last simulation
-      * @retrun (foundation::Map<PhysicsBody*, foundation::Vector<PhysicsManifold>>&) The collection of manifolds
+      * @brief manifold buffer limit
       */
-      virtual Manifolds& GetManifolds() = 0;
+      static const size_t kManifoldBufferLimit;
 
       /**
-      * @brief Adds a fixed constraint between body_a and body_b, where body_a is the master
-      * @param[in] body_a (sulphur::physics::PhysicsBody*) body A
-      * @param[in] body_b (sulphur::physics::PhysicsBody*) body B
+      * @brief The list of manifolds that were constructed since the last fixed update
       */
-      virtual FixedConstraint* AddFixedConstraint(PhysicsBody* body_a, PhysicsBody* body_b) = 0;
+      virtual PhysicsManifold* GetManifolds() = 0;
 
       /**
-      * @brief Adds a hinge constraint between body_a and body_b, where body_a is the master
-      * @param[in] body_a (sulphur::physics::PhysicsBody*) body A
-      * @param[in] body_b (sulphur::physics::PhysicsBody*) body B
+      * @brief the count of sulphur::physics::IPhysics::GetManifolds as in the amount of manifolds
       */
-      virtual HingeConstraint* AddHingeConstraint(PhysicsBody* body_a, PhysicsBody* body_b) = 0;
+      virtual size_t GetManifoldsSize() = 0;
+  
+      /**
+      * @brief Ensures that the manifold listner looks for the physicsbody in question
+      */
+      virtual void SubscribeCallback(PhysicsBody* body) = 0;
+
+      /**
+      * @brief Unsubbes the body from manifold forwarding
+      */
+      virtual void UnSubscribeCallback(PhysicsBody* body) = 0;
     };
   }
 }

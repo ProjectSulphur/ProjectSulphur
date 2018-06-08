@@ -7,7 +7,7 @@ namespace sulphur
   namespace physics
   {
     class IPhysicsBody;
-    class PhysicsShape;
+    class IPhysicsShape;
 
     /**
     * @class sulphur::physics::PhysicsCollider
@@ -35,9 +35,9 @@ namespace sulphur
       /**
       * @brief Constructor, for use by sulphur::physics::IPhysicsBody only.
       * @param[in] owner (sulphur::physics::IPhysicsBody*) The physics body this collider is attached to.
-      * @param[in] shape (sulphur::physics::PhysicsShape*) The shape of this collider.
+      * @param[in] shape (sulphur::physics::IPhysicsShape*) The shape of this collider.
       */
-      PhysicsCollider(IPhysicsBody* owner, PhysicsShape* shape);
+      PhysicsCollider(IPhysicsBody* owner, IPhysicsShape* shape);
 
       /**
       * @brief Destructor.
@@ -70,9 +70,9 @@ namespace sulphur
 
       /**
       * @brief Returns the physics shape.
-      * @return (sulphur::physics::PhysicsShape*) The physics shape.
+      * @return (sulphur::physics::IPhysicsShape*) The physics shape.
       */
-      PhysicsShape* shape() const;
+      IPhysicsShape* shape() const;
 
       /**
       * @brief Returns the PhysicsBody this collider is attached to.
@@ -123,13 +123,13 @@ namespace sulphur
 
       /**
       * @brief Sets the friction combine mode to use.
-      * @param[in] mode (sulphur::physics::PhysicsShape::MaterialCombineMode) The mode to use.
+      * @param[in] mode (sulphur::physics::PhysicsCollider::MaterialCombineMode) The mode to use.
       */
       virtual void SetFrictionCombineMode(MaterialCombineMode mode) = 0;
 
       /**
       * @brief Gets the friction combine mode to be used.
-      * @returns (sulphur::physics::PhysicsShape::MaterialCombineMode) The mode to be used.
+      * @returns (sulphur::physics::PhysicsCollider::MaterialCombineMode) The mode to be used.
       */
       virtual MaterialCombineMode GetFrictionCombineMode() const = 0;
 
@@ -149,13 +149,13 @@ namespace sulphur
 
       /**
       * @brief Sets the restitution combine mode to use.
-      * @param[in] mode (sulphur::physics::PhysicsShape::MaterialCombineMode) The mode to use.
+      * @param[in] mode (sulphur::physics::PhysicsCollider::MaterialCombineMode) The mode to use.
       */
       virtual void SetRestitutionCombineMode(MaterialCombineMode mode) = 0;
 
       /**
       * @brief Gets the restitution combine mode to be used.
-      * @returns (sulphur::physics::PhysicsShape::MaterialCombineMode) The mode to be used.
+      * @returns (sulphur::physics::PhysicsCollider::MaterialCombineMode) The mode to be used.
       */
       virtual MaterialCombineMode GetRestitutionCombineMode() const = 0;
 
@@ -163,7 +163,7 @@ namespace sulphur
 
     protected:
       IPhysicsBody* owner_; //!< PhysicsBody this collider is attached to.
-      PhysicsShape* shape_; //!< The shape this collider is using.
+      IPhysicsShape* shape_; //!< The shape this collider is using.
       glm::vec3 translation_; //!< The collider's local translation.
       glm::quat rotation_; //!< The collider's local rotation.
     };

@@ -69,15 +69,15 @@ namespace sulphur
             //   communication between the engine and editor
             new_transform.SetSiblingIndex(actual_payload.sibling_index);
           }
+          glm::vec3 p(actual_payload.postion[0], actual_payload.postion[1], actual_payload.postion[2]);
+          glm::quat r(actual_payload.rotation[3], actual_payload.rotation[0], actual_payload.rotation[1], actual_payload.rotation[2]);
+          glm::vec3 s(actual_payload.scale[0], actual_payload.scale[1], actual_payload.scale[2]);
 
+          new_transform.SetWorldPosition(p);
+          new_transform.SetWorldRotation(r);
+          new_transform.SetWorldScale(s);
           // @note (Maarten) The following code is debug-stuff to show off the functionality. This
           //   will soon be removed once gizmos have been integrated.
-          glm::vec3 xyz = glm::vec3(
-            10.0f * rand() / (float)RAND_MAX,
-            10.0f * rand() / (float)RAND_MAX,
-            10.0f * rand() / (float)RAND_MAX);
-          new_transform.SetLocalPosition(xyz);
-
           MeshRenderComponent new_mesh = new_entity.Add<MeshRenderComponent>();
           new_mesh.SetMesh(editor_default_mesh_);
         }
@@ -90,6 +90,7 @@ namespace sulphur
 
           TransformComponent target_transform = transform_system.GetByHierarchyIndex(
             actual_payload.entity_index);
+
           if (target_transform.IsValid() == false)
           {
             PS_LOG(Error, "Invalid entity index (%ld) received", actual_payload.entity_index);

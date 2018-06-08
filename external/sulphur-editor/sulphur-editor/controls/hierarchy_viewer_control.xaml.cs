@@ -10,6 +10,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Shapes;
 
+
 namespace sulphur
 {
   namespace editor
@@ -103,7 +104,6 @@ namespace sulphur
             (uint)native.NetworkMessages.kEntitySelected,
             data,
             (uint)data.Length);
-          native.Networking.SNetFlushPackets();
         }
 
 

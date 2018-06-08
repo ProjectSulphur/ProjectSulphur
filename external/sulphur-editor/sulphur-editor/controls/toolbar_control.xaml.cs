@@ -31,7 +31,7 @@ namespace sulphur.editor.controls
     {
       native.Networking.SNetSendData(
           (uint)native.NetworkMessages.kFastBackward, null, 0);
-      native.Networking.SNetFlushPackets();
+
     }
 
     /**
@@ -44,7 +44,7 @@ namespace sulphur.editor.controls
     {
       native.Networking.SNetSendData(
           (uint)native.NetworkMessages.kPreviousFrame, null, 0);
-      native.Networking.SNetFlushPackets();
+
     }
 
     /**
@@ -59,7 +59,7 @@ namespace sulphur.editor.controls
 
       if (button.IsChecked == true)
       {
-        Awesome.SetContent(button, FontAwesomeIcon.Pause);
+        Awesome.SetContent(button, FontAwesomeIcon.Stop);
 
         native.Networking.SNetSendData(
           (uint)native.NetworkMessages.kStartedPlaying, null, 0);
@@ -72,7 +72,7 @@ namespace sulphur.editor.controls
           (uint)native.NetworkMessages.kStoppedPlaying, null, 0);
       }
 
-      native.Networking.SNetFlushPackets();
+
     }
 
     /**
@@ -85,7 +85,7 @@ namespace sulphur.editor.controls
     {
       native.Networking.SNetSendData(
           (uint)native.NetworkMessages.kNextFrame, null, 0);
-      native.Networking.SNetFlushPackets();
+
     }
 
     /**
@@ -98,7 +98,7 @@ namespace sulphur.editor.controls
     {
       native.Networking.SNetSendData(
           (uint)native.NetworkMessages.kFastForward, null, 0);
-      native.Networking.SNetFlushPackets();
+
     }
 
     /**
@@ -119,7 +119,7 @@ namespace sulphur.editor.controls
       byte[] buffer = Utils.StructToBytes(msg);
       native.Networking.SNetSendData(
           (uint)native.NetworkMessages.kSetTransformGizmo, buffer, (uint)buffer.Length);
-      native.Networking.SNetFlushPackets();
+
     }
 
     /**
@@ -140,7 +140,7 @@ namespace sulphur.editor.controls
       byte[] buffer = Utils.StructToBytes(msg);
       native.Networking.SNetSendData(
           (uint)native.NetworkMessages.kSetTransformGizmo, buffer, (uint)buffer.Length);
-      native.Networking.SNetFlushPackets();
+
     }
 
     /**
@@ -161,7 +161,21 @@ namespace sulphur.editor.controls
       byte[] buffer = Utils.StructToBytes(msg);
       native.Networking.SNetSendData(
           (uint)native.NetworkMessages.kSetTransformGizmo, buffer, (uint)buffer.Length);
-      native.Networking.SNetFlushPackets();
+
+    }
+
+    private void PauseButtonClick(object sender, RoutedEventArgs e)
+    {
+      if ((sender as ToggleButton).IsChecked == false)
+      {
+        native.Networking.SNetSendData(
+         (uint)native.NetworkMessages.kContinuePlaying, null, 0);
+      }
+      else
+      {
+        native.Networking.SNetSendData(
+          (uint)native.NetworkMessages.kPause, null, 0);
+      }
     }
   }
 }

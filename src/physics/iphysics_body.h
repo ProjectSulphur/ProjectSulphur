@@ -7,8 +7,8 @@ namespace sulphur
 {
   namespace physics
   {
-    class PhysicsShape;
     class PhysicsCollider;
+    class IPhysicsShape;
 
     /**
     * @brief Indicates the type of physics body, which in turn influences its behaviour in the simulation.
@@ -28,7 +28,11 @@ namespace sulphur
     class IPhysicsBody
     {
     public:
-      virtual ~IPhysicsBody() {};
+
+      /**
+      * @brief Virtual destructor.
+      */
+      virtual ~IPhysicsBody() = default;
 
       /**
       * @brief Sets the translation of this physics body.
@@ -250,10 +254,10 @@ namespace sulphur
 
       /**
       * @brief Adds a physics shape to the body.
-      * @param[in] shape (sulphur::physics::PhysicsShape*) The shape to add to the body.
+      * @param[in] shape (sulphur::physics::IPhysicsShape*) The shape to add to the body.
       * @return (sulphur::physics:PhysicsCollider*) The constructed collider linked to this body.
       */
-      virtual PhysicsCollider* AddShape(PhysicsShape* shape) = 0;
+      virtual PhysicsCollider* AddShape(IPhysicsShape* shape) = 0;
 
       /**
       * @brief Removes a collider from the body and destroys the collider instance.

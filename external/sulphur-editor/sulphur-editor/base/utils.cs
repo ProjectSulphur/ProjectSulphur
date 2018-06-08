@@ -354,6 +354,29 @@ namespace sulphur
       }
 
       /**
+      *@class sulphur.editor.utils.UVec3 : sulphur.editor.IBinarySerializable
+      *@brief class for serializing a Vector3 of type sulphur.editor.utils.Uint32_s
+      *@author Stan Pepels  
+      */
+      public class Vec3U : IBinarySerializable
+      {
+        public UInt32_s x { get; set; }
+        public UInt32_s y { get; set; }
+        public UInt32_s z { get; set; }
+
+        /**
+        *@brief implementation of the sulphur.editor.IBinarySerializable interface. this will read an entry from a binary file and fill this struct with its contents.
+        *@param[in] reader (sulphur.editor.BinaryReader) reader containing the cache data.
+        */
+        public void Read(BinaryReader reader)
+        {
+          x = reader.ReadU32();
+          y = reader.ReadU32();
+          z = reader.ReadU32();
+        }
+      }
+
+      /**
       *@class sulphur.editor.utils.UInt16_s : sulphur.editor.utils.SerializableDataType<UInt16> 
       *@brief class for serializing a Uint16
       *@see sulphur.editor.BinaryReader.ReadList<T> 
@@ -514,6 +537,47 @@ namespace sulphur
         public override void Read(BinaryReader reader)
         {
           value = reader.ReadI16();
+        }
+      }
+
+      /**
+      *@class sulphur.editor.utils.Byte_s : sulphur.editor.utils.SerializableDataType<byte> 
+      *@brief class for serializing a byte
+       *@see sulphur.editor.BinaryReader.ReadList<T> 
+       *@see sulphur.editor.BinaryReader.ReadDictionary<T, U> 
+      *@author Stan Pepels  
+      */
+      public class Byte_s : SerializableDataType<byte>
+      {
+        /**
+         *@brief default constructor 
+         */
+        public Byte_s() { }
+
+        /**
+         *@see sulphur.editor.utils.SerializableDataType<T> 
+         */
+        public Byte_s(byte val) : base(val) { }
+
+        /**
+         *@brief implicit conversion from Byte_s 
+         *@param[in] other (byte) value to convert from 
+         */
+        public static implicit operator Byte_s(byte other) { return new Byte_s(other); }
+
+        /**
+        *@brief implicit conversion from sulphur.editor.utils.Byte_s 
+        *@param[in] other (Byte_s) value to convert from 
+        */
+        public static implicit operator byte(Byte_s other) { return other.value; }
+
+        /**
+         *@brief sulphur.editor.IBinarySerializable implementation 
+         *@param[in] reader (sulphur.editor.BinaryReader) reader to read the value from
+         */
+        public override void Read(BinaryReader reader)
+        {
+          value = reader.ReadByte();
         }
       }
 

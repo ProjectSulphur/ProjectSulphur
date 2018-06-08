@@ -22,6 +22,12 @@ namespace sulphur
         public static extern void Initialize();
 
         /**
+        *@see sulphur.builder.shared.SetProjectDirectory 
+        */
+        [DllImport("sulphur-builder-shared.dll")]
+        public static extern void SetProjectDirectory(string project_dir);
+
+        /**
          * @see sulphur.builder.shared.CreateDefaults 
          */
         [DllImport("sulphur-builder-shared.dll")]
@@ -49,7 +55,7 @@ namespace sulphur
          *@see sulphur.builder.shared.ImportModel 
          */
         [DllImport("sulphur-builder-shared.dll")]
-        public static extern bool_ ImportModel(string path, bool single_model, string vertex_shader, string pixel_shader);
+        public static extern bool_ ImportModel(string path, bool single_model, string vertex_shader, string pixel_shader, ref UInt64 ptr);
 
         /**
          *@see sulphur.builder.shared.ImportMaterial 
@@ -80,7 +86,13 @@ namespace sulphur
          */
         [DllImport("sulphur-builder-shared.dll")]
         public static extern bool_ ImportScript(string path, ref UInt64 ptr);
-        
+
+        /**
+         *@see sulphur.builder.shared.RegisterWorld 
+         */
+        [DllImport("sulphur-builder-shared.dll")]
+        public static extern bool_ RegisterWorld(string path, ref UInt64 ptr);
+
         /**
          *@see sulphur.builder.shared.DeleteModel 
          */

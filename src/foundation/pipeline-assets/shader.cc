@@ -38,8 +38,8 @@ namespace sulphur
      concrete_type = binary_reader.Read<ConcreteType>();
      cols = binary_reader.ReadUnsigned32();
      vec_size = binary_reader.ReadUnsigned32();
-     offset = binary_reader.Read<size_t>();
-     size = binary_reader.Read<size_t>();
+     offset = binary_reader.ReadUnsigned64();
+     size = binary_reader.ReadUnsigned64();
      members = binary_reader.ReadVector<ShaderResource>();
     }
 

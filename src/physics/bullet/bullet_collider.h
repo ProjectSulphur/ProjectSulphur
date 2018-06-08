@@ -19,9 +19,9 @@ namespace sulphur
       /**
       * @see sulphur::physics::PhysicsCollider
       * @param[in] owner (sulphur::physics::IPhysicsBody*) The physics body this collider is attached to.
-      * @param[in] shape (sulphur::physics::PhysicsShape*) The shape of this collider.
+      * @param[in] shape (sulphur::physics::IPhysicsShape*) The shape of this collider.
       */
-      BulletCollider(IPhysicsBody* owner, PhysicsShape* shape);
+      BulletCollider(IPhysicsBody* owner, IPhysicsShape* shape);
 
       /**
       * @brief Function intended to update the collider and/or PhysicsBody if required by the implementation.

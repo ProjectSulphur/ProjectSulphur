@@ -1,17 +1,5 @@
 #include "constraint_system.h"
 
-#include "engine/systems/components/transform_system.h"
-#include "engine/systems/components/camera_system.h"
-
-#include "engine/application/application.h"
-#include "engine/assets/asset_system.h"
-#include "engine/graphics/debug_render_system.h"
-
-#include <foundation/job/data_policy.h>
-#include <foundation/job/job.h>
-#include <foundation/job/job_graph.h>
-#include <graphics/platform/pipeline_state.h>
-
 #include <lua-classes/constraint_system.lua.cc>
 
 namespace sulphur
@@ -69,13 +57,25 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void ConstraintComponent::SetFrameAMat(const glm::mat4x4& frame)
+    void ConstraintComponent::SetEnabled(bool enabled)
+    {
+      system_->GetConstraint(*this)->SetEnabled(enabled);
+    }
+
+    //-------------------------------------------------------------------------
+    bool ConstraintComponent::IsEnabled() const
+    {
+      return system_->GetConstraint(*this)->IsEnabled();
+    }
+
+    //-------------------------------------------------------------------------
+    void ConstraintComponent::SetFrameA(const glm::mat4x4& frame)
     {
       system_->GetConstraint(*this)->SetFrameA(frame);
     }
 
     //-------------------------------------------------------------------------
-    void ConstraintComponent::SetFrameBMat(const glm::mat4x4& frame)
+    void ConstraintComponent::SetFrameB(const glm::mat4x4& frame)
     {
       system_->GetConstraint(*this)->SetFrameB(frame);
     }
@@ -83,13 +83,19 @@ namespace sulphur
     //-------------------------------------------------------------------------
     void ConstraintComponent::AttachEntity(Entity* entity)
     {
+      Entity entity2 = Entity();
+      if (system_->GetEntityB(*this) != entity2 )
+      {
+        DetachEntity();
+      }
+
       system_->AttachEntity(*this, *entity);
     }
 
     //-------------------------------------------------------------------------
     void ConstraintComponent::DetachEntity()
     {
-      // TODO: Will be implemented in the near future.
+      system_->DetachEntity(*this );
     }
 
     //-------------------------------------------------------------------------
@@ -132,31 +138,38 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void HingeConstraintComponent::SetMaxAngle(float angle)
+    void HingeConstraintComponent::SetMaximumAngle(float angle)
     {
       reinterpret_cast<physics::HingeConstraint*>
-        (system_->GetConstraint(*this))->SetMax(angle);
+        (system_->GetConstraint(*this))->SetMaximumAngle(angle);
     }
 
     //-------------------------------------------------------------------------
-    void HingeConstraintComponent::SetMinAngle(float angle)
+    void HingeConstraintComponent::SetMinimumAngle(float angle)
     {
       reinterpret_cast<physics::HingeConstraint*>
-        (system_->GetConstraint(*this))->SetMin(angle);
+        (system_->GetConstraint(*this))->SetMinimumAngle(angle);
     }
 
     //-------------------------------------------------------------------------
-    float HingeConstraintComponent::GetMinAngle() const
+    float HingeConstraintComponent::GetMinimumAngle() const
     {
       return reinterpret_cast<physics::HingeConstraint*>
-        (system_->GetConstraint(*this))->GetMin();
+        (system_->GetConstraint(*this))->GetMinimumAngle();
     }
 
     //-------------------------------------------------------------------------
-    float HingeConstraintComponent::GetMaxAngle() const
+    float HingeConstraintComponent::GetMaximumAngle() const
     {
       return reinterpret_cast<physics::HingeConstraint*>
-        (system_->GetConstraint(*this))->GetMax();
+        (system_->GetConstraint(*this))->GetMaximumAngle();
+    }
+
+    //-------------------------------------------------------------------------
+    float HingeConstraintComponent::GetHingeAngle() const
+    {
+      return reinterpret_cast<physics::HingeConstraint*>
+        (system_->GetConstraint(*this))->GetHingeAngle();
     }
 
     //-------------------------------------------------------------------------
@@ -174,14 +187,28 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void HingeConstraintComponent::SetPivotA(const glm::vec3 & pivot)
+    glm::vec3 HingeConstraintComponent::GetAxisA() const
+    {
+      return reinterpret_cast<physics::HingeConstraint*>
+        (system_->GetConstraint(*this))->GetAxisA();
+    }
+
+    //-------------------------------------------------------------------------
+    glm::vec3 HingeConstraintComponent::GetAxisB() const
+    {
+      return reinterpret_cast<physics::HingeConstraint*>
+        (system_->GetConstraint(*this))->GetAxisB();
+    }
+
+    //-------------------------------------------------------------------------
+    void HingeConstraintComponent::SetPivotA(const glm::vec3& pivot)
     {
       reinterpret_cast<physics::HingeConstraint*>
         (system_->GetConstraint(*this))->SetPivotA(pivot);
     }
 
     //-------------------------------------------------------------------------
-    void HingeConstraintComponent::SetPivotB(const glm::vec3 & pivot)
+    void HingeConstraintComponent::SetPivotB(const glm::vec3& pivot)
     {
       reinterpret_cast<physics::HingeConstraint*>
         (system_->GetConstraint(*this))->SetPivotB(pivot);
@@ -202,33 +229,46 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    glm::vec3 HingeConstraintComponent::GetAxisA() const
-    {
-      return reinterpret_cast<physics::HingeConstraint*>
-        (system_->GetConstraint(*this))->GetAxisA();
-    }
-
-    //-------------------------------------------------------------------------
-    glm::vec3 HingeConstraintComponent::GetAxisB() const
-    {
-      return reinterpret_cast<physics::HingeConstraint*>
-        (system_->GetConstraint(*this))->GetAxisB();
-    }
-    
-    //-------------------------------------------------------------------------
-    void HingeConstraintComponent::SetFrameA(const glm::vec3& pivot, const glm::vec3& axis)
+    void HingeConstraintComponent::SetSoftness(float softness)
     {
       reinterpret_cast<physics::HingeConstraint*>
-        (system_->GetConstraint(*this))->SetFrameA(pivot, axis, false);
+        (system_->GetConstraint(*this))->SetSoftness(softness);
     }
 
     //-------------------------------------------------------------------------
-    void HingeConstraintComponent::SetFrameB(const glm::vec3& pivot, const glm::vec3& axis)
+    float HingeConstraintComponent::GetSoftness() const
     {
-      reinterpret_cast<physics::HingeConstraint*>
-        (system_->GetConstraint(*this))->SetFrameB(pivot, axis);
+      return reinterpret_cast<physics::HingeConstraint*>
+        (system_->GetConstraint(*this))->GetSoftness();
     }
 
+    //-------------------------------------------------------------------------
+    void HingeConstraintComponent::SetBiasFactor(float bias)
+    {
+      reinterpret_cast<physics::HingeConstraint*>
+        (system_->GetConstraint(*this))->SetBiasFactor(bias);
+    }
+
+    //-------------------------------------------------------------------------
+    float HingeConstraintComponent::GetBiasFactor() const
+    {
+      return reinterpret_cast<physics::HingeConstraint*>
+        (system_->GetConstraint(*this))->GetBiasFactor();
+    }
+
+    //-------------------------------------------------------------------------
+    void HingeConstraintComponent::SetRelaxationFactor(float relaxation)
+    {
+      reinterpret_cast<physics::HingeConstraint*>
+        (system_->GetConstraint(*this))->SetRelaxationFactor(relaxation);
+    }
+
+    //-------------------------------------------------------------------------
+    float HingeConstraintComponent::GetRelaxationFactor() const
+    {
+      return reinterpret_cast<physics::HingeConstraint*>
+        (system_->GetConstraint(*this))->GetRelaxationFactor();
+    }
 
 
     //-------------------------------------------------------------------------
@@ -251,7 +291,7 @@ namespace sulphur
     //-------------------------------------------------------------------------
     void ConstraintSystem::Destroy(ComponentHandleBase handle)
     {
-      foundation::Memory::Destruct(GetConstraint(handle));
+      physics_service_->DestroyConstraint(GetConstraint(handle));
       this->component_data_.data.Remove(handle);
     }
 
@@ -279,11 +319,26 @@ namespace sulphur
     //-------------------------------------------------------------------------
     void ConstraintSystem::AttachEntity(ConstraintComponent handle, Entity entity)
     {
-      // Hard-coded for hinge constraint, for now.
-      // Will be refactored in the near future.
-      component_data_.data.template
-        Get<static_cast<size_t>(ConstraintComponentElements::kConstraint)>(handle) =
-        physics_service_->AddConstraint<physics::HingeConstraint>(GetEntityA(handle), entity); 
+      this->component_data_.data.template
+        Get < static_cast<size_t>(ConstraintComponentElements::kEntity_b)>(handle) = entity;
+
+      physics::PhysicsBody* body = physics_service_->GetPhysicsBody(entity);
+
+      if (body == nullptr)
+      {
+        body = physics_service_->CreatePhysicsBody(entity);
+      }
+
+      GetConstraint(handle)->SetBodyB(body);
+    }
+
+    //-------------------------------------------------------------------------
+    void ConstraintSystem::DetachEntity(ConstraintComponent handle)
+    {
+      this->component_data_.data.template
+        Get < static_cast<size_t>(ConstraintComponentElements::kEntity_b)>(handle) = Entity();
+
+      GetConstraint(handle)->SetBodyB(nullptr);
     }
   }
 }

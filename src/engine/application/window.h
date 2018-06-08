@@ -16,3 +16,15 @@ namespace sulphur
   }
 }
 #endif
+
+#ifdef PS_PS4
+#include "engine/ps4/ps4_window.h"
+
+namespace sulphur
+{
+  namespace engine
+  {
+    using Window = PS4Window;
+  }
+}
+#endif

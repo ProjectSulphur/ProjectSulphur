@@ -18,6 +18,7 @@ namespace sulphur
 #include "physics/bullet/bullet_cylinder_shape.h"
 #include "physics/bullet/bullet_cone_shape.h"
 #include "physics/bullet/bullet_convex_shape.h"
+#include "physics/bullet/bullet_mesh_shape.h"
 namespace sulphur
 {
   namespace physics
@@ -28,6 +29,7 @@ namespace sulphur
     using PhysicsCapsuleShape = BulletCapsuleShape; //!< Platform specific capsule shape to use.
     using PhysicsConeShape = BulletConeShape; //!< Platform specific capsule shape to use.
     using PhysicsConvexShape = BulletConvexShape; //!< Platform specific convex hull shape to use.
+    using PhysicsMeshShape = BulletMeshShape; //!< Platform specific mesh shape to use.
   }
 }
 #else

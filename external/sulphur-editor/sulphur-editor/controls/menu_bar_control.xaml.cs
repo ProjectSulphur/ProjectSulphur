@@ -2,7 +2,6 @@
 using System.ComponentModel;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.IO;
 
 namespace sulphur.editor.controls
 {
@@ -121,6 +120,9 @@ namespace sulphur.editor.controls
         {
           NotificationEventArgs args = new NotificationEventArgs(null, (uint)Notifications.kProjectLoaded, id<MenuBar>.type_id_);
           notify_subscribers_?.Invoke(this, args);
+          native.messages.LoadProjectMessage msg = new native.messages.LoadProjectMessage(Project.directory_path);
+          byte[] data = Utils.StructToBytes(msg);
+          native.Networking.SNetSendData((int)native.NetworkMessages.kLoadProject, data);
         }
       };
       dialog.ShowDialog();
@@ -152,9 +154,13 @@ namespace sulphur.editor.controls
      * @brief Commands that saves a project.
      * @param[in | opt] param (object) Optional parameter that can be passed with the command.
      */
+
     private void Save(object param)
     {
+      WorldHierarchy hierarchy = (WorldHierarchy)param;
+      hierarchy.hierarchy.SaveToDisk();
 
+      // todo: save project changes
     }
   }
 }

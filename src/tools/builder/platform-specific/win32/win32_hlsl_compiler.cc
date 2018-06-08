@@ -86,7 +86,8 @@ namespace sulphur
       if (error_messages != nullptr)
       {
         PS_LOG_BUILDER(Error, 
-          "%s", static_cast<const char*>(error_messages->GetBufferPointer()));
+          "Failed to compile HLSL shader. HLSL compiler returned the following errors.")
+        PS_LOG_BUILDER(Error, "%s", static_cast<const char*>(error_messages->GetBufferPointer()));
         result = false;
         error_messages->Release();
         out_compiled.clear();

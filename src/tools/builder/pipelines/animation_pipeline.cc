@@ -12,11 +12,22 @@ namespace sulphur
       SceneLoader& scene_loader,
       foundation::Vector<foundation::AnimationAsset>& animations)
     {
-      const aiScene* scene = scene_loader.LoadScene(file);
+      if (ValidatePath(file) == false)
+      {
+        PS_LOG_BUILDER(Error,
+          "Invalid file path passed. The path %s does not point to a location in the project directory %s", file.path().c_str(),
+          project_dir().path().c_str());
+        return false;
+      }
+
+      foundation::Path file_path = file.is_relative_path() ? project_dir() + file : file;
+
+
+      const aiScene* scene = scene_loader.LoadScene(file_path);
       if (scene == nullptr)
       {
         PS_LOG_BUILDER(Error,
-          "Unable to load scene from file %s.", file.GetString().c_str());
+          "Unable to load scene from file %s.", file_path.GetString().c_str());
         return false;
       }
 
@@ -104,6 +115,16 @@ namespace sulphur
     bool AnimationPipeline::PackageAnimation(const foundation::Path& asset_origin,
       foundation::AnimationAsset& animation)
     {
+      if (ValidatePath(asset_origin) == false)
+      {
+        PS_LOG_BUILDER(Error,
+          "Invalid file path passed. The path %s does not point to a location in the project directory %s", asset_origin.path().c_str(),
+          project_dir().path().c_str());
+        return false;
+      }
+
+      foundation::Path origin = CreateProjectRelativePath(asset_origin);
+
       if (animation.name.get_length() == 0)
       {
         PS_LOG_BUILDER(Error,
@@ -119,7 +140,7 @@ namespace sulphur
       }
 
       foundation::Path output_file = "";
-      if (RegisterAsset(asset_origin, animation.name, output_file, animation.id) == false)
+      if (RegisterAsset(origin, animation.name, output_file, animation.id) == false)
       {
         PS_LOG_BUILDER(Error,
           "Failed to register animation. The animation will not be packaged.");

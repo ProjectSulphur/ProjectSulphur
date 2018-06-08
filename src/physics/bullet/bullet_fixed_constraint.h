@@ -1,8 +1,9 @@
 #pragma once
 #include "physics/iphysics_fixed_constraint.h"
+#include "physics/platform_physics_body.h"
 
-#include <glm/glm.hpp>
-#include "physics/bullet/bullet_include.h"
+class btDynamicsWorld;
+class btGeneric6DofSpring2Constraint;
 
 namespace sulphur
 {
@@ -11,79 +12,94 @@ namespace sulphur
     /**
     * @class sulphur::physics::BulletFixedConstraint : public sulphur::physics::IPhysicsFixedConstraint
     * @brief Fixed constraint implementation
-    * @author Benjamin Waanders
+    * @author Benjamin Waanders, Angelo van der Mark
     */
     class BulletFixedConstraint : public IPhysicsFixedConstraint
     {
     public:
-      /**
-      * @brief constructor default values, currently up to bullets restrictions
-      */
-      BulletFixedConstraint(btRigidBody* body_a, btRigidBody* body_b, btDynamicsWorld* world);
 
       /**
-      * @brief The default deconstructor
+      * @brief Constructor.
+      * @param[in] body_a (sulphur::physics::PhysicsBody*) The main body.
+      * @param[in] world (btDynamicsWorld*) The dynamics world this constraint will live in.
       */
-      virtual ~BulletFixedConstraint();
+      BulletFixedConstraint(PhysicsBody* body_a, btDynamicsWorld* world);
 
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::SetTorqueLimit
+      * @brief Destructor.
       */
-      virtual void SetTorqueLimit(float limit) override;
+      ~BulletFixedConstraint();
 
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::SetForceLimit
+      * @see sulphur::physics::IPhysicsConstraint::SetTorqueLimit
       */
-      virtual void SetForceLimit(float limit) override;
+      void SetTorqueLimit(float limit) override;
 
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::GetForceLimit
+      * @see sulphur::physics::IPhysicsConstraint::SetForceLimit
       */
-      virtual float GetForceLimit() const override;
+      void SetForceLimit(float limit) override;
 
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::GetTorqueLimit
+      * @see sulphur::physics::IPhysicsConstraint::GetForceLimit
       */
-      virtual float GetTorqueLimit() const override;
+      float GetForceLimit() const override;
 
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::GetBodyA
+      * @see sulphur::physics::IPhysicsConstraint::GetTorqueLimit
       */
-      virtual PhysicsBody * GetBodyA() override;
+      float GetTorqueLimit() const override;
 
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::GetBodyB
+      * @see sulphur::physics::IPhysicsConstraint::SetEnabled
       */
-      virtual PhysicsBody * GetBodyB() override;
+      void SetEnabled(bool enabled) override;
 
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::SetFrameA
+      * @see sulphur::physics::IPhysicsConstraint::IsEnabled
       */
-      virtual void SetFrameA(const glm::mat4x4 & transform) override;
+      bool IsEnabled() const override;
 
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::SetFrameB
+      * @see sulphur::physics::IPhysicsConstraint::GetBodyA
       */
-      virtual void SetFrameB(const glm::mat4x4 & transform) override;
+      PhysicsBody* GetBodyA() override;
 
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::GetFrameA
+      * @see sulphur::physics::IPhysicsConstraint::SetBodyB
       */
-      virtual const glm::mat4x4 GetFrameA() const override;
+      void SetBodyB(PhysicsBody* body_b) override;
 
       /**
-      * @see sulphur::physics::IPhysicsFixedConstraint::GetFrameB
+      * @see sulphur::physics::IPhysicsConstraint::GetBodyB
       */
-      virtual const glm::mat4x4 GetFrameB() const override;
+      PhysicsBody* GetBodyB() override;
+
+      /**
+      * @see sulphur::physics::IPhysicsConstraint::SetFrameA
+      */
+      void SetFrameA(const glm::mat4x4& transform) override;
+
+      /**
+      * @see sulphur::physics::IPhysicsConstraint::SetFrameB
+      */
+      void SetFrameB(const glm::mat4x4& transform) override;
+
+      /**
+      * @see sulphur::physics::IPhysicsConstraint::GetFrameA
+      */
+      glm::mat4x4 GetFrameA() const override;
+
+      /**
+      * @see sulphur::physics::IPhysicsConstraint::GetFrameB
+      */
+      glm::mat4x4 GetFrameB() const override;
 
     private:
-      btFixedConstraint* bullet_constraint_; //!< The internal constraint
-      btRigidBody* body_a_; //!< The A body
-      btRigidBody* body_b_; //!< The B body
-      btDynamicsWorld* world_; //!< pointer to the dynamics world that the constraint lives in
-
-      btTransform frame_a_;
-      btTransform frame_b_;
+      btGeneric6DofSpring2Constraint* bullet_constraint_; //!< The internal constraint.
+      PhysicsBody* body_a_; //!< The A body.
+      PhysicsBody* body_b_; //!< The B body.
+      btDynamicsWorld* world_; //!< Pointer to the dynamics world that the constraint lives in.
     };
   }
 }

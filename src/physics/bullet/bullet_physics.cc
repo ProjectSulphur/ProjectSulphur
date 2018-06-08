@@ -1,11 +1,10 @@
 #include "physics/bullet/bullet_physics.h"
 #include "physics/bullet/bullet_conversions.h"
 #include "physics/bullet/bullet_allocator.h"
-#include "physics/bullet/bullet_conversions.h"
+#include "physics/platform_physics_constraint.h"
 
 #include <foundation/memory/memory.h>
-
-#include <LinearMath/btVector3.h>
+#include <foundation/logging/logger.h>
 
 namespace sulphur
 {
@@ -32,10 +31,10 @@ namespace sulphur
 
       btAlignedAllocSetCustom(BulletAllocator::Allocate, BulletAllocator::Deallocate);
 
-      collision_config_ = 
+      collision_config_ =
         foundation::Memory::Construct<btDefaultCollisionConfiguration>();
 
-      collision_dispatcher_ = 
+      collision_dispatcher_ =
         foundation::Memory::Construct<btCollisionDispatcher>(collision_config_);
 
       broad_phase_ = foundation::Memory::Construct<btDbvtBroadphase>();
@@ -48,12 +47,17 @@ namespace sulphur
         constraint_solver_,
         collision_config_);
 
-      bullet_manifolds = foundation::Vector<btPersistentManifold>();
       dynamics_world_->setInternalTickCallback(InternalTickCallback);
       dynamics_world_->setWorldUserInfo(reinterpret_cast<void*>(this));
       SetGlobalGravity(IPhysics::kDefaultGravity);
 
-      manifolds_ = foundation::Map<PhysicsBody*, foundation::Vector<PhysicsManifold>>();
+      manifolds_ = static_cast<PhysicsManifold*>(
+        foundation::Memory::Allocate(sizeof(PhysicsManifold) * kManifoldBufferLimit));
+      callback_subs_ = static_cast<PhysicsBody**>(
+        foundation::Memory::Allocate(sizeof(PhysicsBody) * kManifoldBufferLimit));
+
+      callback_subs_size_ = 0;
+      manifolds_size_ = 0;
 
       return true;
     }
@@ -77,12 +81,18 @@ namespace sulphur
 
         foundation::Memory::Destruct(collision_config_);
         collision_config_ = nullptr;
+
+        foundation::Memory::Destruct(manifolds_);
+        manifolds_ = nullptr;
+
+        foundation::Memory::Destruct(callback_subs_);
+        callback_subs_ = nullptr;
       }
     }
 
     //-------------------------------------------------------------------------
     PhysicsBody* BulletPhysics::AddPhysicsBody(
-      const glm::vec3& translation, 
+      const glm::vec3& translation,
       const glm::quat& rotation)
     {
       return foundation::Memory::Construct<PhysicsBody>(
@@ -95,6 +105,30 @@ namespace sulphur
     void BulletPhysics::RemovePhysicsBody(PhysicsBody* body)
     {
       foundation::Memory::Destruct<PhysicsBody>(body);
+    }
+
+    //-------------------------------------------------------------------------
+    IPhysicsConstraint* BulletPhysics::AddConstraint(PhysicsBody* owner,
+      IPhysicsConstraint::ConstraintTypes type)
+    {
+      switch (type)
+      {
+      case IPhysicsConstraint::ConstraintTypes::kFixed:
+        return foundation::Memory::Construct<FixedConstraint>(owner, dynamics_world_);
+        break;
+      case IPhysicsConstraint::ConstraintTypes::kHinge:
+        return foundation::Memory::Construct<HingeConstraint>(owner, dynamics_world_);
+        break;
+      default:
+        PS_LOG(Error, "Attempted to instantiate constraint of unknown type in BulletPhysics::AddConstraint.");
+        return nullptr;
+      }
+    }
+
+    //-------------------------------------------------------------------------
+    void BulletPhysics::RemoveConstraint(IPhysicsConstraint* constraint)
+    {
+      foundation::Memory::Destruct(constraint);
     }
 
     //-------------------------------------------------------------------------
@@ -127,75 +161,11 @@ namespace sulphur
       {
         return;
       }
+      
+      // Reset the size of manifolds, this gets populated by the InternalTickCallback()
+      manifolds_size_ = 0;
 
       dynamics_world_->stepSimulation(fixed_time_step, 1, fixed_time_step);
-      
-      manifolds_.clear();
-      //btDispatcher* dispatch = dynamics_world_->getDispatcher();
-
-      for (int i = 0; i < bullet_manifolds.size(); i++)
-      {
-        btPersistentManifold& manifold = bullet_manifolds[i];
-
-        int numberOfContacts = manifold.getNumContacts();
-
-        PhysicsManifold phys_manifold_a = PhysicsManifold(
-          reinterpret_cast<PhysicsBody*>(manifold.getBody0()->getUserPointer()),
-          reinterpret_cast<PhysicsBody*>(manifold.getBody1()->getUserPointer()));
-
-        PhysicsManifold phys_manifold_b = PhysicsManifold(
-          reinterpret_cast<PhysicsBody*>(manifold.getBody1()->getUserPointer()),
-          reinterpret_cast<PhysicsBody*>(manifold.getBody0()->getUserPointer()));
-
-        bool hasContact = false;
-
-        for (int j = 0; j < numberOfContacts; ++j)
-        {
-          btManifoldPoint& point = manifold.getContactPoint(j);
-
-          if (point.getDistance() < 0.f)
-          {
-            hasContact = true;
-
-            phys_manifold_a.AddContactPoint(PhysicsManifold::ContactPoint(
-              BulletConversions::ToGlm(point.getPositionWorldOnA()),
-              BulletConversions::ToGlm(point.m_normalWorldOnB),
-              point.getDistance()));
-
-            phys_manifold_b.AddContactPoint(PhysicsManifold::ContactPoint(
-              BulletConversions::ToGlm(point.getPositionWorldOnB()),
-              BulletConversions::ToGlm(point.m_normalWorldOnB * -1.0f),
-              point.getDistance()));
-          }
-        }
-
-        if (hasContact == true)
-        {
-          if (manifolds_.find(phys_manifold_a.body_a()) == manifolds_.end())
-          {
-            foundation::Vector<PhysicsManifold> manifolds = foundation::Vector<PhysicsManifold>();
-            manifolds.push_back(phys_manifold_a);
-            manifolds_.emplace(phys_manifold_a.body_a(), manifolds);
-          }
-          else
-          {
-            manifolds_.at(phys_manifold_a.body_a()).push_back(phys_manifold_a);
-          }
-
-          if (manifolds_.find(phys_manifold_b.body_a()) == manifolds_.end())
-          {
-            foundation::Vector<PhysicsManifold> manifolds = foundation::Vector<PhysicsManifold>();
-            manifolds.push_back(phys_manifold_b);
-            manifolds_.emplace(phys_manifold_b.body_a(), manifolds);
-          }
-          else
-          {
-            manifolds_.at(phys_manifold_b.body_a()).push_back(phys_manifold_b);
-          }
-        }
-      }
-
-      bullet_manifolds.clear();
     }
 
     //-------------------------------------------------------------------------
@@ -241,8 +211,8 @@ namespace sulphur
 
     //-------------------------------------------------------------------------
     RaycastHits BulletPhysics::RaycastAll(
-      const foundation::Ray& ray, 
-      bool* hit, 
+      const foundation::Ray& ray,
+      bool* hit,
       float max_distance)
     {
       UpdateBodies();
@@ -286,9 +256,53 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    Manifolds& BulletPhysics::GetManifolds()
+    PhysicsManifold* BulletPhysics::GetManifolds()
     {
       return manifolds_;
+    }
+
+    //-------------------------------------------------------------------------
+    size_t BulletPhysics::GetManifoldsSize()
+    {
+      return manifolds_size_;
+    }
+
+    //-------------------------------------------------------------------------
+    void BulletPhysics::SubscribeCallback(PhysicsBody * physics_body)
+    {
+      for (int i = 0; i < callback_subs_size_; ++i)
+      {
+        if (callback_subs_[i] == physics_body)
+        {
+          // Already subbed.
+          return;
+        }
+      }
+      
+      if (callback_subs_size_ == kManifoldBufferLimit)
+      {
+        PS_LOG(Warning, "We have reached the sub limit!");
+        return;
+      }
+      callback_subs_[callback_subs_size_++] = physics_body;
+    }
+
+    //-------------------------------------------------------------------------
+    void BulletPhysics::UnSubscribeCallback(PhysicsBody * physics_body)
+    {
+      for (int i = 0; i < callback_subs_size_; ++i)
+      {
+        if (callback_subs_[i] == physics_body)
+        {
+          for (int j = i; j < callback_subs_size_ - 1; ++j)
+          {
+            callback_subs_[j] = callback_subs_[j + 1];
+          }
+
+          callback_subs_size_--;
+          break;
+        }
+      }
     }
 
     //-------------------------------------------------------------------------
@@ -304,28 +318,90 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    void BulletPhysics::InternalTickCallback(btDynamicsWorld * world, btScalar time_step)
+    void BulletPhysics::InternalTickCallback(btDynamicsWorld* world, btScalar time_step)
     {
-      BulletPhysics* that = reinterpret_cast<BulletPhysics*>(reinterpret_cast<btDiscreteDynamicsWorld*>(world)->getWorldUserInfo());
+      // That is here so that we know to which physics world the callback belongs to.
+      // In case we actually do as we designed and have multiple (physics) worlds
+      BulletPhysics* that = reinterpret_cast<BulletPhysics*>(world->getWorldUserInfo());
+
       if (that != nullptr)
       {
-        that->SaveManifolds(world, time_step);
+        that->SaveManifolds(world);
       }
     }
 
     //-------------------------------------------------------------------------
-
-    //-------------------------------------------------------------------------
-    void BulletPhysics::SaveManifolds(btDynamicsWorld * world, btScalar time_step)
+    void BulletPhysics::SaveManifolds(btDynamicsWorld* world)
     {
       btDispatcher* dispatch = world->getDispatcher();
-    
+
       int num_manifolds = dispatch->getNumManifolds();
       btPersistentManifold** manifolds = dispatch->getInternalManifoldPointer();
 
       for (int i = 0; i < num_manifolds; ++i)
       {
-        bullet_manifolds.push_back(*manifolds[i]);
+        bool contact = false;
+
+        for (int j = 0; j < manifolds[i]->getNumContacts(); ++j)
+        {
+          btManifoldPoint& point = manifolds[i]->getContactPoint(j);
+
+          if (point.getDistance() < 0.f)
+          {
+            contact = true;
+            break;
+          }
+        }
+
+        if (contact == true)
+        {
+          for (int j = 0; j < callback_subs_size_; ++j)
+          {
+            // Check if A or B are listed
+            if (callback_subs_[j] ==
+              static_cast<PhysicsBody*>(manifolds[i]->getBody0()->getUserPointer()))
+            {
+              PhysicsManifold* phys_manifold = new (
+                manifolds_ + manifolds_size_++)  PhysicsManifold(
+                reinterpret_cast<PhysicsBody*>(manifolds[i]->getBody0()->getUserPointer()),
+                reinterpret_cast<PhysicsBody*>(manifolds[i]->getBody1()->getUserPointer()));
+
+              for (int j = 0; j < manifolds[i]->getNumContacts(); ++j)
+              {
+                btManifoldPoint& point = manifolds[i]->getContactPoint(j);
+
+                if (point.getDistance() < 0.f)
+                {
+                  phys_manifold->AddContactPoint(PhysicsManifold::ContactPoint(
+                    BulletConversions::ToGlm(point.getPositionWorldOnA()),
+                    BulletConversions::ToGlm(point.m_normalWorldOnB),
+                    point.getDistance()));
+                }
+              }
+            }
+            else if (callback_subs_[j] ==
+              static_cast<PhysicsBody*>(manifolds[i]->getBody1()->getUserPointer()))
+            {
+              PhysicsManifold* phys_manifold = new (
+                manifolds_ + manifolds_size_++)  PhysicsManifold(
+                reinterpret_cast<PhysicsBody*>(manifolds[i]->getBody1()->getUserPointer()),
+                reinterpret_cast<PhysicsBody*>(manifolds[i]->getBody0()->getUserPointer()));
+
+              for (int j = 0; j < manifolds[i]->getNumContacts(); ++j)
+              {
+                btManifoldPoint& point = manifolds[i]->getContactPoint(j);
+
+                if (point.getDistance() < 0.f)
+                {
+                  phys_manifold->AddContactPoint(PhysicsManifold::ContactPoint(
+                    BulletConversions::ToGlm(point.getPositionWorldOnB()),
+                    BulletConversions::ToGlm(point.m_normalWorldOnB * -1.0f),
+                    point.getDistance()));
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

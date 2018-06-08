@@ -36,6 +36,10 @@ namespace sulphur
         size_t entity_index; //!< The index in the hierarchy of the new entity
         size_t sibling_index; //!< The sibling index of the new entity
         size_t parent_index; //!< The index in the hierarchy of the new entity's parent (or PS_SIZE_MAX to indicate no parent)
+
+        float postion[3];
+        float rotation[4];
+        float scale[3];
       };
       /**
       * @see sulphur::engine::editor::EditorMessageID::kEntityCreated
@@ -134,65 +138,120 @@ namespace sulphur
       * @see sulphur::engine::editor::EditorMessageID::kStoppedPlaying
       */
       using StoppedPlayingMessage = EditorMessage<EditorMessageID::kStoppedPlaying, Payload>;
+      /**
+      * @see sulphur::engine::editor::EditorMessageID::kStoppedPlaying
+      */
+      using PauseMessage = EditorMessage<EditorMessageID::kPause, Payload>;
 
-
+      using ContinuePlayingMessage = EditorMessage<EditorMessageID::kContinuePlaying, Payload>;
+      /**
+      * @struct sulphur::engine::editor::EntitySelectedPayload : sulphur::engine::editor::Payload
+      * @see sulphur::engine::editor::EditorMessageID::kEntitySelected
+      * @author Maarten ten Velden
+      */
       struct EntitySelectedPayload : Payload
       {
-        size_t entity_index;
+        size_t entity_index; //!< Hierarchy index of the entity selected.
       };
       
+      /**
+      * @see sulphur::engine::editor::EditorMessageID::EntitySelectedPayload
+      */
       using EntitySelectedMessage = EditorMessage<EditorMessageID::kEntitySelected, EntitySelectedPayload>;
 
+      /**
+      * @struct sulphur::engine::editor::EntityMovedPayload : sulphur::engine::editor::Payload
+      * @see sulphur::engine::editor::EditorMessageID::kEntityMoved
+      * @author Maarten ten Velden
+      */
       struct EntityMovedPayload : Payload
       {
-        size_t entity_index;
-        float x;
-        float y;
-        float z;
+        size_t entity_index; //!< Hierarchy index of the entity selected.
+        float x; //!< New X position of the object.
+        float y; //!< New Y position of the object.
+        float z; //!< New Z position of the object.
       };
 
+      /**
+      * @see sulphur::engine::editor::EditorMessageID::EntitySelectedPayload
+      */
       using EntityMovedMessage = EditorMessage<EditorMessageID::kEntityMoved, EntityMovedPayload>;
 
+      /**
+      * @struct sulphur::engine::editor::EntityRotatePayload : sulphur::engine::editor::Payload
+      * @see sulphur::engine::editor::EditorMessageID::kEntityRotated
+      * @author Maarten ten Velden
+      */
       struct EntityRotatePayload : Payload
       {
-        size_t entity_index;
-        float w;
-        float x;
-        float y;
-        float z;
+        size_t entity_index; //!< Hierarchy index of the entity selected.
+        float w; //!< New W component of the rotation quaternion.
+        float x; //!< New X component of the rotation quaternion.
+        float y; //!< New Y component of the rotation quaternion.
+        float z; //!< New Z component of the rotation quaternion.
       };
 
+      /**
+      * @see sulphur::engine::editor::EditorMessageID::EntityRotatePayload
+      */
       using EntityRotateMessage = EditorMessage<EditorMessageID::kEntityRotated, EntityMovedPayload>;
 
+      /**
+      * @struct sulphur::engine::editor::EntityScalePayload : sulphur::engine::editor::Payload
+      * @see sulphur::engine::editor::EditorMessageID::kEntityScaled
+      * @author Maarten ten Velden
+      */
       struct EntityScalePayload : Payload
       {
-        size_t entity_index;
-        float x;
-        float y;
-        float z;
+        size_t entity_index; //!< Hierarchy index of the entity selected.
+        float x; //!< New X scale of the object.
+        float y; //!< New Y scale of the object.
+        float z; //!< New Z scale of the object.
       };
 
+      /**
+      * @see sulphur::engine::editor::EditorMessageID::EntitySelectedPayload
+      */
       using EntityScaleMessage = EditorMessage<EditorMessageID::kEntityScaled, EntityScalePayload>;
 
+      /**
+      * @struct sulphur::engine::editor::SetTransformGizmoPayload : sulphur::engine::editor::Payload
+      * @see sulphur::engine::editor::EditorMessageID::kSetTransformGizmo
+      * @author Maarten ten Velden
+      */
       struct SetTransformGizmoPayload : Payload
       {
+        /**
+        * @brief Type of transform gizmos available.
+        */
         enum struct Type
         {
-          kTranslate,
-          kRotate,
-          kScale
+          kTranslate, //!< Translate gizmo used to move objects
+          kRotate, //!< Rotate gizmo used to rotate objects
+          kScale //!< Scale gizmo used to scale objects
         };
 
-        int32_t type;
+        int32_t type; //!< The type of gizmo selected
       };
 
+      /**
+      * @see sulphur::engine::editor::EditorMessageID::SetTransformGizmoPayload
+      */
       using SetTransformGizmoMessage = EditorMessage<EditorMessageID::kSetTransformGizmo, SetTransformGizmoPayload>;
       
+      /**
+      * @struct sulphur::engine::editor::LoadProjectPayload : sulphur::engine::editor::Payload
+      * @see sulphur::engine::editor::EditorMessageID::kSetTransformGizmo
+      * @author Maarten ten Velden
+      */
       struct LoadProjectPayload : Payload
       {
-        char path[networking::editor::kMaxPayloadSize - 1];
+        unsigned char path[networking::editor::kMaxPayloadSize - 1]; //!< Path to the *.spr file.
       };
 
+      /**
+      * @see sulphur::engine::editor::EditorMessageID::LoadProjectPayload
+      */
       using LoadProjectMessage = EditorMessage<EditorMessageID::kLoadProject, LoadProjectPayload>;
     }
   }

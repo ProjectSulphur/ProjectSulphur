@@ -25,7 +25,7 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    const foundation::Vector<PhysicsManifold::ContactPoint>& PhysicsManifold::get_contact_points() const
+    const foundation::Vector<PhysicsManifold::ContactPoint>& PhysicsManifold::contact_points() const
     {
       return contact_points_;
     }

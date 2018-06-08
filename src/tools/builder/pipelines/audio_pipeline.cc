@@ -8,19 +8,30 @@ namespace sulphur
     //--------------------------------------------------------------------------------
     bool AudioPipeline::Create(const foundation::Path& file, foundation::AudioBankAsset& bank) const
     {
-      if(file.GetFileExtension() != "bank")
+      if (ValidatePath(file) == false)
       {
         PS_LOG_BUILDER(Error,
-          "File is not an audio bank. file: %s", file.GetString().c_str());
+          "Invalid file path passed. The path %s does not point to a location in the project directory %s", file.path().c_str(),
+          project_dir().path().c_str());
         return false;
       }
 
-      foundation::BinaryReader reader(file);
+      foundation::Path file_path = file.is_relative_path() ? project_dir() + file : file;
+
+
+      if(file_path.GetFileExtension() != "bank")
+      {
+        PS_LOG_BUILDER(Error,
+          "File is not an audio bank. file: %s", file_path.GetString().c_str());
+        return false;
+      }
+
+      foundation::BinaryReader reader(file_path);
       if(reader.is_ok() == false)
       {
         PS_LOG_BUILDER(Error, 
           "Failed to load audio bank. The audio bank asset should be discarded. file: %s", 
-          file.GetString().c_str());
+          file_path.GetString().c_str());
         return false;
       }
 
@@ -29,11 +40,11 @@ namespace sulphur
       {
         PS_LOG_BUILDER(Error,
           "The loaded audio bank is empty. The audio bank asset should be discarded. file: %s",
-          file.GetString().c_str());
+          file_path.GetString().c_str());
         return false;
       }
 
-      bank.name = file.GetFileName();
+      bank.name = file_path.GetFileName();
       eastl::move(file_data.begin(), file_data.end(), eastl::back_inserter(bank.data.data));
 
       return true;
@@ -43,6 +54,16 @@ namespace sulphur
     bool AudioPipeline::PackageAudioBank(const foundation::Path& asset_origin,
       foundation::AudioBankAsset& bank)
     {
+      if (ValidatePath(asset_origin) == false)
+      {
+        PS_LOG_BUILDER(Error,
+          "Invalid file path passed. The path %s does not point to a location in the project directory %s", asset_origin.path().c_str(),
+          project_dir().path().c_str());
+        return false;
+      }
+
+      foundation::Path origin = CreateProjectRelativePath(asset_origin);
+
       if (bank.name.get_length() == 0)
       {
         PS_LOG_BUILDER(Error,
@@ -58,7 +79,7 @@ namespace sulphur
       }
 
       foundation::Path output_file = "";
-      if (RegisterAsset(asset_origin, bank.name, output_file, bank.id) == false)
+      if (RegisterAsset(origin, bank.name, output_file, bank.id) == false)
       {
         PS_LOG_BUILDER(Error,
           "Failed to register audio bank %s. It will not be packaged.", bank.name.GetCString());

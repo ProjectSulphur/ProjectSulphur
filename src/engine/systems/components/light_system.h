@@ -16,7 +16,7 @@ namespace sulphur
   namespace engine
   {
     class LightSystem;
-
+    class RewindStorage;
     enum struct LightType
     {
       kDirectionalLight,
@@ -150,6 +150,7 @@ namespace sulphur
       IRenderer* renderer_;
 
       LightData component_data_; //!< An instance of the container that stores per-component data
+      RewindStorage* rewind_storage_;//!< Storage for the rewind system
     };
 
     template<LightComponentElements Index>

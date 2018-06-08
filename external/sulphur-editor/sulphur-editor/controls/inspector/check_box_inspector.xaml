@@ -1,0 +1,12 @@
+﻿<UserControl x:Class="sulphur.editor.controls.inspector.CheckBoxInspector"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:sulphur.editor"
+             mc:Ignorable="d" 
+             d:DesignHeight="30" d:DesignWidth="300">
+    <Grid>
+        <CheckBox Name="checkbox1" Content="" HorizontalAlignment="Left" Margin="5,0,0,0" VerticalAlignment="Center" Height="18" Width="18" Padding="4,-1,0,0" IsChecked="True" Checked="CheckBox_Checked" Unchecked="CheckBox_Unchecked"/>
+    </Grid>
+</UserControl>

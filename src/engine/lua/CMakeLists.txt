@@ -4,6 +4,7 @@ SET (LUA_CLASSES
 
 	"systems/components/camera_system.h"
 	"systems/components/transform_system.h"
+	"systems/components/skinned_mesh_render_system.h"
 	"systems/components/mesh_render_system.h"
 	"systems/components/rigid_body_system.h"
 	"systems/components/collider_system.h"

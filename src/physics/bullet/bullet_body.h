@@ -1,4 +1,5 @@
 #pragma once
+
 #include "physics/iphysics_body.h"
 #include "physics/physics_collider.h"
 
@@ -195,7 +196,7 @@ namespace sulphur
       * @see sulphur::physics::IPhysicsBody::AddShape
       * @remarks Modifying the body's shape will recalculate the inertia tensor automatically.
       */
-      PhysicsCollider* AddShape(PhysicsShape* shape) override;
+      PhysicsCollider* AddShape(IPhysicsShape* shape) override;
 
       /**
       * @see sulphur::physics::IPhysicsBody::RemoveShape
@@ -275,6 +276,8 @@ namespace sulphur
 
       btCompoundShape* shape_; //!< The shape container, can manage multiple shapes.
       foundation::Vector<PhysicsCollider*> colliders_; //!< List of colliders currently attached to this body.
+
+      float kinematic_mass_; //!< The body's mass, stored in case the body is set to kinematic.
 
       // Because Bullet handles materials per body, additional material data and functions will be handled by this class as well.
 

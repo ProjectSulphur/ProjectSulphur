@@ -3,6 +3,10 @@
 
 #include <foundation/pipeline-assets/shader.h>
 
+#if defined(PS_PS4)
+#include <graphics/gnm/ps4_default_shaders.h>
+#endif
+
 namespace sulphur
 {
   namespace engine

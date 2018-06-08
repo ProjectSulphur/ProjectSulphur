@@ -53,15 +53,15 @@ namespace sulphur
       /**
       * @brief Set the collision shape of this collider directly. This allows for shape reuse.
       * @remarks The collision shape must be of the same type as the collider.
-      * @param[in] shape (sulphur::physics::PhysicsShape*) The shape to use for this collider.
+      * @param[in] shape (sulphur::physics::IPhysicsShape*) The shape to use for this collider.
       */
-      void SetShape(physics::PhysicsShape* shape);
+      void SetShape(physics::IPhysicsShape* shape);
       
       /**
       * @brief Returns the collision shape of this collider.
-      * @return (sulphur::physics::PhysicsShape*) The pointer to the used collision shape.
+      * @return (sulphur::physics::IPhysicsShape*) The pointer to the used collision shape.
       */
-      physics::PhysicsShape* GetShape() const;
+      physics::IPhysicsShape* GetShape() const;
       
       /** 
       * @brief Sets the local translation for this collider.
@@ -461,7 +461,7 @@ namespace sulphur
     };
   
   
-  /**
+    /**
     * @class sulphur::engine::ConvexColliderComponent : public sulphur::engine::ColliderComponent
     * @brief Used to attach convex collider components to the entities to send over to the physics layer.
     * @author Daniel Konings, Angelo van der Mark
@@ -498,6 +498,43 @@ namespace sulphur
       MeshHandle GetMesh() const;
     };
 
+    /**
+    * @class sulphur::engine::MeshColliderComponent : public sulphur::engine::ColliderComponent
+    * @brief Used to attach concave mesh collider components to the entities to send over to the physics layer.
+    * @remarks This collider is only usable as a static collider.
+    * @author Daniel Konings, Angelo van der Mark
+    */
+    SCRIPT_CLASS() class MeshColliderComponent : public ColliderComponent
+    {
+    public:
+
+      SCRIPT_NAME(MeshColliderComponent);
+      SCRIPT_COMPONENT();
+      SCRIPT_EXPAND();
+
+      /**
+      * @brief Default constructor (creates an empty/invalid handle).
+      */
+      MeshColliderComponent() {};
+      /**
+      * @brief Constructor for creating a handle from an integral value.
+      * @param[in] system (sulphur::engine::ColliderComponent::System&) A reference to the relevant system that owns this component.
+      * @param[in] handle (size_t) The integral value to use for constructing the handle.
+      */
+      MeshColliderComponent(System& system, size_t handle);
+
+      /**
+      * @brief Sets the mesh to base this collider on.
+      * @param[in] mesh (sulphur::engine::MeshHandle) The handle to the mesh.
+      */
+      void SetMesh(MeshHandle mesh);
+
+      /**
+      * @brief Returns the mesh this collider is using.
+      * @return (sulphur::engine::MeshHandle) The handle to the mesh used by this collider.
+      */
+      MeshHandle GetMesh() const;
+    };
 
     /**
     * @brief An enumerator that is an index of the element. 
@@ -598,13 +635,13 @@ namespace sulphur
       * @see sulphur::engine::ColliderComponent::SetShape
       * @param[in] handle (sulphur::engine::ColliderComponent) The component handle.
       */
-      void SetShape(ColliderComponent handle, physics::PhysicsShape* shape);
+      void SetShape(ColliderComponent handle, physics::IPhysicsShape* shape);
 
       /**
       * @see sulphur::engine::ColliderComponent::GetShape
       * @param[in] handle (sulphur::engine::ColliderComponent) The component handle.
       */
-      physics::PhysicsShape* GetShape(ColliderComponent handle) const;
+      physics::IPhysicsShape* GetShape(ColliderComponent handle) const;
 
       /**
       * @brief Returns the mesh handle associated with this collider.
@@ -823,7 +860,7 @@ namespace sulphur
       CreatePhysicsBody(entity);
 
       physics::PhysicsCollider* ptr = physics_service_->CreatePrimitiveCollider(
-        entity, physics::PhysicsShape::ShapeTypes::kBox);
+        entity, physics::IPhysicsShape::ShapeTypes::kBox);
 
       return BoxColliderComponent(*this, component_data_.data.Add(
         ptr,
@@ -838,7 +875,7 @@ namespace sulphur
       CreatePhysicsBody(entity);
 
       physics::PhysicsCollider* ptr = physics_service_->CreatePrimitiveCollider(
-        entity, physics::PhysicsShape::ShapeTypes::kSphere);
+        entity, physics::IPhysicsShape::ShapeTypes::kSphere);
 
       return SphereColliderComponent(*this, component_data_.data.Add(
         ptr,
@@ -853,7 +890,7 @@ namespace sulphur
       CreatePhysicsBody(entity);
 
       physics::PhysicsCollider* ptr = physics_service_->CreatePrimitiveCollider(
-        entity, physics::PhysicsShape::ShapeTypes::kCone);
+        entity, physics::IPhysicsShape::ShapeTypes::kCone);
 
       return ConeColliderComponent(*this, component_data_.data.Add(
         ptr,
@@ -868,7 +905,7 @@ namespace sulphur
       CreatePhysicsBody(entity);
 
       physics::PhysicsCollider* ptr = physics_service_->CreatePrimitiveCollider(
-        entity, physics::PhysicsShape::ShapeTypes::kCapsule);
+        entity, physics::IPhysicsShape::ShapeTypes::kCapsule);
 
       return CapsuleColliderComponent(*this, component_data_.data.Add(
         ptr,
@@ -883,7 +920,7 @@ namespace sulphur
       CreatePhysicsBody(entity);
 
       physics::PhysicsCollider* ptr = physics_service_->CreatePrimitiveCollider(
-        entity, physics::PhysicsShape::ShapeTypes::kCylinder);
+        entity, physics::IPhysicsShape::ShapeTypes::kCylinder);
 
       return CylinderColliderComponent(*this, component_data_.data.Add(
         ptr,
@@ -902,6 +939,22 @@ namespace sulphur
         entity, MeshHandle(), true);
 
       return ConvexColliderComponent(*this, component_data_.data.Add(
+        ptr,
+        MeshHandle(),
+        entity));
+    }
+
+    //-------------------------------------------------------------------------
+    template<>
+    inline MeshColliderComponent ColliderSystem::Create(Entity& entity)
+    {
+      CreatePhysicsBody(entity);
+
+      // Uses fallback convex collider as placeholder for creation
+      physics::PhysicsCollider* ptr = physics_service_->CreateMeshCollider(
+        entity, MeshHandle(), false);
+
+      return MeshColliderComponent(*this, component_data_.data.Add(
         ptr,
         MeshHandle(),
         entity));

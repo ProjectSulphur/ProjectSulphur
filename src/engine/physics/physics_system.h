@@ -15,7 +15,7 @@
 
 #include <physics/platform_physics.h>
 #include <physics/platform_physics_constraint.h>
-#include <physics/physics_shape.h>
+#include <physics/iphysics_shape.h>
 
 #include <glm/vec3.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -45,6 +45,11 @@ namespace sulphur
       PhysicsSystem();
 
       /**
+      * @brief Default constructor
+      */
+      ~PhysicsSystem();
+
+      /**
       * @see sulphur::engine::ISystemBase::OnInitialize
       */
       void OnInitialize(Application& app, foundation::JobGraph& job_graph) override;
@@ -68,22 +73,27 @@ namespace sulphur
       void DestroyPhysicsBody(Entity entity);
 
       /**
-      * @brief Addes a constraint between the two entities of type T
-      * where T implements any of the constraint interfaces
-      * @param[in] entity_a (sulphur::engine::Entity) The master
-      * @param[in] entity_b (sulphur::engine::Entity) The slave
+      * @brief Creates a constraint for an entity.
+      * @param[in] owner (sulphur::engine::Entity) The owning entity.
+      * @param[in] type (sulphur::physics::IPhysicsConstraint::ConstraintTypes) The constraint type to create.
       */
-      template<typename T>
-      T* AddConstraint(Entity entity_a, Entity entity_b);
+      physics::IPhysicsConstraint* CreateConstraint(Entity owner,
+                                   physics::IPhysicsConstraint::ConstraintTypes type);
+
+      /**
+      * @brief Destroys the constraint.
+      * @param[in] constraint (sulphur::physics::IPhysicsConstraint*) The constraint to destroy.
+      */
+      void DestroyConstraint(physics::IPhysicsConstraint* constraint);
 
       /**
       * @brief Creates a collider instance based on a primitive collision shape.
       * @param[in] entity (sulphur::engine::Entity) The entity requesting a collider.
-      * @param[in] type (sulphur::physics::PhysicsShape::ShapeTypes) The type of primitive collider.
+      * @param[in] type (sulphur::physics::IPhysicsShape::ShapeTypes) The type of primitive collider.
       * @return (sulphur::physics::PhysicsCollider*) The created collider instance.
       */
       physics::PhysicsCollider* CreatePrimitiveCollider(Entity entity,
-                                physics::PhysicsShape::ShapeTypes type);
+                                physics::IPhysicsShape::ShapeTypes type);
 
       /**
       * @brief Creates a collider instance based on a mesh resource.
@@ -96,16 +106,17 @@ namespace sulphur
       * @todo Concave collision shapes are currently not yet supported.
       * @return (sulphur::physics::PhysicsCollider*) The created collider instance.
       */
-      physics::PhysicsCollider* CreateMeshCollider(Entity entity, MeshHandle mesh, bool convex = true);
+      physics::PhysicsCollider* CreateMeshCollider(
+        Entity entity, MeshHandle mesh, bool convex = true);
       
       /**
       * @brief Creates a collider instance based on an existing collision shape.
       * @remarks Any changes made to the given collision shape will affect all colliders using them.
       * @param[in] entity (sulphur::engine::Entity) The entity requesting a collider.
-      * @param[in] shape (sulphur::physics::PhysicsShape*) An existing collision shape.
+      * @param[in] shape (sulphur::physics::IPhysicsShape*) An existing collision shape.
       * @return (sulphur::physics::PhysicsCollider*) The created collider instance.
       */
-      physics::PhysicsCollider* CreateCollider(Entity entity, physics::PhysicsShape* shape);
+      physics::PhysicsCollider* CreateCollider(Entity entity, physics::IPhysicsShape* shape);
 
       /**
       * @brief Destroys the collider instance.
@@ -120,10 +131,10 @@ namespace sulphur
       void SimulateStep(float delta_time);
 
       /**
-      * @param[in] gravity (const glm::vec3&)
-      * @brief sets the global gravity for the world
+      * @brief Sets the global gravity for the world.
+      * @param[in] gravity (const glm::vec3&) The gravity to use.
       */
-      void SetGlobalGravity(const glm::vec3& gravity);
+      SCRIPT_FUNC() void SetGlobalGravity(const glm::vec3& gravity);
 
       /**
       * @brief Returns the global gravity for the world.
@@ -250,15 +261,12 @@ namespace sulphur
       BodyEntityMap entities_; //!< The list of Bullet rigid bodies, with a mapping to the platform physics body
       foundation::Vector<EntityBodyMapIt> changes_; //!< Set of components that have changed transform since last frame
 
-      foundation::Vector<physics::PhysicsShape*> primitive_shapes_; //!< List of primitive shapes that are currently in use.
-      foundation::Map<MeshHandle, physics::PhysicsShape*> mesh_shapes_; //!< List of mesh shapes that are currently in use.
-
-      using BodyPairIterator = foundation::Vector<EntityBodyMapIt>::iterator;
-
-      physics::Manifolds contact_history_; //!< Collection that keeps track of past collision events for the callbacks
+      foundation::Vector<physics::IPhysicsShape*> primitive_shapes_; //!< List of primitive shapes that are currently in use.
+      foundation::Map<MeshHandle, physics::IPhysicsShape*> convex_shapes_; //!< List of convex mesh shapes that are currently in use.
+      foundation::Map<MeshHandle, physics::IPhysicsShape*> concave_shapes_; //!< List of concave mesh shapes that are currently in use.
+      MeshHandle fallback_mesh_; //!< Fallback mesh instance for shapes.
 
       physics::PlatformPhysics* physics_; //!< A pointer to the platform-specific physics wrapper
-
       ScriptSystem* script_system_; //!< Cached local scripting system;
 
       /**
@@ -266,19 +274,30 @@ namespace sulphur
       */
       enum struct CallbackType : int
       {
-        kCollisionEnter,
-        kCollisionStay,
-        kCollisionLeave,
-        kOverlapEnter,
-        kOverlapStay,
-        kOverlapLeave,
-        kSize
+        kCollisionEnter = 0,
+        kCollisionStay = 1,
+        kCollisionLeave = 2,
+        kOverlapEnter = 3,
+        kOverlapStay = 4,
+        kOverlapLeave = 5,
+        kSize = 6
       };
 
-      using EntityCallbackMap =
-        foundation::Map<CallbackType, foundation::Vector<ScriptableCallback>>; //!< Map to keep track of all possible callback instances
-      using CallbackMap = foundation::Map<Entity, EntityCallbackMap>; //!< Map that maps callbacks to an entity
-      CallbackMap callbacks_; //!< Maps the callbacks to an entity
+      /**
+      * @struct sulphur::engine::PhysicsScriptingCallbacks
+      * @brief a collection that keeps track of callbacks and their respective bodies it SoA so every index is aligned
+      */
+      struct PhysicsScriptingCallbacks
+      {
+        physics::PhysicsBody** bodies_; //!< The related physics body for the callback, stored so no real time fetching has to be done based on entity
+        CallbackType* types_; //!< The callback type
+        ScriptableCallback* callbacks_; //!< The actual callback object for scripting to call
+        size_t size_; //!< The size of this SoA
+      };
+
+      physics::PhysicsManifold* contact_history_; //!< Collection that keeps track of past collision events for the callbacks
+      size_t contact_history_size_; //!< Size of the contact_history_;
+      PhysicsScriptingCallbacks callbacks_; //!< SoA scripting callbacks
 
       /**
       * @brieft internal add callback function
@@ -298,14 +317,11 @@ namespace sulphur
 
       /**
       * @brief Internal function to call a callback
-      * @param[in] entity (sulphur::engine::Entity) the entity that owns the callback
-      * @param[in] type (sulphur::engine::PhysicsSystem::CallbackType) The callback type
-      * @param[in] manifolds (sulphur::foundation::Vector<sulphur::physics::PhysicsManifold>&) the manifolds to be passed to the callback
+      * @param[in] callback (int) the callback index in sulphur::engine::PhysicsSystem::callbacks_
+      * @param[in] manifold (int) the manifold index in sulphur::physics::PlatformPhysics::GetManifolds()
+      * @param[in] swap_manifold_order (bool) if the order of the manifold should be swapped (body_a = body_b and body_b = body_a)
       */
-      void inline CallCallback(
-        Entity entity,
-        CallbackType type,
-        foundation::Vector<physics::PhysicsManifold>& manifolds);
+      void inline CallCallback(int callback, int manifold, bool swap_manifold_order = false);
     };
 
     /**
@@ -323,17 +339,5 @@ namespace sulphur
         return lhs->first.GetIndex() == rhs.GetIndex();
       }
     };
-
-    template<>
-    inline physics::FixedConstraint* PhysicsSystem::AddConstraint<physics::FixedConstraint>(Entity entity_a, Entity entity_b)
-    {
-      return physics_->AddFixedConstraint(bodies_.at(entity_a), bodies_.at(entity_b));
-    }
-
-    template<>
-    inline physics::HingeConstraint* PhysicsSystem::AddConstraint<physics::HingeConstraint>(Entity entity_a, Entity entity_b)
-    {
-      return physics_->AddHingeConstraint(bodies_.at(entity_a), bodies_.at(entity_b));
-    }
   }
 }

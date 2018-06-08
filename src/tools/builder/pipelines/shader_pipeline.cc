@@ -4,7 +4,14 @@
 #include "tools/builder/platform-specific/win32/win32_hlsl_compiler.h"
 #include "tools/builder/shared/application.h"
 
+#ifdef PS_PS4_TOOLS
+#include "tools/builder/platform-specific/ps4/ps4_pssl_compiler.h"
+#define ADDITIONALCOMPILERLIST sulphur::builder::PS4PsslCompiler, \
+                     sulphur::builder::Win32HlslCompiler
+
+#else
 #define ADDITIONALCOMPILERLIST sulphur::builder::Win32HlslCompiler
+#endif
 
 #include <foundation/io/binary_writer.h>
 #include <foundation/io/binary_reader.h>
@@ -20,7 +27,18 @@ namespace sulphur
     bool ShaderPipeline::Create(const foundation::Path& shader_file, 
       const ShaderPipelineOptions& options, foundation::ShaderAsset& shader)
     {
-      foundation::String extension = shader_file.GetFileExtension();
+      if (ValidatePath(shader_file) == false)
+      {
+        PS_LOG_BUILDER(Error,
+          "Invalid file path passed. The path %s does not point to a location in the project directory %s", shader_file.path().c_str(),
+          project_dir().path().c_str());
+        return false;
+      }
+
+      foundation::Path file_path = shader_file.is_relative_path() ? project_dir() + shader_file : shader_file;
+
+
+      foundation::String extension = file_path.GetFileExtension();
       if (extension != "vert" && extension != "pixe" && extension != "geom" &&
         extension != "comp" && extension != "doma" && extension != "hull")
       {
@@ -29,33 +47,33 @@ namespace sulphur
         return false;
       }
 
-      foundation::BinaryReader reader(shader_file, false);
+      foundation::BinaryReader reader(file_path, false);
 
       if (reader.is_ok() == false)
       {
-        PS_LOG_BUILDER(Warning,
-          "Failed to load shader. file: %s", shader_file.GetString().c_str());
+        PS_LOG_BUILDER(Error,
+          "Failed to load shader. file: %s", file_path.GetString().c_str());
         return false;
       }
 
 
-      if (GetShaderStage(shader_file, shader.data) == false)
+      if (GetShaderStage(file_path, shader.data) == false)
       {
         DeconstructCompilers();
 
-        PS_LOG_BUILDER(Warning,
+        PS_LOG_BUILDER(Error,
           "Failed to deduce shader stage from file extension.");
 
         return false;
       }
 
-      GetShaderName(shader_file, shader);
+      GetShaderName(file_path, shader);
 
       
       foundation::String source_data = GetShaderDefines();
-      source_data += reader.GetDataAsString().c_str();
-      
-      CreateFromSource(source_data, shader_file, shader.name.GetString(), 
+      source_data += reader.GetDataAsString();
+
+      CreateFromSource(source_data, file_path, shader.name.GetString(),
         shader.data.stage, options, shader);
 
       return true;
@@ -65,6 +83,16 @@ namespace sulphur
     bool ShaderPipeline::PackageShader(const foundation::Path& asset_origin,
       foundation::ShaderAsset& shader)
     {
+      if (ValidatePath(asset_origin) == false)
+      {
+        PS_LOG_BUILDER(Error,
+          "Invalid file path passed. The path %s does not point to a location in the project directory %s", asset_origin.path().c_str(), 
+          project_dir().path().c_str());
+        return false;
+      }
+
+      foundation::Path origin = CreateProjectRelativePath(asset_origin);
+
       if (shader.name.get_length() == 0)
       {
         PS_LOG_BUILDER(Warning,
@@ -82,7 +110,7 @@ namespace sulphur
       }
 
       foundation::Path output_file = "";
-      if (RegisterAsset(asset_origin, shader.name, output_file, shader.id) == false)
+      if (RegisterAsset(origin, shader.name, output_file, shader.id) == false)
       {
         PS_LOG_BUILDER(Warning,
           "Failed to register shader. It will not be packaged.");
@@ -171,10 +199,10 @@ namespace sulphur
           "}                                                                              \n";
 
         if (CreateFromSource(source, "", asset.name.GetString(), asset.data.stage,
-          options, asset) == false)
+          options, asset) == false || (asset.data.hlsl_data.empty() == true && 
+          asset.data.pssl_data.empty() == true))
         {
-          PS_LOG_BUILDER(Error,
-            "Failed to create default asset.");
+          PS_LOG_BUILDER(Error, "Failed to create default asset.");
           return false;
         }
 
@@ -215,17 +243,16 @@ namespace sulphur
           "}                                                                                          \n";
 
         if (CreateFromSource(source, "", asset.name.GetString(), asset.data.stage,
-          options, asset) == false)
+          options, asset) == false || (asset.data.hlsl_data.empty() == true &&
+          asset.data.pssl_data.empty() == true))
         {
-          PS_LOG_BUILDER(Error,
-            "Failed to create default asset.");
+          PS_LOG_BUILDER(Error, "Failed to create default asset.");
           return false;
         }
 
         if (PackageShader(ASSET_ORIGIN_USER, asset) == false)
         {
-          PS_LOG_BUILDER(Error,
-            "Failed to package default asset.");
+          PS_LOG_BUILDER(Error, "Failed to package default asset.");
           return false;
         }
       }
@@ -424,7 +451,7 @@ namespace sulphur
       {
         DeconstructCompilers();
 
-        PS_LOG_BUILDER(Warning,
+        PS_LOG_BUILDER(Error,
           "Shader validation failed. file: %s.", shader_file.GetString().c_str());
         return false;
       }

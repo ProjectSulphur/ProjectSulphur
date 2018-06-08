@@ -56,6 +56,15 @@ namespace sulphur
           public UInt64 entity_index; //!< The index in the hierarchy of the new entity
           public UInt64 sibling_index; //!< The sibling index of the new entity
           public UInt64 parent_index; //!< The index in the hierarchy of the new entity's parent (or UInt64.MaxValue to indicate no parent)
+          [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
+          public float[] position; //!< Position to instantiate the object at.
+
+          [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+          public float[] rotation; //!< Rotation to instantiate the object at.
+
+          [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
+          public float[] scale; //!< Scale to instantiate the object at.
+
         }
 
         /**
@@ -141,10 +150,10 @@ namespace sulphur
         [StructLayout(LayoutKind.Sequential)]
         struct EntityScaleMessage
         {
-          UInt64 entity_index; //!< index of the entity in the world hierarchy.
-          float x; //!< The scaling to be applied in the x direction.
-          float y; //!< The scaling to be applied in the y direction.
-          float z; //!< The scaling to be applied in the z direction.
+          public UInt64 entity_index; //!< index of the entity in the world hierarchy.
+          public float x; //!< The scaling to be applied in the x direction.
+          public float y; //!< The scaling to be applied in the y direction.
+          public float z; //!< The scaling to be applied in the z direction.
         };
 
         /**
@@ -156,11 +165,11 @@ namespace sulphur
         [StructLayout(LayoutKind.Sequential)]
         struct EntityRotateMessage
         {
-          UInt64 entity_index; //!< index of the entity in the world hierarchy.
-          float w; //!< The w component of the quaternion with which to rotate the entity.
-          float x; //!< The x component of the quaternion with which to rotate the entity.
-          float y; //!< The y component of the quaternion with which to rotate the entity.
-          float z; //!< The z component of the quaternion with which to rotate the entity.
+          public UInt64 entity_index; //!< index of the entity in the world hierarchy.
+          public float w; //!< The w component of the quaternion with which to rotate the entity.
+          public float x; //!< The x component of the quaternion with which to rotate the entity.
+          public float y; //!< The y component of the quaternion with which to rotate the entity.
+          public float z; //!< The z component of the quaternion with which to rotate the entity.
         };
 
         /**
@@ -178,12 +187,12 @@ namespace sulphur
            */
           public LoadProjectMessage(string path)
           {
-            directory_path = new byte[Networking.kMaxPayLoadSize];
+            directory_path = new byte[Networking.kMaxPayLoadSize - 1];
             byte[] str_bytes = System.Text.Encoding.ASCII.GetBytes(path);
 
             Buffer.BlockCopy(str_bytes, 0, directory_path, 0, str_bytes.Length);
           }
-
+          [MarshalAs(UnmanagedType.ByValArray, SizeConst = (int)Networking.kMaxPayLoadSize - 1)]
           byte[] directory_path; //!< Byte array with data containning the converted path string.
         };
       }
@@ -206,6 +215,8 @@ namespace sulphur
         kPreviousFrame,  //!< A request from the editor to rewind one frame
         kStartedPlaying, //!< A request from the editor to start playing the game
         kStoppedPlaying, //!< A request from the editor to stop playing the game
+        kPause,
+        kContinuePlaying,
         kNextFrame,  //!< A request from the editor to forward one frame
         kFastForward,  //!< A request from the editor to fast forward
 

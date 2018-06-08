@@ -179,7 +179,7 @@ namespace sulphur
     {}
 
     //--------------------------------------------------------------------------
-    void D3D11Renderer::SetCamera(const glm::mat4& view, const glm::mat4& projection, const engine::DepthBuffer& depth_buffer, const engine::RenderTarget& render_target)
+    void D3D11Renderer::SetCamera(const glm::vec3& pos, const glm::mat4& view, const glm::mat4& projection, const engine::DepthBuffer& depth_buffer, const engine::RenderTarget& render_target)
     {
       // TODO:
 
@@ -188,6 +188,7 @@ namespace sulphur
       
       cb_per_obj_.view = view;
       cb_per_obj_.projection = projection;
+      cb_per_obj_.eye_position = pos;
 
       if (!depth_buffer.buffer().GetGPUHandle())
       {

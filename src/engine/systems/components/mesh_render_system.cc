@@ -120,6 +120,7 @@ namespace sulphur
       {
         camera_system_->set_current_camera(camera);
         renderer_->SetCamera(
+          camera.GetTransform().GetWorldPosition(),
           camera.GetViewMatrix(),
           camera.GetProjectionMatrix(),
           camera.GetDepthBuffer(),
@@ -134,7 +135,7 @@ namespace sulphur
             component_data_.entity[i].Get<TransformComponent>();
 
           // Layer culling
-          if (camera.GetLayerMask().ContainsLayer(transform.GetSortingLayer()) == false)
+          if (component_data_.visible[i] == false || camera.GetLayerMask().ContainsLayer(transform.GetSortingLayer()) == false)
           {
             continue;
           }

@@ -25,6 +25,8 @@ namespace sulphur
         kPreviousFrame,  //!< A request from the editor to rewind one frame
         kStartedPlaying, //!< A request from the editor to start playing the game
         kStoppedPlaying, //!< A request from the editor to stop playing the game
+        kPause,
+        kContinuePlaying,
         kNextFrame,  //!< A request from the editor to forward one frame
         kFastForward,  //!< A request from the editor to fast forward
 

@@ -3,41 +3,51 @@
 
 //#define SCRIPT_COMPILE_DEBUG
 
-namespace sulphur 
+namespace sulphur
 {
-  namespace builder 
+  namespace builder
   {
     //--------------------------------------------------------------------------------
-    bool ScriptPipeline::Create(const foundation::Path& file, 
+    bool ScriptPipeline::Create(const foundation::Path& file,
       foundation::ScriptAsset& script) const
     {
+      if (ValidatePath(file) == false)
+      {
+        PS_LOG_BUILDER(Error,
+          "Invalid file path passed. The path %s does not point to a location in the project directory %s", file.path().c_str(),
+          project_dir().path().c_str());
+        return false;
+      }
+
+      foundation::Path file_path = file.is_relative_path() ? project_dir() + file : file;
+
       char buffer[1024] = {};
 #ifdef SCRIPT_COMPILE_DEBUG
-      snprintf(buffer, sizeof(buffer), "luajit -bg \"%s\" temp_script.temp", file.GetString().c_str());
+      snprintf(buffer, sizeof(buffer), "luajit -bg \"%s\" temp_script.temp", file_path.GetString().c_str());
 #else
-      snprintf(buffer, sizeof(buffer), "luajit -b \"%s\" temp_script.temp", file.GetString().c_str());
+      snprintf(buffer, sizeof(buffer), "luajit -b \"%s\" temp_script.temp", file_path.GetString().c_str());
 #endif
-      
+
       int result = system(buffer);
-      if(result != 0)
+      if (result != 0)
       {
         PS_LOG_WITH(foundation::LineAndFileLogger, Error,
-          "Failed to create bytecode from script. file: %s", file.GetString().c_str());
+          "Failed to create bytecode from script. file: %s", file_path.GetString().c_str());
         return false;
       }
 
       foundation::BinaryReader binary_reader("temp_script.temp");
-      if(binary_reader.is_ok() == false)
+      if (binary_reader.is_ok() == false)
       {
         return false;
       }
 
       remove("temp_script.temp");
 
-      script.name = file.GetFileName();
+      script.name = file_path.GetFileName();
 
       script.data.binary.resize(binary_reader.GetSize());
-      memcpy_s(script.data.binary.data(), script.data.binary.size(), 
+      memcpy_s(script.data.binary.data(), script.data.binary.size(),
         binary_reader.data().data(), binary_reader.GetSize());
 
       return true;
@@ -47,6 +57,16 @@ namespace sulphur
     bool ScriptPipeline::PackageScript(const foundation::Path& asset_origin,
       foundation::ScriptAsset& script)
     {
+      if (ValidatePath(asset_origin) == false)
+      {
+        PS_LOG_BUILDER(Error,
+          "Invalid file path passed. The path %s does not point to a location in the project directory %s", asset_origin.path().c_str(),
+          project_dir().path().c_str());
+        return false;
+      }
+
+      foundation::Path origin = CreateProjectRelativePath(asset_origin);
+
       if (script.name.get_length() == 0)
       {
         PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
@@ -62,7 +82,7 @@ namespace sulphur
       }
 
       foundation::Path output_file = "";
-      if (RegisterAsset(asset_origin, script.name, output_file, script.id) == false)
+      if (RegisterAsset(origin, script.name, output_file, script.id) == false)
       {
         PS_LOG_WITH(foundation::LineAndFileLogger, Warning,
           "Failed to register script. It will not be packaged.");

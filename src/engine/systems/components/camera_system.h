@@ -24,6 +24,7 @@ namespace sulphur
     class Entity;
     class CameraSystem;
     class TransformComponent;
+    class RewindStorage;
 
     SCRIPT_CLASS() class CameraEnums : public ScriptableObject
     {
@@ -798,6 +799,7 @@ namespace sulphur
       DepthBuffer g_depth_buffer_; //!< The depth buffer used as a back buffer
 
       CameraData component_data_; //!< An instance of the container that stores per-component data
+      RewindStorage* rewind_storage_;//!< Rewind storage for the camera system
     };
   }
 }

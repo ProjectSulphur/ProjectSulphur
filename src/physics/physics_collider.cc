@@ -1,5 +1,5 @@
 #include "physics/physics_collider.h"
-#include "physics/physics_shape.h"
+#include "physics/iphysics_shape.h"
 
 namespace sulphur
 {
@@ -9,7 +9,7 @@ namespace sulphur
     const float PhysicsCollider::kStaticFrictionThreshold = 0.01f;
 
     //-------------------------------------------------------------------------
-    PhysicsCollider::PhysicsCollider(IPhysicsBody* owner, PhysicsShape* shape) :
+    PhysicsCollider::PhysicsCollider(IPhysicsBody* owner, IPhysicsShape* shape) :
       owner_(owner),
       shape_(shape),
       translation_(0,0,0),
@@ -51,7 +51,7 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    PhysicsShape* PhysicsCollider::shape() const
+    IPhysicsShape* PhysicsCollider::shape() const
     {
       return shape_;
     }

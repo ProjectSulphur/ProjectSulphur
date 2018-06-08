@@ -47,10 +47,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="FontAwesome.WPF, Version=4.7.0.37774, Culture=neutral, PublicKeyToken=0758b07a11a4f466, processorArchitecture=MSIL">
-      <HintPath>C:\Users\Stan\Documents\Visual Studio 2015\Projects\SulphurEngine\packages\FontAwesome.WPF.4.7.0.9\lib\net40\FontAwesome.WPF.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\..\..\..\sulphur-workspace\packages\FontAwesome.WPF.4.7.0.9\lib\net40\FontAwesome.WPF.dll</HintPath>
     </Reference>
-    <Reference Include="Newtonsoft.Json, Version=6.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL" />
+    <Reference Include="Newtonsoft.Json, Version=11.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\..\..\..\..\sulphur-workspace\packages\Newtonsoft.Json.11.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
@@ -84,6 +85,50 @@
     <Compile Include="controls\hierarchy_viewer_control.xaml.cs">
       <DependentUpon>hierarchy_viewer_control.xaml</DependentUpon>
     </Compile>
+    <Compile Include="controls\inspector\check_box_inspector.xaml.cs">
+      <DependentUpon>check_box_inspector.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\inspector\color_inspector.xaml.cs">
+      <DependentUpon>color_inspector.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\inspector\inspectors.cs" />
+    <Compile Include="controls\inspector\matrix3x3_inspector.xaml.cs">
+      <DependentUpon>matrix3x3_inspector.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\inspector\matrix4x4_inspector.xaml.cs">
+      <DependentUpon>matrix4x4_inspector.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\network_debugger_control.xaml.cs">
+      <DependentUpon>network_debugger_control.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="data\components\transform_component.cs" />
+    <Compile Include="data\material_data.cs" />
+    <Compile Include="data\shader_data.cs" />
+    <Compile Include="data\uniform_buffer_data.cs" />
+    <Compile Include="utils\color_picker_window.xaml.cs">
+      <DependentUpon>color_picker_window.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\inspector\combo_box_inspector.xaml.cs">
+      <DependentUpon>combo_box_inspector.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\inspector\image_inspector.xaml.cs">
+      <DependentUpon>image_inspector.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\inspector\number_inspector.xaml.cs">
+      <DependentUpon>number_inspector.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\inspector\slider_inspector.xaml.cs">
+      <DependentUpon>slider_inspector.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\inspector\vector2_inspector.xaml.cs">
+      <DependentUpon>vector2_inspector.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\inspector\vector3_inspector.xaml.cs">
+      <DependentUpon>vector3_inspector.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="controls\inspector\vector4_inspector.xaml.cs">
+      <DependentUpon>vector4_inspector.xaml</DependentUpon>
+    </Compile>
     <Compile Include="controls\layout\dynamic_dock_splitter.cs" />
     <Compile Include="controls\layout\dynamic_dock_tabcontrol.cs" />
     <Compile Include="controls\layout\layout_manager.cs" />
@@ -93,12 +138,16 @@
       <DependentUpon>tab_window.xaml</DependentUpon>
     </Compile>
     <Compile Include="controls\logger_control.cs" />
+    <Compile Include="controls\inspector_control.xaml.cs">
+      <DependentUpon>inspector_control.xaml</DependentUpon>
+    </Compile>
     <Compile Include="controls\menu_bar_control.xaml.cs">
       <DependentUpon>menu_bar_control.xaml</DependentUpon>
     </Compile>
     <Compile Include="controls\project_window.xaml.cs">
       <DependentUpon>project_window.xaml</DependentUpon>
     </Compile>
+    <Compile Include="utils\string_to_formula.cs" />
     <Compile Include="controls\toolbar_control.xaml.cs">
       <DependentUpon>toolbar_control.xaml</DependentUpon>
     </Compile>
@@ -132,7 +181,63 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="controls\inspector\check_box_inspector.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="controls\inspector\color_inspector.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="controls\inspector\matrix3x3_inspector.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="controls\inspector\matrix4x4_inspector.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="controls\network_debugger_control.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="utils\color_picker_window.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="controls\inspector\combo_box_inspector.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="controls\inspector\image_inspector.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="controls\inspector\number_inspector.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="controls\inspector\slider_inspector.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="controls\inspector\vector2_inspector.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="controls\inspector\vector3_inspector.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="controls\inspector\vector4_inspector.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="controls\layout\tab_window.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="controls\inspector_control.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

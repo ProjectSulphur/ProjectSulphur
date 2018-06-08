@@ -17,6 +17,8 @@ namespace sulphur
       glm::fvec3 tangent; //!< Vertex tangent.
       glm::fvec2 uv; //!< Vertex UV coordinates.
       glm::fvec4 color; //!< Vertex color.
+      glm::fvec4 bone_weights; //!< Per vertex bone weights.
+      glm::uvec4 bone_indices; //!< Per vertex bone indices.
     };
   }
 }

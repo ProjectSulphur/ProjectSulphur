@@ -12,15 +12,15 @@ namespace sulphur
     //-------------------------------------------------------------------------
     BulletCapsuleShape::BulletCapsuleShape()
     {
-      shape_ = foundation::Memory::Construct<btCapsuleShape>(PhysicsShape::kDefaultExtents,
-                                                             PhysicsShape::kDefaultExtents*3);
+      shape_ = foundation::Memory::Construct<btCapsuleShape>(IPhysicsShape::kDefaultExtents,
+                                                             IPhysicsShape::kDefaultExtents*3);
       shape_->setUserPointer(this);
     }
 
     //-------------------------------------------------------------------------
-    PhysicsShape::ShapeTypes BulletCapsuleShape::GetType() const
+    BulletCapsuleShape::~BulletCapsuleShape()
     {
-      return ShapeTypes::kCapsule;
+      foundation::Memory::Destruct<btCapsuleShape>(shape_);
     }
 
     //-------------------------------------------------------------------------
@@ -28,7 +28,10 @@ namespace sulphur
     {
       btVector3 half_extents = btVector3(radius, GetHeight()*0.5f, radius);
 
-      reinterpret_cast<btCapsuleShape*>(shape_)->setImplicitShapeDimensions(half_extents);
+      shape_->setImplicitShapeDimensions(half_extents);
+      // Update m_collisionMargin using this function, because Bullet doesn't provide another way
+      // https://www.youtube.com/watch?v=pIgZ7gMze7A
+      shape_->setLocalScaling(btVector3(1.0f, 1.0f, 1.0f));
 
       UpdateColliders();
     }
@@ -36,7 +39,7 @@ namespace sulphur
     //-------------------------------------------------------------------------
     float BulletCapsuleShape::GetRadius() const
     {
-      return reinterpret_cast<btCapsuleShape*>(shape_)->getRadius();
+      return shape_->getRadius();
     }
 
     //-------------------------------------------------------------------------
@@ -44,7 +47,7 @@ namespace sulphur
     {
       btVector3 half_extents = btVector3(GetRadius(), height*0.5f, GetRadius());
 
-      reinterpret_cast<btCapsuleShape*>(shape_)->setImplicitShapeDimensions(half_extents);
+      shape_->setImplicitShapeDimensions(half_extents);
 
       UpdateColliders();
     }
@@ -52,7 +55,13 @@ namespace sulphur
     //-------------------------------------------------------------------------
     float BulletCapsuleShape::GetHeight() const
     {
-      return reinterpret_cast<btCapsuleShape*>(shape_)->getHalfHeight() * 2;
+      return shape_->getHalfHeight() * 2;
+    }
+
+    //-------------------------------------------------------------------------
+    void* BulletCapsuleShape::GetInternalShape() const
+    {
+      return shape_;
     }
   }
 }

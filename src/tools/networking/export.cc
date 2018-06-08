@@ -288,7 +288,13 @@ namespace sulphur
     //-------------------------------------------------------------------------
     void SNetClearRPCBuffer()
     {
-      return network_manager_->ClearRPCBuffer();
+      network_manager_->ClearRPCBuffer();
+    }
+
+    //-------------------------------------------------------------------------
+    void SNetSortIDs()
+    {
+      network_manager_->SortIDS();
     }
 
     namespace editor
@@ -409,13 +415,12 @@ namespace sulphur
               source_size = capacity;
             }
 
-            const enet_uint8* id_src = network_event.packet->data;
+            *id = *network_event.packet->data;
             const enet_uint8* payload_src = 
               network_event.packet->data + sizeof(uint32_t);
-            memcpy_s(id, sizeof(*id), id_src, sizeof(uint32_t));
             if (payload_size > 0 && capacity > 0)
             {
-              memcpy_s(data, capacity, payload_src, payload_size);
+              memcpy_s(data, capacity, payload_src, source_size);
             }
 
             enet_packet_destroy(network_event.packet);

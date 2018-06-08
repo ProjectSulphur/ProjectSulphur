@@ -22,6 +22,16 @@ namespace sulphur
       return frame_data_[index];
     }
 
+    RewindSystem::RewindSystem()
+      :
+      IServiceSystem( "Rewinder" ),
+      frames_to_skip_( 0 ),
+      frame_limit_( 0 ),
+      frame_to_restore_( -1 ),
+      prev_restored_frame( -1 ),
+      active_( false )
+    {}
+
     //--------------------------------------------------------------------------
     void RewindSystem::OnInitialize(Application&, foundation::JobGraph& job_graph )
     {

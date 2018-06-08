@@ -27,6 +27,7 @@ namespace sulphur
     class ShaderPipeline;
     class SkeletonPipeline;
     class TexturePipeline;
+    class WorldPipeline;
 
     namespace shared
     {
@@ -54,6 +55,7 @@ namespace sulphur
           CreatePipeline<ShaderPipeline>();
           CreatePipeline<SkeletonPipeline>();
           CreatePipeline<TexturePipeline>();
+          CreatePipeline<WorldPipeline>();
         }
 
         /**
@@ -150,11 +152,16 @@ namespace sulphur
       PipelineContainer* pipelines; //!< Container used to hold all pipelines.
 
       static SceneLoader* scene_loader = nullptr;             //!< Scene loader used for loading scenes
-
+  
       /**
       * @brief initializes all the pipeline and readies them for use
       */
       PS_BUILDER_C_API void Initialize();
+
+      /**
+      * @brief Set the pipelines project directory.
+      */
+      PS_BUILDER_C_API void SetProjectDirectory(const char* project_dir);
 
       /**
       * @brief frees resources used by all different pipelines
@@ -189,6 +196,8 @@ namespace sulphur
       * @return (bool) success return value
       */
       PS_BUILDER_C_API bool ImportMaterial(const char* path, uint64_t* id);
+
+      PS_BUILDER_C_API bool RegisterWorld(const char* path, uint64_t* id);
 
       /**
       * @brief imports a model and packages it for use by the engine and editor

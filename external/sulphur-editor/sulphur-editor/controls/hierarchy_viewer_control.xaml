@@ -22,7 +22,7 @@
 
 
                 <!-- Entity name label -->
-            <controls:EditBox Name="hierarchy_item" text_="{Binding Path=name}" AllowDrop="True"
+            <controls:EditBox Name="hierarchy_item" Text="{Binding Path=name}" AllowDrop="True"
                                                                                 Drop="HierarchyItemDrop">
 
                 <!--- Context menu for a single entity -->

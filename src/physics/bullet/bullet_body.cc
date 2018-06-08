@@ -2,9 +2,9 @@
 
 #include "physics/bullet/bullet_include.h"
 #include "physics/bullet/bullet_conversions.h"
-
-#include "physics/physics_shape.h"
 #include "physics/bullet/bullet_collider.h"
+
+#include "physics/iphysics_shape.h"
 
 #include <foundation/memory/memory.h>
 #include <foundation/logging/logger.h>
@@ -19,6 +19,7 @@ namespace sulphur
       const glm::vec3& translation,
       const glm::quat& rotation) 
       : dynamics_world_(dynamics_world),
+      kinematic_mass_(1.0f),
       friction_combine_mode_(PhysicsCollider::kAverage),
       restitution_combine_mode_(PhysicsCollider::kAverage),
       static_friction_(0.6f)
@@ -119,6 +120,11 @@ namespace sulphur
     //-------------------------------------------------------------------------
     float BulletBody::GetMass() const
     {
+      if (GetPhysicsBodyType() == PhysicsBodyType::kKinematic)
+      {
+        return kinematic_mass_; // Return stored value for this case, else it returns 0.
+      }
+
       float mass = rigid_body_->getInvMass();
       return mass == 0.0f ? 0.0f : 1.0f / mass;
     }
@@ -313,7 +319,7 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
-    PhysicsCollider* BulletBody::AddShape(PhysicsShape* shape)
+    PhysicsCollider* BulletBody::AddShape(IPhysicsShape* shape)
     {
       PhysicsCollider* new_collider = foundation::Memory::Construct<BulletCollider>
         (reinterpret_cast<IPhysicsBody*>(this), shape);
@@ -372,31 +378,45 @@ namespace sulphur
     {
       if (GetPhysicsBodyType() == type)
       {
-        ForceWake();
         return;
       }
+
+      PhysicsBodyType old_type = GetPhysicsBodyType();
 
       // Switching between static and non-static requires the body to be
       // temporarily removed from the simulation. I couldn't find it documented 
       // anywhere, but the physics world doesn't get notified about this change otherwise.
       bool static_switch = (type == PhysicsBodyType::kStatic || 
-                          GetPhysicsBodyType() == PhysicsBodyType::kStatic);
+                          old_type == PhysicsBodyType::kStatic);
 
       if (static_switch == true)
       {
         dynamics_world_->removeRigidBody(rigid_body_);
-        SetMass(static_cast<float>(type != PhysicsBodyType::kStatic));
       }
 
-      if (type == PhysicsBodyType::kKinematic)
+      switch (type)
       {
-        rigid_body_->setCollisionFlags(rigid_body_->getCollisionFlags() | 
+      case PhysicsBodyType::kKinematic:
+        if (old_type == PhysicsBodyType::kDynamic)
+        {
+          kinematic_mass_ = GetMass(); //Store the mass for later.
+        }
+        rigid_body_->setCollisionFlags(rigid_body_->getCollisionFlags() |
           btCollisionObject::CollisionFlags::CF_KINEMATIC_OBJECT);
-      }
-      else
-      {
+        SetMass(0.0f);
+        break;
+
+      case PhysicsBodyType::kStatic:
         rigid_body_->setCollisionFlags(rigid_body_->getCollisionFlags() &
           ~btCollisionObject::CollisionFlags::CF_KINEMATIC_OBJECT);
+        SetMass(0.0f);
+        break;
+
+      case PhysicsBodyType::kDynamic:
+        rigid_body_->setCollisionFlags(rigid_body_->getCollisionFlags() &
+          ~btCollisionObject::CollisionFlags::CF_KINEMATIC_OBJECT);
+        SetMass(kinematic_mass_); //Restore the mass, or set to default.
+        break;
       }
 
       if (static_switch == true)
@@ -412,13 +432,13 @@ namespace sulphur
     //-------------------------------------------------------------------------
     PhysicsBodyType BulletBody::GetPhysicsBodyType() const
     {
-      if (rigid_body_->isStaticObject() == true)
-      {
-        return PhysicsBodyType::kStatic;
-      }
       if(rigid_body_->isKinematicObject() == true)
       {
         return PhysicsBodyType::kKinematic;
+      }
+      if (rigid_body_->isStaticObject() == true)
+      {
+        return PhysicsBodyType::kStatic;
       }
       return PhysicsBodyType::kDynamic;
     }

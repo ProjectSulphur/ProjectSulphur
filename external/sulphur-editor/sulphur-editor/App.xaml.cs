@@ -3,6 +3,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System;
+using System.Windows.Interop;
 
 namespace sulphur
 {
@@ -52,8 +53,8 @@ namespace sulphur
 
         InitializeComponent();
         main_.Initialize();
-        
 
+        SubscriptionHandler.Register(main_);
         SubscriptionHandler.Register(handler_);
         SubscriptionHandler.Register(Resources["asset_database"] as AssetDatabase);
         SubscriptionHandler.Register(Resources["workspace"] as Workspace);
@@ -64,6 +65,7 @@ namespace sulphur
 
         main_.Show();
         main_.Focus();
+        main_.AddWndProc();
       }
 
       /**

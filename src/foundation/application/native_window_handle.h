@@ -23,7 +23,7 @@ namespace sulphur
       union
       {
         void* win32_window; //!< Native win32 window handle
-        int totally_not_a_window_handle_for_a_gaming_platform_by_a_big_japanse_conglomerate;     //!< This variable is not used...
+        int totally_not_a_window_handle_for_a_gaming_platform_by_a_big_japanse_conglomerate; //!< This variable is not used...
       };
     };
   }

@@ -254,9 +254,16 @@ namespace sulphur
       operator int() const;
 
       /**
-       * @brief Equal to operator.
-       */
+      * @brief Equal to handle operator.
+      * @param[in] other (const sulphur::engine::BaseAssetHandle&) The other handle
+      */
       bool operator==(const BaseAssetHandle& other) const;
+
+      /**
+      * @brief Not equal to handle operator.
+      * @param[in] other (const sulphur::engine::BaseAssetHandle&) The other handle
+      */
+      bool operator!=(const BaseAssetHandle& other) const;
 
       /**
       * @brief Less than operator.
@@ -264,6 +271,12 @@ namespace sulphur
       * @return (bool) True if this handle's asset ID is less than the other handle.
       */
       bool operator<(const BaseAssetHandle& other) const;
+
+      /**
+      * @brief Returns whether this handle is valid.
+      * @returns (bool) True if this handle has a valid asset ID, false if not.
+      */
+      bool IsValid() const;
 
       /**
        * @brief Release and invalidate the handle.

@@ -226,11 +226,7 @@ namespace sulphur
       static MeshHandle mesh_plane_; //!< The mesh instance for rendering plane shapes
       static MeshHandle mesh_pyramid_; //!< The mesh instance for rendering pyramid shapes
       static MeshHandle mesh_sphere_; //!< The mesh instance for rendering sphere shapes
-
-      static MeshHandle mesh_transform_; //!< The mesh instance for rendering translation-gizmo shapes
-      static MeshHandle mesh_scale_; //!< The mesh instance for rendering scale-gizmo shapes
-      static MeshHandle mesh_rotation_; //!< The mesh instance for rendering rotation-gizmo shapes
-
+      
       static foundation::Vector<DebugRenderData> data_; //!< The debug shapes that are currently being drawn
 
       CameraSystem* camera_system_; //!< A reference to the camera system of this world

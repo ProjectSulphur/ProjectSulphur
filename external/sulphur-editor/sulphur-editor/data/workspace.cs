@@ -62,6 +62,26 @@ namespace sulphur
       }
 
       /**
+       * @brief path to this directory relative from the root item.
+        *@remark setting this property raises the PropertyChanged event 
+       */
+      public string relative_path
+      {
+        get
+        {
+          return relative_path_value_;
+        }
+        set
+        {
+          if (value != relative_path_value_)
+          {
+            relative_path_value_ = value;
+            NotifyPropertyChanged();
+          }
+        }
+      }
+
+      /**
        *@brief name of this directory
        *@remark setting this property raises the PropertyChanged event 
        */
@@ -129,19 +149,25 @@ namespace sulphur
        */
       public DirectoryItem(string folder_path, string folder_name, DirectoryItem parent_dir)
       {
-        callback = HandleRenamed;
         DirectoryInfo info = new DirectoryInfo(folder_path);
         if (info.Exists == false)
         {
           return;
         }
-
         path = info.FullName;
         name = info.Name;
         parent = parent_dir;
         editable = true;
         items = new DirectoryList();
         DirectoryInfo[] sub_dirs = info.GetDirectories();
+
+        relative_path = parent_dir == null ? path.Remove(0, Project.directory_path.Length) : 
+          parent_dir.relative_path + path.Remove(0, parent_dir.path.Length);
+
+        if(relative_path.StartsWith("\\") == true)
+        {
+          relative_path = relative_path.Remove(0, 1);
+        }
 
         foreach (DirectoryInfo dir in sub_dirs)
         {
@@ -181,6 +207,7 @@ namespace sulphur
 
       private DirectoryList items_value_; //<! actual list of sub directories used by the items property
 
+      private string relative_path_value_; //<! actual relative path value used by the relative_path property
       /**
        *@brief implementation of the System.ComponentModel.INotifyPropertyChanged interface 
        *@param[in] property_name (string) name of the propperty that changed.
@@ -195,15 +222,30 @@ namespace sulphur
        * @param[in] sender (object) The editbox representing this item.
        * @param[in] e (sulphur.editor.controls.EditBoxRenamedEventArgs) Arguments passed with the event.
        */
-      public void HandleRenamed(object sender, EditBoxRenamedEventArgs e)
+      public void HandleRenamed(object param)
       {
+        EditBoxRenamedEventArgs e = param as EditBoxRenamedEventArgs;
         string new_path = path.Substring(0, path.LastIndexOf("\\"));
         new_path += "\\";
         new_path += e.new_value;
         Directory.Move(path, new_path);
       }
 
-      public EditBoxCallback callback { get; } //!< Callback used to handle the editbox renamed event.
+      private ICommand rename_folder_cmd_;       //<! command for a contextmenu. this command will delete an existing folder inside a given parent folder.
+
+      /**
+       *@brief delete_folder command property used for binding by a contextmenu.
+       *@see sulphur.editor.Workspace.DeleteFolder
+       */
+      public ICommand rename_folder_cmd
+      {
+        get
+        {
+          return rename_folder_cmd_ ??
+            (rename_folder_cmd_ = new utils.CommandHandler((object param) => HandleRenamed(param),
+                                                           true));
+        }
+      }
     }
 
     /**
@@ -428,10 +470,6 @@ namespace sulphur
           ++i;
         }
         Directory.CreateDirectory(new_path);
-
-        Log.Write(Log.Verbosity.kInfo, "test info log");
-        Log.Write(Log.Verbosity.kWarning, "test warning log");
-        Log.Write(Log.Verbosity.kFatal, "test fatal log");
       }
 
       /**

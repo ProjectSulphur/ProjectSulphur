@@ -2,9 +2,6 @@
 
 #include "physics/platform_physics_body.h"
 
-#include <foundation/memory/memory.h>
-#include <foundation/containers/vector.h>
-
 #include <glm/vec3.hpp>
 
 namespace sulphur
@@ -12,13 +9,23 @@ namespace sulphur
   namespace physics
   {
     /**
-    * @class sulphur::physics::PhysicsContraint
+    * @class sulphur::physics::IPhysicsContraint
     * @brief Base interface for all physics constraints
-    * @author Benjamin Waanders
+    * @author Benjamin Waanders, Angelo van der Mark
     */
     class IPhysicsConstraint
     {
     public:
+
+      /**
+      * @brief The different constraint types that are supported.
+      */
+      enum struct ConstraintTypes
+      {
+        kFixed,
+        kHinge,
+        kSlider
+      };
 
       /**
       * @brief Virtual destructor.
@@ -26,60 +33,90 @@ namespace sulphur
       virtual ~IPhysicsConstraint() = default;
 
       /**
-      * @brief torque limit setter
+      * @brief Returns the type of this constraint.
+      * @return (sulphur::physics::ConstraintTypes) The type of this constraint.
       */
-      virtual void SetTorqueLimit(const float limit) = 0;
-      /**
-      * @brief force limit setter
-      */
-      virtual void SetForceLimit(const float limit) = 0;
+      virtual ConstraintTypes GetType() const = 0;
 
       /**
-      * @brief force_limit getter
+      * @brief Sets the force limit of the constraint before it breaks.
+      * @param[in] limit (float) The force limit, or 0 for an unbreakable constraint.
+      * @remarks The Bullet implementation does not distinguish between torque and force.
+      */
+      virtual void SetForceLimit(float limit) = 0;
+      
+      /**
+      * @brief Sets the torque limit of the constraint before it breaks.
+      * @param[in] limit (float) The torque limit, or 0 for an unbreakable constraint.
+      * @remarks The Bullet implementation does not distinguish between torque and force.
+      */
+      virtual void SetTorqueLimit(float limit) = 0;
+
+      /**
+      * @brief Returns the force limit of the constraint.
+      * @return (float) The maximum force the constraint can take before it breaks.
       */
       virtual float GetForceLimit() const = 0;
+
       /**
-      * @brief Torque limit getter
+      * @brief Returns the torque limit of the constraint.
+      * @return (float) The maximum torque the constraint can take before it breaks.
       */
       virtual float GetTorqueLimit() const = 0;
 
       /**
-      * @brief Getter for Body A
+      * @brief Sets whether a constraint is active in the world. Can be used to re-enable broken constraints.
+      * @param[in] enabled (bool) Whether the constraint should be active or not.
+      */
+      virtual void SetEnabled(bool enabled) = 0;
+
+      /**
+      * @brief Returns whether the constraint is active or not. Broken constraints are considered inactive.
+      * @return (bool) True if the constraint is active.
+      */
+      virtual bool IsEnabled() const = 0;
+
+      /**
+      * @brief Returns the main body this constraint is attached to.
+      * @return (sulphur::physics::PhysicsBody*) The body that owns this constraint.
       */
       virtual PhysicsBody* GetBodyA() = 0;
 
       /**
-      * @brief Getter for Body B
+      * @brief Attaches a second body to this constraint.
+      * @param[in] body (sulphur::physics::PhysicsBody*) The body to attach, or 0 to detach the previous body.
+      */
+      virtual void SetBodyB(PhysicsBody* body) = 0;
+
+      /**
+      * @brief Returns the second body this constraint is connected with.
+      * @return (sulphur::physics::PhysicsBody*) The secondary body attached to this constraint, or null if there is none.
       */
       virtual PhysicsBody* GetBodyB() = 0;
 
       /**
-      * @brief Sets the frame relative to the A body of the constraint
-      * @param[in] transform (const glm::mat4x4&)
+      * @brief Sets the reference frame of the owning body relative to the constraint.
+      * @param[in] transform (const glm::mat4x4&) The relative transform.
       */
       virtual void SetFrameA(const glm::mat4x4& transform) = 0;
 
       /**
-      * @brief Sets the frame relative to the B body of the constraint
-      * @param[in] transform (const glm::mat4x4&)
+      * @brief Returns the reference frame of the owning body relative to the constraint.
+      * @return (glm::mat4x4) The relative transform.
+      */
+      virtual glm::mat4x4 GetFrameA() const = 0;
+
+      /**
+      * @brief Sets the reference frame of the attached body relative to the constraint.
+      * @param[in] transform (const glm::mat4x4&) The relative transform.
       */
       virtual void SetFrameB(const glm::mat4x4& transform) = 0;
 
       /**
-      * @brief Getter for the frame to the constraint, relative to the A body
-      * @return (const glm::mat4x4&) the transform that represents the frame
+      * @brief Returns the reference frame of the attached body relative to the constraint.
+      * @return (glm::mat4x4) The relative transform.
       */
-      virtual const glm::mat4x4 GetFrameA() const = 0;
-
-      /**
-      * @brief Getter for the frame to the constraint, relative to the A body
-      * @return (const glm::mat4x4&) the transform that represents the frame
-      */
-      virtual const glm::mat4x4 GetFrameB() const = 0;
-
-    protected:
-      float torque_limit_; //!< The torque limit that breaks the constraint
-      float force_limit_; //!< The foce limit that breaks the constraint
+      virtual glm::mat4x4 GetFrameB() const = 0;
     };
   }
 }

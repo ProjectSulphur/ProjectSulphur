@@ -681,6 +681,13 @@ namespace sulphur
     }
 
     //-------------------------------------------------------------------------
+    void NetworkingSystem::SortIDS()
+    {
+      rpc_system_->SortIDs();
+      value_syncer_->SortIDs();
+    }
+
+    //-------------------------------------------------------------------------
     void NetworkingSystem::ClientUpdateName(uint8_t* data)
     {
       const uint8_t& id = data[0];

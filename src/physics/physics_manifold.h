@@ -60,9 +60,9 @@ namespace sulphur
 
       /**
       * @brief Getter for the contact points
-      * @return (sulphur::foundation::Vector<sulphur::physics::PhysicsManifold::ContactPoint>& the contact points
+      * @return const (sulphur::foundation::Vector<sulphur::physics::PhysicsManifold::ContactPoint>& the contact points
       */
-      const foundation::Vector<ContactPoint>& get_contact_points() const;
+      const foundation::Vector<ContactPoint>& contact_points() const;
 
       /**
       * @brief Adds a contact point to the manifold

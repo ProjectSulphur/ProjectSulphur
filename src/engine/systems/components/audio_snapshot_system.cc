@@ -61,7 +61,7 @@ namespace sulphur
       };
 
       foundation::Job update_positions = make_job(
-        "update_audio_event_positions",
+        "update_audio_snapshot_positions",
         "update",
         update_positions_job,
         bind_write(*this)

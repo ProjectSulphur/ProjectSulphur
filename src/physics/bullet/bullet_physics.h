@@ -91,9 +91,24 @@ namespace sulphur
         float max_distance) override;
 
       /**
-      * @see sulpur::physics::IPhysics::GetManifolds()
+      * @see sulphur::physics::IPhysics::GetManifolds()
       */
-      Manifolds& GetManifolds() override;
+      PhysicsManifold* GetManifolds() override;
+
+      /**
+      * @see sulpur::physics::IPhysics::GetManifoldsSize()
+      */
+      size_t GetManifoldsSize() override;
+
+      /**
+      * @see sulphur::physics::IPhysics::SubscribeCallback
+      */
+      void SubscribeCallback(PhysicsBody* physics_body) override;
+
+      /**
+      * @see sulphur::physics::IPhysics::UnSubscribeCallback
+      */
+      void UnSubscribeCallback(PhysicsBody* physics_body) override;
 
       /**
       * @brief Updates all physics bodies internally without simulating a frame
@@ -111,45 +126,34 @@ namespace sulphur
       static void InternalTickCallback(btDynamicsWorld* world, btScalar time_step);
 
       /**
-      * @brief Adds a fixed constraint bewtween body_a and body_b
-      * @param[in] body_a (sulphur::physics::PhysicsBody*) The A body
-      * @param[in] body_b (sulphur::physics::PhysicsBody*) The B body
+      * @see sulphur::physics::IPhysics::AddConstraint
       */
-      virtual FixedConstraint* AddFixedConstraint(PhysicsBody* body_a, PhysicsBody* body_b) override;
+      IPhysicsConstraint* AddConstraint(PhysicsBody* owner,
+                          IPhysicsConstraint::ConstraintTypes type) override;
 
       /**
-      * @brief Adds a hinge constraint bewtween body_a and body_b
-      * @param[in] body_a (sulphur::physics::PhysicsBody*) The A body
-      * @param[in] body_b (sulphur::physics::PhysicsBody*) The B body
+      * @see sulphur::physics::IPhysics::RemoveConstraint
       */
-      virtual HingeConstraint* AddHingeConstraint(PhysicsBody* body_a, PhysicsBody* body_b) override;
+      void RemoveConstraint(IPhysicsConstraint* constraint) override;
 
     private:
-      void SaveManifolds(btDynamicsWorld* world, btScalar time_step); //!< Saves the manifolds that were made during the last internal update
+      PhysicsBody** callback_subs_; //!< Buffer of physics bodies that are subscribed for callbacks
+      size_t callback_subs_size_; //!< Size of the callback subs buffer
 
-      foundation::Vector<btPersistentManifold> bullet_manifolds; //!< Bullet manifolds caputered from sulphur::physics::BulletPhysics::SaveManifolds
-      Manifolds manifolds_; //!< Collection of manifolds to be forwarded to the engine
+      PhysicsManifold* manifolds_; //!< Buffer of converted manifolds 
+      size_t manifolds_size_; //!< Size of the manifolds collection
+
       btDiscreteDynamicsWorld* dynamics_world_; //!< The Bullet physics world
       btDbvtBroadphase* broad_phase_; //!< The Bullet broad phase search
       btSequentialImpulseConstraintSolver* constraint_solver_; //!< The Bullet constraint solver
       btCollisionDispatcher* collision_dispatcher_; //!< The Bullet collision dispatcher
       btDefaultCollisionConfiguration* collision_config_; //!< The Bullet collision configuration
+
+      /**
+      * @brief Saves the manifolds that were made during the last internal update
+      * @param[in] world (btDynamicsWorld*) the world where the callback originates \
+      */
+      void SaveManifolds(btDynamicsWorld* world); 
     };
-
-    //-------------------------------------------------------------------------
-    inline FixedConstraint*
-      BulletPhysics::AddFixedConstraint(PhysicsBody * body_a, PhysicsBody * body_b)
-    {
-      return foundation::Memory::Construct<FixedConstraint>(
-        body_a->rigid_body(), body_b->rigid_body(), dynamics_world_);
-    }
-
-    //-------------------------------------------------------------------------
-    inline HingeConstraint*
-      BulletPhysics::AddHingeConstraint(PhysicsBody * body_a, PhysicsBody * body_b)
-    {
-      return foundation::Memory::Construct<HingeConstraint>(
-        body_a->rigid_body(), body_b->rigid_body(), dynamics_world_);
-    }
   }
 }

@@ -114,6 +114,7 @@ namespace sulphur
       * @see sulphur::engine::IRenderer::SetCamera
       */
       void SetCamera(
+        const glm::vec3& pos,
         const glm::mat4& view,
         const glm::mat4& projection,
         const engine::DepthBuffer& depth_buffer,

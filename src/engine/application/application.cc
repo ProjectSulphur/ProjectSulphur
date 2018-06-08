@@ -139,6 +139,10 @@ namespace sulphur
       renderer_endframe_job.set_blocker("camerasystem_copy_to_screen");
       job_graph.Add(std::move(renderer_endframe_job));
 
+      foundation::Job end_frame_job = foundation::make_job( "end_frame", "", []() {} );
+      end_frame_job.set_blocker( "render" );
+      job_graph.Add( std::move( end_frame_job ) );
+
       // Initialization
       // 0. Save the project directory
 
@@ -240,6 +244,9 @@ namespace sulphur
         update(thread_pool, job_graph, update_scheduler);
 
         job_graph.SubmitSubTreeToPool("render", thread_pool);
+        thread_pool.RunAllTasks();
+
+        job_graph.SubmitSubTreeToPool( "end_frame", thread_pool );
         thread_pool.RunAllTasks();
 
         platform_->ProcessEvents();

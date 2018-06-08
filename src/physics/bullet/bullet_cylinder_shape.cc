@@ -13,16 +13,16 @@ namespace sulphur
     BulletCylinderShape::BulletCylinderShape()
     {
       shape_ = foundation::Memory::Construct<btCylinderShape>(
-        btVector3(PhysicsShape::kDefaultExtents,
-                  PhysicsShape::kDefaultExtents*1.5f, // Three times default, as half-extents
-                  PhysicsShape::kDefaultExtents));
+        btVector3(IPhysicsShape::kDefaultExtents,
+                  IPhysicsShape::kDefaultExtents*1.5f, // Three times default, as half-extents
+                  IPhysicsShape::kDefaultExtents));
       shape_->setUserPointer(this);
     }
 
     //-------------------------------------------------------------------------
-    PhysicsShape::ShapeTypes BulletCylinderShape::GetType() const
+    BulletCylinderShape::~BulletCylinderShape()
     {
-      return ShapeTypes::kCylinder;
+      foundation::Memory::Destruct<btCylinderShape>(shape_);
     }
 
     //-------------------------------------------------------------------------
@@ -30,7 +30,10 @@ namespace sulphur
     {
       btVector3 half_extents = btVector3(radius, GetHeight()*0.5f, radius);
 
-      reinterpret_cast<btCylinderShape*>(shape_)->setImplicitShapeDimensions(half_extents);
+      // Mimic btCylinderShape's constructor for setting the correct margin:
+      btVector3 margin(shape_->getMargin(), shape_->getMargin(), shape_->getMargin());
+      shape_->setImplicitShapeDimensions(half_extents - margin);
+      shape_->setSafeMargin(half_extents);
       
       UpdateColliders();
     }
@@ -38,7 +41,7 @@ namespace sulphur
     //-------------------------------------------------------------------------
     float BulletCylinderShape::GetRadius() const
     {
-      return reinterpret_cast<btCylinderShape*>(shape_)->getRadius();
+      return shape_->getRadius();
     }
 
     //-------------------------------------------------------------------------
@@ -46,7 +49,10 @@ namespace sulphur
     {
       btVector3 half_extents = btVector3(GetRadius(), height*0.5f, GetRadius());
 
-      reinterpret_cast<btCylinderShape*>(shape_)->setImplicitShapeDimensions(half_extents);
+      // Mimic btCylinderShape's constructor for setting the correct margin:
+      btVector3 margin(shape_->getMargin(), shape_->getMargin(), shape_->getMargin());
+      shape_->setImplicitShapeDimensions(half_extents - margin);
+      shape_->setSafeMargin(half_extents);
 
       UpdateColliders();
     }
@@ -54,7 +60,13 @@ namespace sulphur
     //-------------------------------------------------------------------------
     float BulletCylinderShape::GetHeight() const
     {
-      return reinterpret_cast<btCylinderShape*>(shape_)->getHalfExtentsWithMargin().y() * 2;
+      return shape_->getHalfExtentsWithMargin().y() * 2;
+    }
+
+    //-------------------------------------------------------------------------
+    void* BulletCylinderShape::GetInternalShape() const
+    {
+      return shape_;
     }
   }
 }

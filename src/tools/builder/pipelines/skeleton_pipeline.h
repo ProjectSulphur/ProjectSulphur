@@ -21,7 +21,7 @@ namespace sulphur
     /**
      * @class sulphur::builder::SkeletonPipeline : sulphur::builder::PipelineBase
      * @brief Pipeline that handles the creation, packaging and management of skeletons.
-     * @author Timo van Hees
+     * @author Riko Ophorst, Timo van Hees
      */
     class SkeletonPipeline : public PipelineBase
     {
@@ -94,18 +94,6 @@ namespace sulphur
        * @remark If the function returned false, the skeleton should be discarded.
        */
       bool GetBonesFromMesh(const aiMesh* ai_mesh,
-        foundation::SkeletonData& skeleton) const;
-
-      /**
-       * @brief Assigns parents the the bones in the skeleton.
-       * @param scene (const aiScene*) The scene containing the mesh.
-       * @param ai_mesh (const aiMesh*) The mesh that references the skeleton.
-       * @param skeleton (sulphur::foundation::SkeletonData&) 
-       * The skeleton with the bones that need to be linked.
-       * @return (bool) False when there was an error that couldn't be recovered from.
-       * @remark If the function returned false, the skeleton should be discarded.
-       */
-      bool LinkBones(const aiScene* scene, const aiMesh* ai_mesh,
         foundation::SkeletonData& skeleton) const;
     };
   }

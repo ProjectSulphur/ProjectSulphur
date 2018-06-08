@@ -15,6 +15,10 @@
 #include "engine/systems/components/constraint_system.h"
 #include "engine/systems/components/audio_listener_system.h"
 #include "engine/systems/components/audio_event_system.h"
+#include "engine/systems/components/audio_snapshot_system.h"
+#include "engine/systems/components/audio_vca_system.h"
+#include "engine/systems/components/audio_bus_system.h"
+
 #include "engine/assets/asset_system.h"
 
 #include <lua-classes/world.lua.cc>
@@ -96,6 +100,9 @@ namespace sulphur
       components_.Create<ConstraintSystem>();
       components_.Create<AudioEventSystem>();
       components_.Create<AudioListenerSystem>();
+      components_.Create<AudioSnapshotSystem>();
+      components_.Create<AudioVCASystem>();
+      components_.Create<AudioBusSystem>();
       // Self-owned systems
       owners_.Create<EntitySystem>();
       owners_.Create<DebugRenderSystem>();

@@ -310,29 +310,29 @@ namespace sulphur
     void Frustum::MoveCamera(const glm::vec3& position, const glm::vec3& look_at, 
       const glm::vec3& up)
     {
-      const glm::vec3 z = glm::normalize(position - look_at);
+      const glm::vec3 z = glm::normalize(look_at - position);
       const glm::vec3 x = glm::normalize(glm::cross(up, z));
       const glm::vec3 y = glm::cross(z, x);
-      const glm::vec3 near_center = position - z * near_z_;
-      const glm::vec3 far_center = position - z * far_z_;
+      const glm::vec3 near_center = position + z * near_z_;
+      const glm::vec3 far_center = position + z * far_z_;
 
-      planes_[kNear] = Plane(-z, near_center);
-      planes_[kFar] = Plane(z, far_center);
+      planes_[kNear] = Plane(z, near_center);
+      planes_[kFar] = Plane(-z, far_center);
 
       glm::vec3 normal = glm::normalize(near_center + y * near_height_ - position);
-      normal = glm::cross(normal, x);
+      normal = glm::normalize(glm::cross(x, normal));
       planes_[kTop] = Plane(normal, near_center + y * near_height_);
 
       normal = glm::normalize(near_center - y * near_height_ - position);
-      normal = glm::cross(x, normal);
+      normal = glm::normalize(glm::cross(normal, x));
       planes_[kBottom] = Plane(normal, near_center - y * near_height_);
 
       normal = glm::normalize(near_center - x * near_width_ - position);
-      normal = glm::cross(normal, y);
+      normal = glm::normalize(glm::cross(y, normal));
       planes_[kLeft] = Plane(normal, near_center - x * near_width_);
 
       normal = glm::normalize(near_center + x * near_width_ - position);
-      normal = glm::cross(y, normal);
+      normal = glm::normalize(glm::cross(normal, y));
       planes_[kRight] = Plane(normal, near_center + x * near_width_);
     }
 

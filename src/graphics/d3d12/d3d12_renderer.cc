@@ -48,8 +48,9 @@ namespace sulphur
       glm::mat4 view; //!< View matrix
       glm::mat4 projection; //!< Projection matrix
       float time; //!< Total time passed
-      float padding[15]; //!< Padding to align size to 256 bytes
-      glm::mat4 bone_matrices[256];
+      glm::vec3 eye_position; //!< The position of the camera
+      glm::mat4 bone_matrices[128];
+      float padding[12];
     } g_scene_buffer; //!< The per scene constant buffer 
 
     static_assert(
@@ -671,6 +672,7 @@ namespace sulphur
 
     //------------------------------------------------------------------------------------------------------
     void D3D12Renderer::SetCamera(
+      const glm::vec3& pos,
       const glm::mat4& view,
       const glm::mat4& projection,
       const engine::DepthBuffer& depth_buffer,
@@ -680,6 +682,7 @@ namespace sulphur
       {
         g_scene_buffer.view = view;
         g_scene_buffer.projection = projection;
+        g_scene_buffer.eye_position = pos;
 
         size_t offset;
         constant_buffer_heap_.Write(&g_scene_buffer, sizeof(g_scene_buffer), offset);

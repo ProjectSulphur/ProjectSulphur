@@ -3,6 +3,7 @@
 #include "engine/scripting/script_register.h"
 #include "engine/core/script_debug.h"
 #include "engine/systems/components/mesh_render_system.h"
+#include "engine/systems/components/skinned_mesh_render_system.h"
 #include "engine/systems/components/camera_system.h"
 #include "engine/systems/components/transform_system.h"
 #include "engine/systems/components/rigid_body_system.h"
@@ -10,6 +11,9 @@
 #include "engine/systems/components/network_component_system.h"
 #include "engine/systems/components/audio_event_system.h"
 #include "engine/systems/components/audio_listener_system.h"
+#include "engine/systems/components/audio_snapshot_system.h"
+#include "engine/systems/components/audio_vca_system.h"
+#include "engine/systems/components/audio_bus_system.h"
 #include "engine/systems/components/constraint_system.h" 
 
 #include "engine/audio/audio_system.h"
@@ -88,6 +92,7 @@ namespace sulphur
         ScriptClassRegister<CameraComponent>,
         ScriptClassRegister<TransformComponent>,
         ScriptClassRegister<MeshRenderComponent>,
+        ScriptClassRegister<SkinnedMeshRenderComponent>,
         ScriptClassRegister<RigidBodyComponent>,
         ScriptClassRegister<BoxColliderComponent>,
         ScriptClassRegister<SphereColliderComponent>,
@@ -96,6 +101,9 @@ namespace sulphur
         ScriptClassRegister<ConeColliderComponent>,
         ScriptClassRegister<AudioEventComponent>,
         ScriptClassRegister<AudioListenerComponent>,
+        ScriptClassRegister<AudioSnapshotComponent>,
+        ScriptClassRegister<AudioVCAComponent>,
+        ScriptClassRegister<AudioBusComponent>,
         ScriptClassRegister<CameraEnums>,
         ScriptClassRegister<ScriptableInput>,
         ScriptClassRegister<ButtonEnumWrapper>,

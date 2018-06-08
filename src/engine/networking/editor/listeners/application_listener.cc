@@ -20,7 +20,7 @@ namespace sulphur
       ApplicationListener::ApplicationListener(Application& app, EditorMessagingSystem& message_system) :
         app_(&app)
       {
-        message_system.Subscribe(this, EditorMessageID::kCacheChanged);
+        message_system.Subscribe(this, EditorMessageID::kLoadProject);
       }
 
       //--------------------------------------------------------------------------------
@@ -30,8 +30,8 @@ namespace sulphur
         {
           const LoadProjectPayload& actual_payload =
             payload.AsFormat<editor::LoadProjectPayload>();
-
-          foundation::Path path = actual_payload.path;
+          const char* val = reinterpret_cast<const char*>(actual_payload.path);
+          foundation::Path path = val;
           app_->SetProjectDirectory(path);
         }
       }

@@ -12,27 +12,33 @@ namespace sulphur
     //-------------------------------------------------------------------------
     BulletSphereShape::BulletSphereShape()
     {
-      shape_ = foundation::Memory::Construct<btSphereShape>(PhysicsShape::kDefaultExtents);
+      shape_ = foundation::Memory::Construct<btSphereShape>(IPhysicsShape::kDefaultExtents);
       shape_->setUserPointer(this);
     }
 
     //-------------------------------------------------------------------------
-    PhysicsShape::ShapeTypes BulletSphereShape::GetType() const
+    BulletSphereShape::~BulletSphereShape()
     {
-      return ShapeTypes::kSphere;
+      foundation::Memory::Destruct<btSphereShape>(shape_);
     }
 
     //-------------------------------------------------------------------------
     void BulletSphereShape::SetRadius(float radius)
     {
-      reinterpret_cast<btSphereShape*>(shape_)->setUnscaledRadius(radius);
+      shape_->setUnscaledRadius(radius);
       UpdateColliders();
     }
 
     //-------------------------------------------------------------------------
     float BulletSphereShape::GetRadius() const
     {
-      return reinterpret_cast<btSphereShape*>(shape_)->getRadius();
+      return shape_->getRadius();
+    }
+
+    //-------------------------------------------------------------------------
+    void* BulletSphereShape::GetInternalShape() const
+    {
+      return shape_;
     }
   }
 }

@@ -23,11 +23,11 @@ namespace sulphur
        * @return (sulphur.editor.AssetCacheData) The data stored in the cache of the asset of the given id. If not found an invalid struct is returned.
        * @see sulphur.editor.AssetCacheData
        */
-      public AssetCacheData Find(UInt64 id)
+      public AssetCacheData Find(UInt64 id, AssetType type)
       {
         foreach (AssetCacheData entry in this)
         {
-          if (entry.id == id)
+          if (entry.id == id && entry.type == type)
           {
             return entry;
           }
@@ -67,7 +67,8 @@ namespace sulphur
       kAnimation, //!< Animation asset constructed from an animation asset.
       kScript,//!< Script asset (*.lua).
       kSkeleton, //!< Skeleton asset constructed from an animation asset.
-      kNumAssets, //! Number of supported asset types
+      kWorld, //!< World asset. These assets are created by the editor.
+      kNumAssets, //!< Number of supported asset types
       kUnknown //!< Unsuported asset type.
     }
 
@@ -144,31 +145,62 @@ namespace sulphur
       }
 
       /**
-       *@brief process a single asset. When an asset has been imported an message is send to the attached engine. 
+       * @brief Find an asset by its id.
+       * @param[in] id (UInt64) id of the asset to find.
+       * @return (sulphur.editor.AssetCacheData) The data stored in the cache of the asset of the given id. If not found an invalid struct is returned.
+       * @see sulphur.editor.AssetCacheData
+       */
+      public AssetCacheData Find(UInt64 id, AssetType type)
+      {
+        foreach(var pair in data)
+        {
+          AssetCacheData foundObj = pair.Value.Find(id, type);
+          if (foundObj.is_valid)
+          {
+            return foundObj;
+          }
+        }
+        return new AssetCacheData();
+      }
+
+      /**
+	   *@brief process a single asset. When an asset has been imported an message is send to the attached engine.
        *@param[in] path (string) path to a raw asset to import into the current project  
        * @see sulphur.editor.native.networking.NetworkMessages
        * @remark This does not automatically update the database with the imported asset. But instead will add the imported asset id to the respective cache changelist.
        * @see UpdateDatabase
        * @see change_list
+       * @remark If the path to the file points to a path outside the project assets folder the convert will fail.
        */
       public void ProcessAsset(string path)
       {
         UInt64 id = 0;
         native.bool_ success = false;
         AssetType type = AssetType.kUnknown;
-        if (File.Exists(path) == false)
+        if(path.Length < Project.directory_path.Length)
         {
+          Log.Write(Log.Verbosity.kInfo, "file: \"{0}\" is not in the assets folder. Asset not imported.", path);
           return;
         }
+        string relative_path = path.StartsWith(".") == true ? path : path.Remove(0, Project.directory_path.Length);
+        if (File.Exists(Project.directory_path + relative_path) == false)
+        {
+          Log.Write(Log.Verbosity.kInfo, "file: \"{0}\" does not exist. Asset not imported.", path);
+          return;
+        }
+        if (relative_path.StartsWith("\\") == true)
+        {
+          relative_path = relative_path.Remove(0, 1);
+        }
 
-        string extension = GetExtension(path);
+        string extension = GetExtension(relative_path);
         extension = extension.ToLower();
 
         if (extension == ".obj" ||
             extension == ".fbx" ||
             extension == ".gltf")
         {
-          success = native.AssetProcessor.ImportModel(path, true, "", "");
+          success = native.AssetProcessor.ImportModel(relative_path, true, "", "", ref id);
           if (success)
           {
             type = AssetType.kModel;
@@ -177,7 +209,7 @@ namespace sulphur
 
         else if (extension == ".someAudioExtension") // @todo: correct the file type
         {
-          success = native.AssetProcessor.ImportAudio(path, ref id);
+          success = native.AssetProcessor.ImportAudio(relative_path, ref id);
           if (success)
           {
             type = AssetType.kAudio;
@@ -186,7 +218,7 @@ namespace sulphur
 
         else if (extension == ".lua")
         {
-          success = native.AssetProcessor.ImportScript(path, ref id);
+          success = native.AssetProcessor.ImportScript(relative_path, ref id);
           if (success)
           {
             type = AssetType.kScript;
@@ -199,7 +231,7 @@ namespace sulphur
                  extension == ".tga" ||
                  extension == ".jpg")
         {
-          success = native.AssetProcessor.ImportTexture(path, ref id);
+          success = native.AssetProcessor.ImportTexture(relative_path, ref id);
           if (success)
           {
             type = AssetType.kTexture;
@@ -213,7 +245,7 @@ namespace sulphur
                  extension == ".geom" ||
                  extension == ".pixe")
         {
-          success = native.AssetProcessor.ImportShader(path, ref id);
+          success = native.AssetProcessor.ImportShader(relative_path, ref id);
           if (success)
           {
             type = AssetType.kShader;
@@ -222,12 +254,12 @@ namespace sulphur
 
         if (success == false)
         {
-          Console.WriteLine("Unable to import asset {0}", path);
+          Log.Write(Log.Verbosity.kInfo, "Unable to import asset: {0}", relative_path);
         }
         else
         {
           UpdateDatabase(id, Operation.kAdd, type);
-          Console.WriteLine("Successfully import asset {0}", path);
+          Log.Write(Log.Verbosity.kInfo, "Successfully import asset: {0}", relative_path);
         }
       }
 
@@ -612,7 +644,14 @@ namespace sulphur
         switch (operation)
         {
           case Operation.kAdd:
-            ProcessCacheFileData(asset_id, ReadCache(type)[asset_id]);
+            if (type == AssetType.kModel)
+            {
+              BuildDatabase(Project.directory_path);
+            }
+            else
+            {
+              ProcessCacheFileData(asset_id, ReadCache(type)[asset_id]);
+            }
             break;
           case Operation.kRemove:
             foreach (KeyValuePair<string, AssetList> entry in data)
@@ -639,18 +678,19 @@ namespace sulphur
       private void ProcessCacheFileData(UInt64 id, PackagePtr ptr)
       {
         AssetCacheData cache_data = new AssetCacheData();
-        DirectoryInfo info = new DirectoryInfo(ptr.origin);
+        DirectoryInfo info = new DirectoryInfo(Project.directory_path + "\\" + ptr.origin);
         int slash = ptr.path.LastIndexOf("/") + 1;
         int dot = ptr.path.LastIndexOf(".");
 
         cache_data.id = id;
         cache_data.path = ptr.path;
-        cache_data.origin = info.FullName;
+        cache_data.origin = info.FullName.ToLower();
         cache_data.name = ptr.path.Substring(slash,
                                               dot - slash);
         cache_data.type = GetAssetType(ptr.path);
         cache_data.is_valid = true;
-        string original_folder = info.FullName.Substring(0, info.FullName.LastIndexOf("\\"));
+        string original_folder = info.FullName.Substring(0, info.FullName.LastIndexOf("\\")).ToLower();
+        
         if (data.ContainsKey(original_folder) == false)
         {
           AssetList new_list = new AssetList();
@@ -658,13 +698,17 @@ namespace sulphur
           data.Add(original_folder, new_list);
         }
 
-        if (data[original_folder].Find(id).is_valid == false)
+        AssetCacheData exists = data[original_folder].Find(cache_data.id, cache_data.type);
+        if (exists.is_valid == true)
         {
-          App.Current.Dispatcher.Invoke(delegate
-          {
-            data[original_folder].Add(cache_data);
-          });
+          Log.Write(Log.Verbosity.kWarning, "Asset {0} allready exists", cache_data.path);
+          return;
         }
+
+        App.Current.Dispatcher.Invoke(delegate
+        {
+          data[original_folder].Add(cache_data);
+        });
       }
 
       /**
@@ -727,6 +771,8 @@ namespace sulphur
             return AssetType.kSkeleton;
           case ".ste":
             return AssetType.kTexture;
+          case ".sbw":
+            return AssetType.kWorld;
           default:
             return AssetType.kUnknown;
         }
@@ -739,12 +785,17 @@ namespace sulphur
        */
       private void Instantiate(AssetCacheData asset)
       {
+        if(asset.type != AssetType.kModel)
+        {
+          return;
+        }
+
         native.messages.AssetInstantiatedPayload msg_data = new native.messages.AssetInstantiatedPayload();
         msg_data.asset_id = asset.id;
         byte[] data = Utils.StructToBytes(msg_data);
         native.Networking.SNetSendData((uint)native.NetworkMessages.kAssetInstantiated,
                                         data, (uint)data.Length);
-        native.Networking.SNetFlushPackets();
+        
       }
     }
   }
